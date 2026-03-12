@@ -159,6 +159,17 @@ export function IndiaBuyingEntryForm({
   }, [open, editEntry, reset])
 
   async function onSubmit(values: FormValues) {
+    if (values.hasAdvancePayment) {
+      if (!values.advanceBankAccount) {
+        toast.error('Please select a bank account for the advance payment')
+        return
+      }
+      if (!values.advanceAmount || values.advanceAmount <= 0) {
+        toast.error('Please enter a positive advance amount')
+        return
+      }
+    }
+
     const payload = {
       product: productId,
       entryDate: values.entryDate.toISOString(),
@@ -370,6 +381,12 @@ export function IndiaBuyingEntryForm({
                         id="hasAdvancePayment"
                         checked={!!field.value}
                         onChange={(e) => field.onChange(e.target.checked)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            field.onChange(!field.value)
+                          }
+                        }}
                         onBlur={field.onBlur}
                         ref={field.ref}
                         className="h-4 w-4 rounded border-input"

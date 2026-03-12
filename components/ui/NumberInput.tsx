@@ -106,6 +106,13 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (['e', 'E', '+', '-'].includes(e.key)) {
         e.preventDefault()
+        return
+      }
+      if (e.key === 'Enter') {
+        // Prevent form submission and force blur so any onBlur handlers commit the value.
+        e.preventDefault()
+        e.currentTarget.blur()
+        return
       }
     }
 

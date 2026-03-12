@@ -123,120 +123,144 @@ export async function PUT(
       }
     }
 
-    const oldAdvanceBank = entry.advanceBankAccount
-    const oldAdvanceAmt = entry.advanceAmount
+    // === Advance diff-only model ===
+    const oldAdvance = entry.hasAdvancePayment ? Number(entry.advanceAmount ?? 0) : 0
+    const oldBank = entry.advanceBankAccount
+      ? String(entry.advanceBankAccount)
+      : undefined
 
-    if (body.hasAdvancePayment === false) {
-      entry.advanceAmount = undefined
-      entry.advanceBankAccount = undefined
-      entry.advanceDate = undefined
-      entry.advanceNote = undefined
-      if (oldAdvanceBank && (oldAdvanceAmt ?? 0) > 0) {
-        const debitTx = await BankTransaction.findOne({
-          source: 'india_buying_advance',
-          sourceRef: entry._id,
-        }).lean()
-        if (debitTx) {
-          const lastTx = await BankTransaction.findOne({ bankAccount: debitTx.bankAccount })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean()
-          const lastBalance = lastTx?.balanceAfter ?? 0
-          const product = await IndiaProduct.findById(entry.product).select('productName').lean()
-          const sourceLabel = `Reversal: Advance for India Product: ${product?.productName ?? 'Product'}`
-          await BankTransaction.create({
-            bankAccount: debitTx.bankAccount,
-            type: 'credit',
-            amount: debitTx.amount,
-            balanceAfter: lastBalance + debitTx.amount,
-            source: 'manual',
-            sourceLabel,
-            transactionDate: new Date(),
-            createdBy: updatedBy,
-          })
-          await BankAccount.findByIdAndUpdate(debitTx.bankAccount, {
-            currentBalance: lastBalance + debitTx.amount,
-          })
-        }
-      }
-    } else {
-      if (body.advanceBankAccount !== undefined)
-        entry.advanceBankAccount =
-          body.advanceBankAccount == null || body.advanceBankAccount === ''
-            ? undefined
-            : body.advanceBankAccount
-      if (body.advanceAmount !== undefined)
-        entry.advanceAmount = body.advanceAmount == null || body.advanceAmount === '' ? undefined : Number(body.advanceAmount)
-      if (body.advanceDate !== undefined)
-        entry.advanceDate = body.advanceDate == null || body.advanceDate === '' ? undefined : new Date(body.advanceDate)
-      if (body.advanceNote !== undefined)
-        entry.advanceNote = body.advanceNote == null || body.advanceNote === '' ? undefined : String(body.advanceNote)
+    const newHasAdvance: boolean =
+      body.hasAdvancePayment !== undefined
+        ? !!body.hasAdvancePayment
+        : !!entry.hasAdvancePayment
+    const newAdvance = newHasAdvance ? Number(body.advanceAmount ?? 0) : 0
+    const newBankRaw =
+      body.advanceBankAccount == null || body.advanceBankAccount === ''
+        ? undefined
+        : String(body.advanceBankAccount ?? oldBank)
+    const bankChanged =
+      (oldBank ?? undefined) !== (newBankRaw ?? undefined)
+    const product = await IndiaProduct.findById(entry.product)
+      .select('productName')
+      .lean()
+    const productName = product?.productName ?? 'India Product'
 
-      const newAdvanceAmt = entry.hasAdvancePayment ? (entry.advanceAmount ?? 0) : 0
-      const newAdvanceBank = entry.advanceBankAccount
-      const advanceChanged =
-        !oldAdvanceBank ||
-        (oldAdvanceAmt ?? 0) !== newAdvanceAmt ||
-        String(oldAdvanceBank) !== String(newAdvanceBank)
+    if (newHasAdvance && newAdvance > 0 && !newBankRaw) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Validation failed',
+          message: 'Please select a bank account for the advance payment',
+        },
+        { status: 400 }
+      )
+    }
 
-      if (oldAdvanceBank && (oldAdvanceAmt ?? 0) > 0 && advanceChanged) {
-        const debitTx = await BankTransaction.findOne({
-          source: 'india_buying_advance',
-          sourceRef: entry._id,
-        }).lean()
-        if (debitTx) {
-          const lastTx = await BankTransaction.findOne({ bankAccount: debitTx.bankAccount })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean()
-          const lastBalance = lastTx?.balanceAfter ?? 0
-          const product = await IndiaProduct.findById(entry.product).select('productName').lean()
-          const sourceLabel = `Reversal: Advance for India Product: ${product?.productName ?? 'Product'}`
-          await BankTransaction.create({
-            bankAccount: debitTx.bankAccount,
-            type: 'credit',
-            amount: debitTx.amount,
-            balanceAfter: lastBalance + debitTx.amount,
-            source: 'manual',
-            sourceLabel,
-            transactionDate: new Date(),
-            createdBy: updatedBy,
-          })
-          await BankAccount.findByIdAndUpdate(debitTx.bankAccount, {
-            currentBalance: lastBalance + debitTx.amount,
-          })
-        }
-      }
-
-      if (newAdvanceAmt > 0 && newAdvanceBank && advanceChanged) {
-        const product = await IndiaProduct.findById(entry.product).select('productName').lean()
-        const sourceLabel = `Advance for India Product: ${product?.productName ?? 'Product'}`
-        const bankId =
-          typeof newAdvanceBank === 'object' && newAdvanceBank != null
-            ? newAdvanceBank
-            : new mongoose.Types.ObjectId(String(newAdvanceBank))
-        const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
+    if (bankChanged) {
+      // Fully reverse old advance from old bank.
+      if (oldAdvance > 0 && oldBank) {
+        const lastTx = await BankTransaction.findOne({
+          bankAccount: oldBank,
+        })
           .sort({ transactionDate: -1, createdAt: -1 })
           .select('balanceAfter')
           .lean()
         const lastBalance = lastTx?.balanceAfter ?? 0
+        const newBalance = lastBalance + oldAdvance
         await BankTransaction.create({
-          bankAccount: bankId,
-          type: 'debit',
-          amount: newAdvanceAmt,
-          balanceAfter: lastBalance - newAdvanceAmt,
+          bankAccount: oldBank,
+          type: 'credit',
+          amount: oldAdvance,
+          balanceAfter: newBalance,
           source: 'india_buying_advance',
           sourceRef: entry._id,
-          sourceLabel,
-          transactionDate: entry.advanceDate ?? new Date(),
-          notes: entry.advanceNote,
+          sourceLabel:
+            'Advance refunded — bank account changed (India buying entry)',
+          transactionDate: new Date(),
+          createdBy: updatedBy,
+        })
+        await BankAccount.findByIdAndUpdate(oldBank, {
+          currentBalance: newBalance,
+        })
+      }
+
+      // Debit full new advance to new bank.
+      if (newHasAdvance && newAdvance > 0 && newBankRaw) {
+        const lastTx = await BankTransaction.findOne({
+          bankAccount: newBankRaw,
+        })
+          .sort({ transactionDate: -1, createdAt: -1 })
+          .select('balanceAfter')
+          .lean()
+        const lastBalance = lastTx?.balanceAfter ?? 0
+        const newBalance = lastBalance - newAdvance
+        await BankTransaction.create({
+          bankAccount: newBankRaw,
+          type: 'debit',
+          amount: newAdvance,
+          balanceAfter: newBalance,
+          source: 'india_buying_advance',
+          sourceRef: entry._id,
+          sourceLabel: `Advance for India buying entry — ${productName}`,
+          transactionDate: new Date(),
+          notes: body.advanceNote ?? entry.advanceNote,
+          createdBy: updatedBy,
+        })
+        await BankAccount.findByIdAndUpdate(newBankRaw, {
+          currentBalance: newBalance,
+        })
+      }
+    } else {
+      // Same bank account; only apply diff between new and old advance.
+      const diff = newAdvance - oldAdvance
+      const bankId = newBankRaw ?? oldBank
+      if (diff !== 0 && bankId) {
+        const lastTx = await BankTransaction.findOne({
+          bankAccount: bankId,
+        })
+          .sort({ transactionDate: -1, createdAt: -1 })
+          .select('balanceAfter')
+          .lean()
+        const lastBalance = lastTx?.balanceAfter ?? 0
+        const newBalance =
+          diff > 0 ? lastBalance - Math.abs(diff) : lastBalance + Math.abs(diff)
+        await BankTransaction.create({
+          bankAccount: bankId,
+          type: diff > 0 ? 'debit' : 'credit',
+          amount: Math.abs(diff),
+          balanceAfter: newBalance,
+          source: 'india_buying_advance',
+          sourceRef: entry._id,
+          sourceLabel:
+            diff > 0
+              ? `Advance increased — India buying entry (${productName})`
+              : `Advance reduced — India buying entry (${productName})`,
+          transactionDate: new Date(),
+          notes: body.advanceNote ?? entry.advanceNote,
           createdBy: updatedBy,
         })
         await BankAccount.findByIdAndUpdate(bankId, {
-          currentBalance: lastBalance - newAdvanceAmt,
+          currentBalance: newBalance,
         })
       }
     }
+
+    // Persist new advance fields on the entry.
+    entry.hasAdvancePayment = newHasAdvance
+    entry.advanceAmount =
+      newHasAdvance && newAdvance > 0 ? newAdvance : undefined
+    entry.advanceBankAccount =
+      newHasAdvance && newBankRaw
+        ? new mongoose.Types.ObjectId(newBankRaw)
+        : undefined
+    entry.advanceDate =
+      newHasAdvance && body.advanceDate
+        ? new Date(body.advanceDate)
+        : entry.advanceDate
+    entry.advanceNote =
+      newHasAdvance && body.advanceNote != null
+        ? String(body.advanceNote)
+        : entry.advanceNote
 
     if (body.totalCtn != null) entry.totalCtn = Number(body.totalCtn)
     if (body.qty != null) entry.qty = Number(body.qty)
@@ -307,33 +331,33 @@ export async function DELETE(
     }
 
     if (entry.hasAdvancePayment && (entry.advanceAmount ?? 0) > 0 && entry.advanceBankAccount) {
-      const debitTx = await BankTransaction.findOne({
+      const updatedBy = await resolveCreatedBy(user.id)
+      const amount = Number(entry.advanceAmount ?? 0)
+      const bankId = String(entry.advanceBankAccount)
+      const product = await IndiaProduct.findById(entry.product).select('productName').lean()
+      const productName = product?.productName ?? 'India Product'
+
+      const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
+        .sort({ transactionDate: -1, createdAt: -1 })
+        .select('balanceAfter')
+        .lean()
+      const lastBalance = lastTx?.balanceAfter ?? 0
+      const newBalance = lastBalance + amount
+
+      await BankTransaction.create({
+        bankAccount: bankId,
+        type: 'credit',
+        amount,
+        balanceAfter: newBalance,
         source: 'india_buying_advance',
-        sourceRef: id,
-      }).lean()
-      if (debitTx) {
-        const updatedBy = await resolveCreatedBy(user.id)
-        const lastTx = await BankTransaction.findOne({ bankAccount: debitTx.bankAccount })
-          .sort({ transactionDate: -1, createdAt: -1 })
-          .select('balanceAfter')
-          .lean()
-        const lastBalance = lastTx?.balanceAfter ?? 0
-        const product = await IndiaProduct.findById(entry.product).select('productName').lean()
-        const sourceLabel = `Reversal: Advance for India Product: ${product?.productName ?? 'Product'} (deleted entry)`
-        await BankTransaction.create({
-          bankAccount: debitTx.bankAccount,
-          type: 'credit',
-          amount: debitTx.amount,
-          balanceAfter: lastBalance + debitTx.amount,
-          source: 'manual',
-          sourceLabel,
-          transactionDate: new Date(),
-          createdBy: updatedBy,
-        })
-        await BankAccount.findByIdAndUpdate(debitTx.bankAccount, {
-          currentBalance: lastBalance + debitTx.amount,
-        })
-      }
+        sourceRef: entry._id,
+        sourceLabel: `Reversal: Advance for India Product: ${productName} (deleted entry)`,
+        transactionDate: new Date(),
+        createdBy: updatedBy,
+      })
+      await BankAccount.findByIdAndUpdate(bankId, {
+        currentBalance: newBalance,
+      })
     }
 
     await IndiaBuyingEntry.findByIdAndDelete(id)

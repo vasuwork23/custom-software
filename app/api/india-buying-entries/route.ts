@@ -107,6 +107,19 @@ export async function POST(req: NextRequest) {
         ? body.advanceBankAccount
         : undefined
 
+    if (hasAdvance && (advanceAmt ?? 0) > 0) {
+      if (!advanceBankId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Validation failed',
+            message: 'Please select a bank account for the advance payment',
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     const entry = await IndiaBuyingEntry.create({
       product: body.product,
       totalCtn: body.totalCtn,
