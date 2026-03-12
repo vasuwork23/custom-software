@@ -12,6 +12,7 @@ import { CompanyFormSheet } from '@/components/companies/CompanyFormSheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { apiGet, apiDelete } from '@/lib/api-client'
+import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -48,13 +49,14 @@ export default function CompaniesPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const debouncedSearch = useDebounce(search, 400)
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(page))
     params.set('limit', '20')
-    if (search.trim()) params.set('search', search.trim())
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     const result = await apiGet<{
       companies: CompanyItem[]
       pagination: { page: number; limit: number; total: number; pages: number }
@@ -62,7 +64,7 @@ export default function CompaniesPage() {
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, search])
+  }, [page, debouncedSearch])
 
   useEffect(() => {
     fetchCompanies()

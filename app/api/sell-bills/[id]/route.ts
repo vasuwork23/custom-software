@@ -138,7 +138,6 @@ export async function PUT(
         { status: 400 }
       )
     }
-    console.log('=== EDIT SELL BILL START ===', id)
 
     const body = await req.json()
     const companyId = body.companyId
@@ -204,11 +203,6 @@ export async function PUT(
     // Check how items are stored — find SellBillItem with explicit bill id
     const billIdObj = new mongoose.Types.ObjectId(id)
     const rawItems = await SellBillItem.find({ sellBill: billIdObj }).lean()
-    console.log('rawItems count:', rawItems.length)
-    console.log('rawItems[0]:', JSON.stringify(rawItems[0] ?? null, null, 2))
-    console.log('Searching with sellBill:', id)
-    console.log('rawItems sellBill field:', rawItems[0]?.sellBill?.toString())
-    console.log('Match?', rawItems[0]?.sellBill?.toString() === id)
 
     const bill = await SellBill.findById(id).populate('items')
     if (!bill) {
@@ -242,7 +236,6 @@ export async function PUT(
     // Step 1 — Restore stock from existing bill items FIRST (reversal before any re-run).
     // Use atomic $inc so restoration is guaranteed; no read-modify-save race.
     const existingItems = await SellBillItem.find({ sellBill: billIdObj }).lean()
-    console.log('Restoring FIFO for', existingItems.length, 'items')
     for (const item of existingItems) {
       const breakdown = (item.fifoBreakdown ?? []) as Record<string, unknown>[]
       const isIndia = (item.productSource as string) === 'india'
@@ -255,7 +248,6 @@ export async function PUT(
             ? (entryIdRaw as { _id: mongoose.Types.ObjectId })._id
             : entryIdRaw
         if (entryId == null || !mongoose.Types.ObjectId.isValid(entryId as string)) {
-          console.log('Skip fb (no entryId):', fb)
           continue
         }
         const eid = typeof entryId === 'string' ? new mongoose.Types.ObjectId(entryId) : (entryId as mongoose.Types.ObjectId)
@@ -265,12 +257,10 @@ export async function PUT(
           await IndiaBuyingEntry.findByIdAndUpdate(eid, {
             $inc: { availableCtn: ctnConsumed },
           })
-          console.log(`Restored ${ctnConsumed} CTN to India entry ${eid}`)
         } else {
           await BuyingEntry.findByIdAndUpdate(eid, {
             $inc: { soldCtn: -ctnConsumed, availableCtn: ctnConsumed },
           })
-          console.log(`Restored ${ctnConsumed} CTN to entry ${eid}`)
         }
       }
     }
@@ -286,7 +276,6 @@ export async function PUT(
     }
 
     await SellBillItem.deleteMany({ sellBill: billIdObj })
-    console.log('Deleted items for bill', id)
 
     // Step 2 — Process new items with FIFO. On any failure, rollback: reverse new items and re-apply original.
     const createdItems: mongoose.Types.ObjectId[] = []

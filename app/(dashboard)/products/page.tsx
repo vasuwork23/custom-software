@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProductCard } from '@/components/products/ProductCard'
 import { ProductFormDialog } from '@/components/products/ProductFormDialog'
 import { apiGet, apiPost } from '@/lib/api-client'
+import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -79,13 +80,14 @@ export default function ProductsPage() {
     | 'fullySold'
     | 'unpaid'
   >('all')
+  const debouncedSearch = useDebounce(search, 400)
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(page))
     params.set('limit', '20')
-    if (search.trim()) params.set('search', search.trim())
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     const result = await apiGet<{
       products: ProductItem[]
       counts: {
@@ -104,21 +106,21 @@ export default function ProductsPage() {
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, search])
+  }, [page, debouncedSearch])
 
   const fetchIndiaProducts = useCallback(async () => {
     setIndiaLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(indiaPage))
     params.set('limit', '20')
-    if (search.trim()) params.set('search', search.trim())
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     const result = await apiGet<{ products: IndiaProductItem[]; pagination: { page: number; limit: number; total: number; pages: number } }>(
       `/api/india-products?${params}`
     )
     setIndiaLoading(false)
     if (result.success) setIndiaData(result.data)
     else toast.error(result.message)
-  }, [indiaPage, search])
+  }, [indiaPage, debouncedSearch])
 
   useEffect(() => {
     if (activeTab === 'china') fetchProducts()

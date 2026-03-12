@@ -11,6 +11,7 @@ import { type DateRange } from 'react-day-picker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { apiGet, apiDelete } from '@/lib/api-client'
+import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -40,13 +41,14 @@ export default function SellBillsPage() {
     bills: BillRow[]
     pagination: { page: number; limit: number; total: number; pages: number }
   } | null>(null)
+  const debouncedSearch = useDebounce(search, 400)
 
   const fetchBills = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(page))
     params.set('limit', '20')
-    if (search.trim()) params.set('search', search.trim())
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     if (dateRange?.from) params.set('startDate', dateRange.from.toISOString().slice(0, 10))
     if (dateRange?.to) params.set('endDate', dateRange.to.toISOString().slice(0, 10))
     const result = await apiGet<{ bills: BillRow[]; pagination: { page: number; limit: number; total: number; pages: number } }>(
@@ -55,7 +57,7 @@ export default function SellBillsPage() {
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, search, dateRange])
+  }, [page, debouncedSearch, dateRange])
 
   useEffect(() => {
     fetchBills()

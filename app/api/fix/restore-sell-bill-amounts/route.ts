@@ -59,7 +59,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log(`[restore-sell-bill-amounts] Bill ${bill.billNumber}: restoring totalAmount to ${totalAmount}`)
       await SellBill.findByIdAndUpdate(bill._id, { totalAmount })
       restored += 1
     }

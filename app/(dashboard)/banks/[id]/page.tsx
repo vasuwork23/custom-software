@@ -13,6 +13,7 @@ import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { apiGet, apiDelete } from '@/lib/api-client'
+import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
@@ -50,7 +51,7 @@ export default function BankAccountHistoryPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<PageData | null>(null)
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -75,11 +76,6 @@ export default function BankAccountHistoryPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 400)
-    return () => clearTimeout(timer)
-  }, [search])
 
   const handleDeleteTransaction = async (tx: BankTransactionRow) => {
     setDeletingTxId(tx._id)

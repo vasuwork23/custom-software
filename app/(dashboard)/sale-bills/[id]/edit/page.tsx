@@ -248,14 +248,6 @@ export default function EditSellBillPage() {
             ? inferredFromOriginal
             : 1
         const pcs = qty > 0 ? Math.round(ctn * qty) : 0
-        console.log('setLineCtn:', {
-          lineId,
-          ctn,
-          qty,
-          pcs,
-          originalCtn: r.originalCtn,
-          originalPcs: r.originalPcs,
-        })
         return { ...r, ctnSold: ctn, pcsSold: pcs, lineTotal: pcs * r.ratePerPcs }
       })
     )
@@ -312,19 +304,6 @@ export default function EditSellBillPage() {
     e.preventDefault()
     if (!canSave || !id) return
     const linesWithStock = lines.filter((r) => r.productId && r.pcsSold > 0)
-    console.log('=== VALIDATION DEBUG ===')
-    linesWithStock.forEach((r) => {
-      const max = getAvailablePcsForEdit(r)
-      console.log({
-        product: r.productName,
-        pcsSold: r.pcsSold,
-        originalPcs: r.originalPcs,
-        availableCtn: r.availableCtn,
-        qtyPerCtn: r.qtyPerCtn,
-        maxAllowed: max,
-        wouldFail: r.pcsSold > max,
-      })
-    })
     const over = linesWithStock.find((r) => {
       const max = getAvailablePcsForEdit(r)
       const pcs = r.pcsSold

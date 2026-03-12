@@ -146,9 +146,7 @@ export async function GET(req: NextRequest) {
         }).lean()
 
         for (const entry of entries) {
-          console.log(
-            `Stock report entry ${entry.mark} for product ${row.productName}: isLocked=${entry.isLocked}, finalCost=${entry.finalCost}, availableCtn=${entry.availableCtn}, qty=${entry.qty}`
-          )
+          // debug logs removed
         }
 
         let availablePcs = 0
@@ -176,12 +174,6 @@ export async function GET(req: NextRequest) {
             : 0
 
         const totalCost = Number(totalCostRaw.toFixed(2))
-
-        console.log(
-          `Stock report product ${row.productName}: availablePcs=${availablePcs}, costPerPiece=${costPerPiece}, totalCost=${totalCost}, entriesWithCost=${
-            entries.filter((e) => (Number(e.finalCost) || 0) > 0).length
-          }`
-        )
 
         return {
           ...row,

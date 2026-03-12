@@ -14,6 +14,7 @@ import { apiGet, apiDelete } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
+import { useDebounce } from '@/hooks/useDebounce'
 
 interface CashTransactionRow {
   _id: string
@@ -41,7 +42,7 @@ export default function CashHistoryPage() {
   const [data, setData] = useState<CashHistoryData | null>(null)
   const [typeFilter, setTypeFilter] = useState<'all' | 'credit' | 'debit'>('all')
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -66,11 +67,6 @@ export default function CashHistoryPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 400)
-    return () => clearTimeout(timer)
-  }, [search])
 
   const handleDeleteCashTransaction = async (tx: CashTransactionRow) => {
     setDeletingTxId(tx._id)

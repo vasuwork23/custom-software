@@ -34,10 +34,6 @@ export async function POST(req: NextRequest) {
       fifoBreakdown: { $exists: true, $ne: [] },
     })
     if (sampleItem) {
-      console.log('=== SellBillItem fifoBreakdown sample ===')
-      console.log(JSON.stringify(sampleItem.fifoBreakdown?.[0] ?? {}, null, 2))
-      console.log('=== SellBillItem all fields ===')
-      console.log(Object.keys(sampleItem.toObject?.() ?? sampleItem))
     }
 
     const allSellItems = await SellBillItem.find({
@@ -100,7 +96,6 @@ export async function POST(req: NextRequest) {
         matchingItems,
       })
 
-      console.log(
         `Entry ${entry.mark ?? entry._id}: soldCtn ${soldCtnBefore} → ${actualSoldCtn}, availableCtn → ${correctAvailableCtn}, matchingItems=${matchingItems}`
       )
     }

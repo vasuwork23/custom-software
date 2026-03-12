@@ -137,7 +137,6 @@ export async function GET(
       ? JSON.parse(JSON.stringify(sampleItem)) as Record<string, unknown>
       : null
     if (sampleSellBillItemFull) {
-      console.log('SellBillItem full object (for field names):', JSON.stringify(sampleSellBillItemFull, null, 2))
     }
 
     return NextResponse.json({

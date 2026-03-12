@@ -67,7 +67,6 @@ export async function POST(req: NextRequest) {
 
       const oldSoldCtn = entry.soldCtn ?? 0
       if (actualSoldCtn !== oldSoldCtn || processed < 5) {
-        console.log(
           `[recalculate-sold-ctn] Entry ${entry.mark ?? entry._id}: totalCtn=${totalCtn} actualSoldCtn=${soldCtnRounded} availableCtn=${availableCtn} OLD soldCtn=${oldSoldCtn}`
         )
       }
