@@ -28,6 +28,9 @@ const COLLECTIONS_TO_DROP = [
   'chinabanktransactions',
   'cashtransactions',
   'cashes',
+  'containers',
+  'counters',
+  'liabilities',
   // China people collection name in MongoDB (from ChinaPerson model)
   'chinapeople',
   // Legacy/alternate naming, kept for safety
