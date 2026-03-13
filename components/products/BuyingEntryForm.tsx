@@ -73,7 +73,9 @@ const schema = z
   })
   .superRefine((val, ctx) => {
     const totalQty = (val.totalCtn as number) * (val.qty as number)
-    const totalAmount = totalQty * (val.rate as number)
+    // Round to 2 decimals to avoid floating point issues
+    const rawTotalAmount = totalQty * (val.rate as number)
+    const totalAmount = Math.round(rawTotalAmount * 100) / 100
 
     if (val.hasAdvancePayment) {
       const advanceAmount = val.advanceAmount as number | undefined
@@ -95,7 +97,8 @@ const schema = z
         })
       }
 
-      if (advanceAmount != null && advanceAmount > totalAmount) {
+      // Allow equal or very slightly higher values due to rounding differences
+      if (advanceAmount != null && advanceAmount > totalAmount + 0.0001) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['advanceAmount'],

@@ -44,7 +44,16 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: '$product',
           totalCtn: { $sum: '$totalCtn' },
-          chinaWarehouseCtn: { $sum: { $ifNull: ['$chinaWarehouseCtn', 0] } },
+          // Only count CTN in China warehouse when entry is actually received there
+          chinaWarehouseCtn: {
+            $sum: {
+              $cond: [
+                { $eq: ['$chinaWarehouseReceived', 'yes'] },
+                { $ifNull: ['$chinaWarehouseCtn', 0] },
+                0,
+              ],
+            },
+          },
           inTransitCtn: { $sum: { $ifNull: ['$inTransitCtn', 0] } },
           availableCtn: { $sum: '$availableCtn' },
           soldCtn: { $sum: { $ifNull: ['$soldCtn', 0] } },
@@ -124,6 +133,8 @@ export async function GET(req: NextRequest) {
           : 'no'
 
       const hasUnpaidEntries = Boolean(status.hasUnpaidEntries)
+      const hasWhReceived = Boolean(status.hasWhReceived)
+      const hasNotReceived = Boolean(status.hasNotReceived)
 
       return {
         _id: p._id,
@@ -139,13 +150,17 @@ export async function GET(req: NextRequest) {
         chinaFactoryCtn,
         hasUnpaidEntries,
         chinaWarehouseReceived,
+        hasWhReceived,
+        hasNotReceived,
       }
     })
 
     const counts = {
       all: enrichedProducts.length,
-      chinaFactory: enrichedProducts.filter((p) => p.chinaWarehouseReceived === 'no').length,
-      chinaWh: enrichedProducts.filter((p) => p.chinaWarehouseReceived === 'yes' && p.chinaWarehouseCtn > 0).length,
+      // Count products that still have any entries at factory
+      chinaFactory: enrichedProducts.filter((p) => p.hasNotReceived).length,
+      // Count products that have any entries received into China warehouse
+      chinaWh: enrichedProducts.filter((p) => p.hasWhReceived && p.chinaWarehouseCtn > 0).length,
       inTransit: enrichedProducts.filter((p) => p.inTransitCtn > 0).length,
       inIndia: enrichedProducts.filter((p) => p.availableCtn > 0).length,
       fullySold: enrichedProducts.filter((p) => p.soldCtn > 0 && p.availableCtn === 0).length,

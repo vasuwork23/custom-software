@@ -19,6 +19,8 @@ interface ProductCardProps {
   soldCtn?: number
   hasUnpaidEntries?: boolean
   chinaWarehouseReceived?: 'yes' | 'no'
+  hasWhReceived?: boolean
+  hasNotReceived?: boolean
 }
 
 export function ProductCard({
@@ -34,6 +36,8 @@ export function ProductCard({
   soldCtn,
   hasUnpaidEntries,
   chinaWarehouseReceived,
+  hasWhReceived,
+  hasNotReceived,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -120,18 +124,18 @@ export function ProductCard({
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-1">
-            {chinaWarehouseReceived === 'no' && totalCtn > 0 ? (
+            {(hasNotReceived || chinaWarehouseReceived === 'no') && totalCtn > 0 && (
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700 dark:bg-gray-900/30 dark:text-gray-300">
                 🏭 China Factory
               </span>
-            ) : (
+            )}
+            {(hasWhReceived || chinaWarehouseCtn != null) &&
               chinaWarehouseCtn != null &&
               chinaWarehouseCtn > 0 && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                   🟡 China WH
                 </span>
-              )
-            )}
+              )}
             {inTransitCtn != null && inTransitCtn > 0 && (
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                 🔵 In Transit

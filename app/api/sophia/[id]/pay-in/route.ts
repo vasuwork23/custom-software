@@ -55,14 +55,23 @@ export async function POST(
     const balanceAfter =
       (updatedPerson as { currentBalance?: number } | null)?.currentBalance ?? 0
 
+    // Use transactionDate from client when provided to keep manual entries ordered correctly
+    const txDate =
+      body.transactionDate && typeof body.transactionDate === 'string'
+        ? new Date(body.transactionDate)
+        : new Date()
+
     await ChinaPersonTransaction.create({
       chinaPerson: personId,
       type: 'pay_in',
       amount,
       balanceAfter,
-      transactionDate: new Date(),
+      transactionDate: txDate,
       notes,
       createdBy,
+      // Align createdAt with transactionDate for consistent chronological ordering
+      createdAt: txDate,
+      updatedAt: txDate,
     })
 
     return NextResponse.json({ success: true, data: { balanceAfter } })

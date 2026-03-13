@@ -26,11 +26,13 @@ interface ProductItem {
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
-   chinaWarehouseCtn: number
-   inTransitCtn: number
-   soldCtn: number
-   hasUnpaidEntries: boolean
-   chinaWarehouseReceived: 'yes' | 'no'
+  chinaWarehouseCtn: number
+  inTransitCtn: number
+  soldCtn: number
+  hasUnpaidEntries: boolean
+  chinaWarehouseReceived: 'yes' | 'no'
+  hasWhReceived: boolean
+  hasNotReceived: boolean
 }
 
 interface IndiaProductItem {
@@ -158,9 +160,11 @@ export default function ProductsPage() {
     ? data.products.filter((p) => {
         switch (chinaFilter) {
           case 'chinaFactory':
-            return p.chinaWarehouseReceived === 'no'
+            // Any product that still has entries at factory
+            return p.hasNotReceived
           case 'chinaWh':
-            return p.chinaWarehouseReceived === 'yes' && p.chinaWarehouseCtn > 0
+            // Any product that has entries received into China warehouse
+            return p.hasWhReceived && p.chinaWarehouseCtn > 0
           case 'inTransit':
             return p.inTransitCtn > 0
           case 'inIndia':
@@ -190,12 +194,15 @@ export default function ProductsPage() {
       }
     }
     const totalCtn = filteredChinaProducts.reduce((s, p) => s + (p.totalCtn || 0), 0)
-    const chinaFactoryCtn = filteredChinaProducts
-      .filter((p) => p.chinaWarehouseReceived === 'no')
-      .reduce((s, p) => s + (p.totalCtn || 0), 0)
-    const chinaWhCtn = filteredChinaProducts
-      .filter((p) => p.chinaWarehouseReceived === 'yes')
-      .reduce((s, p) => s + (p.chinaWarehouseCtn || 0), 0)
+    // Use pre-calculated CTN at factory / WH from backend stats
+    const chinaFactoryCtn = filteredChinaProducts.reduce(
+      (s, p) => s + (p.chinaFactoryCtn || 0),
+      0
+    )
+    const chinaWhCtn = filteredChinaProducts.reduce(
+      (s, p) => s + (p.chinaWarehouseCtn || 0),
+      0
+    )
     const inTransitCtn = filteredChinaProducts.reduce(
       (s, p) => s + (p.inTransitCtn || 0),
       0
@@ -414,6 +421,8 @@ export default function ProductsPage() {
                     soldCtn={p.soldCtn}
                     hasUnpaidEntries={p.hasUnpaidEntries}
                     chinaWarehouseReceived={p.chinaWarehouseReceived}
+                    hasWhReceived={p.hasWhReceived}
+                    hasNotReceived={p.hasNotReceived}
                   />
                 ))}
               </div>
