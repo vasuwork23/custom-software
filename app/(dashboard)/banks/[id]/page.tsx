@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Trash2, FileDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,8 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
+import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
+import { exportTableToPdf } from '@/lib/exportPdf'
 
 interface BankTransactionRow {
   _id: string
@@ -53,6 +55,7 @@ export default function BankAccountHistoryPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
+  const [exportingAll, setExportingAll] = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!id) return
@@ -109,6 +112,52 @@ export default function BankAccountHistoryPage() {
   const { account, transactions, pagination } = data
   const isNegative = account.currentBalance < 0
 
+  const pdfColumns = ['Date', 'Description', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']
+
+  const mapRows = (rows: BankTransactionRow[]) =>
+    rows.map((t) => [
+      format(new Date(t.transactionDate), 'dd MMM yyyy'),
+      t.sourceLabel ?? t.source,
+      t.type === 'debit' ? t.amount : '',
+      t.type === 'credit' ? t.amount : '',
+      t.runningBalance ?? t.balanceAfter,
+    ])
+
+  async function handleExportAll() {
+    try {
+      setExportingAll(true)
+      const params = new URLSearchParams()
+      params.set('page', '1')
+      params.set('limit', '20')
+      params.set('exportAll', '1')
+      if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
+      if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      const result = await apiGet<PageData>(
+        `/api/banks/${id}/transactions?${params.toString()}`
+      )
+      if (!result.success) {
+        toast.error(result.message ?? 'Failed to export bank transactions')
+        return
+      }
+      if (!result.data.transactions.length) {
+        toast.info('No transactions to export')
+        return
+      }
+      exportTableToPdf({
+        title: `Bank — ${result.data.account.accountName}`,
+        columns: pdfColumns,
+        rows: mapRows(result.data.transactions),
+        landscape: true,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
+    } finally {
+      setExportingAll(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -135,12 +184,30 @@ export default function BankAccountHistoryPage() {
           placeholder="Filter by date range"
           className="w-full sm:w-auto"
         />
-        <Input
-          placeholder="Search transactions..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:w-64"
-        />
+        <div className="flex flex-wrap gap-2">
+          <Input
+            placeholder="Search transactions..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full sm:w-64"
+          />
+          <ExportPdfButton
+            title={`Bank — ${account.accountName}`}
+            landscape
+            columns={pdfColumns}
+            rows={mapRows(transactions)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportingAll}
+            onClick={handleExportAll}
+            className="gap-2"
+          >
+            <FileDown className="h-4 w-4" />
+            {exportingAll ? 'Exporting...' : 'Export All'}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border overflow-x-auto">

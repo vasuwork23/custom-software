@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { Trash2 } from 'lucide-react'
+import { Trash2, FileDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 import { useDebounce } from '@/hooks/useDebounce'
+import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
+import { exportTableToPdf } from '@/lib/exportPdf'
 
 interface CashTransactionRow {
   _id: string
@@ -44,6 +46,7 @@ export default function CashHistoryPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
+  const [exportingAll, setExportingAll] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -100,6 +103,62 @@ export default function CashHistoryPage() {
 
   const isDeletable = (tx: CashTransactionRow) => tx.category === 'cash_in'
 
+  const pdfColumns = [
+    'Date',
+    'Description',
+    'Category',
+    'Debit (₹)',
+    'Credit (₹)',
+    'Balance (₹)',
+  ]
+
+  const mapRows = (rows: CashTransactionRow[]) =>
+    rows.map((tx) => [
+      format(new Date(tx.date), 'dd MMM yyyy'),
+      tx.description,
+      tx.category.replace(/_/g, ' '),
+      tx.type === 'debit' ? tx.amount : '',
+      tx.type === 'credit' ? tx.amount : '',
+      tx.runningBalance,
+    ])
+
+  async function handleExportAll() {
+    try {
+      setExportingAll(true)
+      const params = new URLSearchParams()
+      params.set('page', '1')
+      params.set('limit', '50')
+      params.set('exportAll', '1')
+      if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
+      if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
+      if (typeFilter && typeFilter !== 'all') params.set('type', typeFilter)
+      if (debouncedSearch) params.set('search', debouncedSearch)
+
+      const result = await apiGet<CashHistoryData>(
+        `/api/our-banks/cash/transactions?${params.toString()}`
+      )
+      if (!result.success) {
+        toast.error(result.message ?? 'Failed to export cash transactions')
+        return
+      }
+      if (!result.data.transactions.length) {
+        toast.info('No cash transactions to export')
+        return
+      }
+      exportTableToPdf({
+        title: 'Cash Transactions',
+        columns: pdfColumns,
+        rows: mapRows(result.data.transactions),
+        landscape: true,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
+    } finally {
+      setExportingAll(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -155,6 +214,22 @@ export default function CashHistoryPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full sm:w-64"
           />
+          <ExportPdfButton
+            title="Cash Transactions"
+            landscape
+            columns={pdfColumns}
+            rows={mapRows(transactions)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportingAll}
+            onClick={handleExportAll}
+            className="gap-2"
+          >
+            <FileDown className="h-4 w-4" />
+            {exportingAll ? 'Exporting...' : 'Export All'}
+          </Button>
         </div>
       </div>
 

@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type') // 'credit' | 'debit' | 'all' | null
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
+    const exportAll = searchParams.get('exportAll') === '1'
 
     await connectDB()
 
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
 
     // Paginate: take page slice, then reverse for display (newest first on page)
     const skip = (page - 1) * limit
-    const pageSlice = allWithBalance.slice(skip, skip + limit)
+    const pageSlice = exportAll ? allWithBalance : allWithBalance.slice(skip, skip + limit)
     const transactions = [...pageSlice].reverse()
 
     const cashDoc = await Cash.findOne().lean()

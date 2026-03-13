@@ -35,6 +35,7 @@ export async function GET(
     const endDate = searchParams.get('endDate')?.trim()
     const typeFilter = searchParams.get('type')?.trim() // 'credit' | 'debit' | 'all'
     const search = searchParams.get('search')?.trim() ?? ''
+    const exportAll = searchParams.get('exportAll') === '1'
 
     await connectDB()
     const account = await BankAccount.findById(id).lean()
@@ -79,7 +80,7 @@ export async function GET(
             })
           : withBalance
       const skip = (page - 1) * limit
-      const pageSlice = searchFiltered.slice(skip, skip + limit)
+      const pageSlice = exportAll ? searchFiltered : searchFiltered.slice(skip, skip + limit)
       const transactions = [...pageSlice].reverse()
       const cashDoc = await Cash.findOne().lean()
       const currentBalance = cashDoc?.balance ?? 0
@@ -137,20 +138,21 @@ export async function GET(
     }
 
     const forDisplay = [...filtered].reverse()
+    const totalFiltered = filtered.length
     const paginated = forDisplay.slice((page - 1) * limit, page * limit)
-      const totalFiltered = filtered.length
 
-      const searchFiltered =
-        search.length > 0
-          ? paginated.filter((tx) => {
-              const haystack = `${tx.sourceLabel ?? ''} ${tx.notes ?? ''} ${
-                tx.source ?? ''
-              }`.toLowerCase()
-              return haystack.includes(search.toLowerCase())
-            })
-          : paginated
+    const searchBase = exportAll ? forDisplay : paginated
+    const searchFiltered =
+      search.length > 0
+        ? searchBase.filter((tx) => {
+            const haystack = `${tx.sourceLabel ?? ''} ${tx.notes ?? ''} ${
+              tx.source ?? ''
+            }`.toLowerCase()
+            return haystack.includes(search.toLowerCase())
+          })
+        : searchBase
 
-      const list = searchFiltered.map((t) => ({
+    const list = searchFiltered.map((t) => ({
       _id: t._id,
       type: t.type,
       amount: t.amount,
@@ -165,7 +167,11 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        account: { _id: account._id, accountName: account.accountName, currentBalance: account.currentBalance ?? 0 },
+        account: {
+          _id: account._id,
+          accountName: account.accountName,
+          currentBalance: account.currentBalance ?? 0,
+        },
         transactions: list,
         pagination: { page, limit, total: totalFiltered, pages: Math.ceil(totalFiltered / limit) },
       },

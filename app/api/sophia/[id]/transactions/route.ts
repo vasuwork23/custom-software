@@ -32,6 +32,7 @@ export async function GET(
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
     const startDate = searchParams.get('startDate')?.trim()
     const endDate = searchParams.get('endDate')?.trim()
+    const exportAll = searchParams.get('exportAll') === '1'
 
     await connectDB()
     const personId = new mongoose.Types.ObjectId(id)
@@ -61,7 +62,9 @@ export async function GET(
 
     const forDisplay = [...allTransactions].reverse()
     const totalFiltered = allTransactions.length
-    const paginated = forDisplay.slice((page - 1) * limit, page * limit)
+    const paginated = exportAll
+      ? forDisplay
+      : forDisplay.slice((page - 1) * limit, page * limit)
     const transactions = paginated
 
     const paymentIds = transactions
@@ -124,9 +127,19 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        person: { _id: person._id, name: person.name, isDefault: person.isDefault, currentBalance: person.currentBalance ?? 0 },
+        person: {
+          _id: person._id,
+          name: person.name,
+          isDefault: person.isDefault,
+          currentBalance: person.currentBalance ?? 0,
+        },
         transactions: list,
-        pagination: { page, limit, total: totalFiltered, pages: Math.ceil(totalFiltered / limit) },
+        pagination: {
+          page,
+          limit,
+          total: totalFiltered,
+          pages: Math.ceil(totalFiltered / limit),
+        },
       },
     })
   } catch (error) {

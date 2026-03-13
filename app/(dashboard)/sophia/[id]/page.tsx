@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ArrowLeft, ArrowDownToLine, ArrowUpFromLine, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowDownToLine, ArrowUpFromLine, Trash2, FileDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
@@ -15,6 +15,8 @@ import { apiGet, apiDelete } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { cn } from '@/lib/utils'
+import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
+import { exportTableToPdf } from '@/lib/exportPdf'
 
 interface TransactionRow {
   _id: string
@@ -52,6 +54,7 @@ export default function JackDetailPage() {
   const [loading, setLoading] = useState(true)
   const [payDialogOpen, setPayDialogOpen] = useState(false)
   const [payMode, setPayMode] = useState<'pay_in' | 'pay_out'>('pay_in')
+  const [exportingAll, setExportingAll] = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!id) return
@@ -90,6 +93,56 @@ export default function JackDetailPage() {
   const { person, transactions, pagination } = data
   const isNegative = person.currentBalance < 0
 
+  const pdfColumns = [
+    'Date',
+    'Type',
+    'Amount (¥)',
+    'Product',
+    'Entry Date',
+    'Balance After (¥)',
+    'Notes',
+  ]
+
+  const mapTransactionsToRows = (rows: TransactionRow[]) =>
+    rows.map((t) => [
+      format(new Date(t.transactionDate), 'dd MMM yyyy'),
+      t.type === 'pay_in' ? 'Pay In' : 'Pay Out',
+      t.type === 'pay_in' ? t.amount : -t.amount,
+      t.productName ?? '—',
+      t.entryDate ? format(new Date(t.entryDate), 'dd MMM yyyy') : '—',
+      t.balanceAfter,
+      t.sourceLabel ?? t.notes ?? '',
+    ])
+
+  async function handleExportAll() {
+    try {
+      setExportingAll(true)
+      const result = await apiGet<PageData>(
+        `/api/sophia/${id}/transactions?page=1&limit=20&exportAll=1`
+      )
+      if (!result.success) {
+        toast.error(result.message)
+        return
+      }
+      const full = result.data.transactions
+      if (!full.length) {
+        toast.info('No transactions to export')
+        return
+      }
+      exportTableToPdf({
+        title: `Sophia — ${result.data.person.name}`,
+        columns: pdfColumns,
+        rows: mapTransactionsToRows(full),
+        landscape: true,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
+    } finally {
+      setExportingAll(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -102,9 +155,28 @@ export default function JackDetailPage() {
         title={`${person.name}${person.isDefault ? ' (Default)' : ''}`}
         action={
           <div className="flex gap-2">
+            <ExportPdfButton
+              title={`Sophia — ${person.name}`}
+              landscape
+              columns={pdfColumns}
+              rows={mapTransactionsToRows(transactions)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={exportingAll}
+              onClick={handleExportAll}
+              className="gap-2"
+            >
+              <FileDown className="h-4 w-4" />
+              {exportingAll ? 'Exporting...' : 'Export All'}
+            </Button>
             <Button
               className="text-green-600 hover:text-green-700"
-              onClick={() => { setPayMode('pay_in'); setPayDialogOpen(true) }}
+              onClick={() => {
+                setPayMode('pay_in')
+                setPayDialogOpen(true)
+              }}
             >
               <ArrowDownToLine className="mr-2 h-4 w-4" />
               Pay In
