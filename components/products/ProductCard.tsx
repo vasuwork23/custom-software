@@ -14,6 +14,7 @@ interface ProductCardProps {
   availableCtn: number
   /** Defaults to /products/[id]. Use /products/india/[id] for India products. */
   detailHref?: string
+  chinaFactoryCtn?: number
   chinaWarehouseCtn?: number
   inTransitCtn?: number
   soldCtn?: number
@@ -21,6 +22,8 @@ interface ProductCardProps {
   chinaWarehouseReceived?: 'yes' | 'no'
   hasWhReceived?: boolean
   hasNotReceived?: boolean
+  totalCbm?: number
+  totalWeight?: number
 }
 
 export function ProductCard({
@@ -31,6 +34,7 @@ export function ProductCard({
   totalCtn,
   availableCtn,
   detailHref,
+  chinaFactoryCtn,
   chinaWarehouseCtn,
   inTransitCtn,
   soldCtn,
@@ -38,6 +42,8 @@ export function ProductCard({
   chinaWarehouseReceived,
   hasWhReceived,
   hasNotReceived,
+  totalCbm,
+  totalWeight,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -122,6 +128,30 @@ export function ProductCard({
               <span className="text-muted-foreground">Entries</span>
               <span className="font-semibold">{buyingEntriesCount}</span>
             </div>
+            {chinaFactoryCtn != null && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">🏭 Factory</span>
+                <span className="font-semibold">{chinaFactoryCtn} CTN</span>
+              </div>
+            )}
+            {totalCbm != null && (
+              <div className="flex items-center justify-between col-span-2">
+                <span className="text-muted-foreground">📦 Total CBM</span>
+                <span className="font-semibold">
+                  {(totalCbm ?? 0).toLocaleString('en-IN', {
+                    maximumFractionDigits: 4,
+                  })}
+                </span>
+              </div>
+            )}
+            {totalWeight != null && (
+              <div className="flex items-center justify-between col-span-2">
+                <span className="text-muted-foreground">⚖️ Total Weight</span>
+                <span className="font-semibold">
+                  {(totalWeight ?? 0).toFixed(2)} kg
+                </span>
+              </div>
+            )}
           </div>
           <div className="mt-3 flex flex-wrap gap-1">
             {(hasNotReceived || chinaWarehouseReceived === 'no') && totalCtn > 0 && (

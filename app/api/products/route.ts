@@ -17,8 +17,29 @@ export async function GET(req: NextRequest) {
     }
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '10', 10)))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '100', 10)))
     const search = searchParams.get('search')?.trim() ?? ''
+    type ChinaFilter =
+      | 'all'
+      | 'chinaFactory'
+      | 'chinaWh'
+      | 'inTransit'
+      | 'inIndia'
+      | 'fullySold'
+      | 'unpaid'
+    const rawFilter = searchParams.get('filter') ?? 'all'
+    const allowedFilters: ChinaFilter[] = [
+      'all',
+      'chinaFactory',
+      'chinaWh',
+      'inTransit',
+      'inIndia',
+      'fullySold',
+      'unpaid',
+    ]
+    const chinaFilter: ChinaFilter = allowedFilters.includes(rawFilter as ChinaFilter)
+      ? (rawFilter as ChinaFilter)
+      : 'all'
 
     await connectDB()
 
@@ -30,9 +51,9 @@ export async function GET(req: NextRequest) {
       ]
     }
 
-    const skip = (page - 1) * limit
     const [products, total] = await Promise.all([
-      Product.find(filter).sort({ productName: 1 }).skip(skip).limit(limit).lean(),
+      // Fetch all products matching search; filtering + pagination handled after enrichment
+      Product.find(filter).sort({ productName: 1 }).lean(),
       Product.countDocuments(filter),
     ])
 
@@ -67,6 +88,8 @@ export async function GET(req: NextRequest) {
               ],
             },
           },
+          totalCbm: { $sum: { $ifNull: ['$totalCbm', 0] } },
+          totalWeight: { $sum: { $ifNull: ['$totalWeight', 0] } },
           count: { $sum: 1 },
         },
       },
@@ -107,6 +130,8 @@ export async function GET(req: NextRequest) {
         availableCtn: 0,
         soldCtn: 0,
         chinaFactoryCtn: 0,
+        totalCbm: 0,
+        totalWeight: 0,
         count: 0,
       }
       const status = statusByProduct[String(p._id)] ?? {
@@ -121,6 +146,8 @@ export async function GET(req: NextRequest) {
       const availableCtn = stats.availableCtn ?? 0
       const soldCtn = stats.soldCtn ?? 0
       const chinaFactoryCtn = stats.chinaFactoryCtn ?? 0
+      const totalCbm = stats.totalCbm ?? 0
+      const totalWeight = stats.totalWeight ?? 0
       const buyingEntries = stats.count ?? 0
 
       const chinaWarehouseReceived: 'yes' | 'no' =
@@ -148,6 +175,8 @@ export async function GET(req: NextRequest) {
         availableCtn,
         soldCtn,
         chinaFactoryCtn,
+        totalCbm,
+        totalWeight,
         hasUnpaidEntries,
         chinaWarehouseReceived,
         hasWhReceived,
@@ -155,6 +184,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    // Global counts for filter chips (affected by search, but not by active filter)
     const counts = {
       all: enrichedProducts.length,
       // Count products that still have any entries at factory
@@ -167,12 +197,52 @@ export async function GET(req: NextRequest) {
       unpaid: enrichedProducts.filter((p) => p.hasUnpaidEntries).length,
     }
 
+    // Apply active filter server-side
+    const filteredProducts = enrichedProducts.filter((p) => {
+      switch (chinaFilter) {
+        case 'chinaFactory':
+          return p.hasNotReceived
+        case 'chinaWh':
+          return p.hasWhReceived && p.chinaWarehouseCtn > 0
+        case 'inTransit':
+          return p.inTransitCtn > 0
+        case 'inIndia':
+          return p.availableCtn > 0
+        case 'fullySold':
+          return p.soldCtn > 0 && p.availableCtn === 0
+        case 'unpaid':
+          return p.hasUnpaidEntries
+        case 'all':
+        default:
+          return true
+      }
+    })
+
+    const totalFiltered = filteredProducts.length
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / limit))
+    const start = (page - 1) * limit
+    const paginatedProducts = filteredProducts.slice(start, start + limit)
+
+    // Totals across all filtered products (not just current page)
+    const { totalCbm: sumCbm, totalWeight: sumWeight } = filteredProducts.reduce(
+      (acc, p) => {
+        acc.totalCbm += p.totalCbm ?? 0
+        acc.totalWeight += p.totalWeight ?? 0
+        return acc
+      },
+      { totalCbm: 0, totalWeight: 0 }
+    )
+
     return NextResponse.json({
       success: true,
       data: {
-        products: enrichedProducts,
+        products: paginatedProducts,
         counts,
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        totals: {
+          cbm: sumCbm,
+          weight: sumWeight,
+        },
+        pagination: { page, limit, total: totalFiltered, pages: totalPages },
       },
     })
   } catch (error) {

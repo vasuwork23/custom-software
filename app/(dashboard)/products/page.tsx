@@ -27,12 +27,15 @@ interface ProductItem {
   totalCtn: number
   availableCtn: number
   chinaWarehouseCtn: number
+  chinaFactoryCtn: number
   inTransitCtn: number
   soldCtn: number
   hasUnpaidEntries: boolean
   chinaWarehouseReceived: 'yes' | 'no'
   hasWhReceived: boolean
   hasNotReceived: boolean
+  totalCbm: number
+  totalWeight: number
 }
 
 interface IndiaProductItem {
@@ -65,6 +68,7 @@ export default function ProductsPage() {
       unpaid: number
     }
     pagination: { page: number; limit: number; total: number; pages: number }
+    totals?: { cbm: number; weight: number }
   } | null>(null)
   const [indiaData, setIndiaData] = useState<{
     products: IndiaProductItem[]
@@ -88,8 +92,9 @@ export default function ProductsPage() {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(page))
-    params.set('limit', '20')
+    params.set('limit', '100')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+    params.set('filter', chinaFilter)
     const result = await apiGet<{
       products: ProductItem[]
       counts: {
@@ -102,13 +107,12 @@ export default function ProductsPage() {
         unpaid: number
       }
       pagination: { page: number; limit: number; total: number; pages: number }
-    }>(
-      `/api/products?${params}`
-    )
+      totals?: { cbm: number; weight: number }
+    }>(`/api/products?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, debouncedSearch])
+  }, [page, debouncedSearch, chinaFilter])
 
   const fetchIndiaProducts = useCallback(async () => {
     setIndiaLoading(true)
@@ -127,6 +131,11 @@ export default function ProductsPage() {
   useEffect(() => {
     if (activeTab === 'china') fetchProducts()
   }, [activeTab, fetchProducts])
+
+  // Reset to first page when filter or search changes
+  useEffect(() => {
+    setPage(1)
+  }, [chinaFilter, debouncedSearch])
 
   useEffect(() => {
     if (activeTab === 'india') fetchIndiaProducts()
@@ -156,29 +165,8 @@ export default function ProductsPage() {
   const currentLoading = activeTab === 'china' ? loading : indiaLoading
   const productLink = (id: string) => (activeTab === 'china' ? `/products/${id}` : `/products/india/${id}`)
 
-  const filteredChinaProducts = data
-    ? data.products.filter((p) => {
-        switch (chinaFilter) {
-          case 'chinaFactory':
-            // Any product that still has entries at factory
-            return p.hasNotReceived
-          case 'chinaWh':
-            // Any product that has entries received into China warehouse
-            return p.hasWhReceived && p.chinaWarehouseCtn > 0
-          case 'inTransit':
-            return p.inTransitCtn > 0
-          case 'inIndia':
-            return p.availableCtn > 0
-          case 'fullySold':
-            return p.soldCtn > 0 && p.availableCtn === 0
-          case 'unpaid':
-            return p.hasUnpaidEntries
-          case 'all':
-          default:
-            return true
-        }
-      })
-    : []
+  // Products are already filtered server-side by chinaFilter
+  const filteredChinaProducts = data ? data.products : []
 
   const chinaSummary = useMemo(() => {
     if (!filteredChinaProducts.length) {
@@ -279,6 +267,38 @@ export default function ProductsPage() {
         </div>
 
         <TabsContent value="china" className="mt-4 space-y-4">
+          {data && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">China Products</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {data.pagination.total} products matching filters
+                </p>
+              </div>
+              <div className="flex gap-3 text-right">
+                <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Total CBM
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {(data.totals?.cbm ?? 0).toLocaleString('en-IN', {
+                      maximumFractionDigits: 4,
+                    })}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Total Weight (kg)
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {(data.totals?.weight ?? 0).toLocaleString('en-IN', {
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {currentLoading ? (
             <TableSkeleton rows={8} columns={5} />
           ) : !data?.products.length ? (
@@ -416,6 +436,7 @@ export default function ProductsPage() {
                     buyingEntriesCount={p.buyingEntriesCount}
                     totalCtn={p.totalCtn}
                     availableCtn={p.availableCtn}
+                    chinaFactoryCtn={p.chinaFactoryCtn}
                     chinaWarehouseCtn={p.chinaWarehouseCtn}
                     inTransitCtn={p.inTransitCtn}
                     soldCtn={p.soldCtn}
@@ -423,6 +444,8 @@ export default function ProductsPage() {
                     chinaWarehouseReceived={p.chinaWarehouseReceived}
                     hasWhReceived={p.hasWhReceived}
                     hasNotReceived={p.hasNotReceived}
+                    totalCbm={p.totalCbm}
+                    totalWeight={p.totalWeight}
                   />
                 ))}
               </div>
