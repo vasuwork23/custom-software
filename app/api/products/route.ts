@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
           },
           totalCbm: { $sum: { $ifNull: ['$totalCbm', 0] } },
           totalWeight: { $sum: { $ifNull: ['$totalWeight', 0] } },
+          remainingAmount: { $sum: { $ifNull: ['$remainingAmount', 0] } },
           count: { $sum: 1 },
         },
       },
@@ -132,6 +133,7 @@ export async function GET(req: NextRequest) {
         chinaFactoryCtn: 0,
         totalCbm: 0,
         totalWeight: 0,
+        remainingAmount: 0,
         count: 0,
       }
       const status = statusByProduct[String(p._id)] ?? {
@@ -148,6 +150,7 @@ export async function GET(req: NextRequest) {
       const chinaFactoryCtn = stats.chinaFactoryCtn ?? 0
       const totalCbm = stats.totalCbm ?? 0
       const totalWeight = stats.totalWeight ?? 0
+      const remainingAmount = stats.remainingAmount ?? 0
       const buyingEntries = stats.count ?? 0
 
       const chinaWarehouseReceived: 'yes' | 'no' =
@@ -177,6 +180,7 @@ export async function GET(req: NextRequest) {
         chinaFactoryCtn,
         totalCbm,
         totalWeight,
+        remainingAmount,
         hasUnpaidEntries,
         chinaWarehouseReceived,
         hasWhReceived,
@@ -224,13 +228,14 @@ export async function GET(req: NextRequest) {
     const paginatedProducts = filteredProducts.slice(start, start + limit)
 
     // Totals across all filtered products (not just current page)
-    const { totalCbm: sumCbm, totalWeight: sumWeight } = filteredProducts.reduce(
+    const { totalCbm: sumCbm, totalWeight: sumWeight, remainingAmount: sumRemaining } = filteredProducts.reduce(
       (acc, p) => {
         acc.totalCbm += p.totalCbm ?? 0
         acc.totalWeight += p.totalWeight ?? 0
+        acc.remainingAmount += p.remainingAmount ?? 0
         return acc
       },
-      { totalCbm: 0, totalWeight: 0 }
+      { totalCbm: 0, totalWeight: 0, remainingAmount: 0 }
     )
 
     return NextResponse.json({
@@ -241,6 +246,7 @@ export async function GET(req: NextRequest) {
         totals: {
           cbm: sumCbm,
           weight: sumWeight,
+          remainingToPay: sumRemaining,
         },
         pagination: { page, limit, total: totalFiltered, pages: totalPages },
       },

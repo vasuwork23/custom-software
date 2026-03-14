@@ -24,6 +24,8 @@ interface ProductCardProps {
   hasNotReceived?: boolean
   totalCbm?: number
   totalWeight?: number
+  /** Sum of remainingAmount (¥ RMB) across unpaid/partially paid entries */
+  remainingAmount?: number
 }
 
 export function ProductCard({
@@ -44,6 +46,7 @@ export function ProductCard({
   hasNotReceived,
   totalCbm,
   totalWeight,
+  remainingAmount,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -149,6 +152,14 @@ export function ProductCard({
                 <span className="text-muted-foreground">⚖️ Total Weight</span>
                 <span className="font-semibold">
                   {(totalWeight ?? 0).toFixed(2)} kg
+                </span>
+              </div>
+            )}
+            {remainingAmount != null && remainingAmount > 0 && (
+              <div className="flex items-center justify-between col-span-2">
+                <span className="text-muted-foreground">Remaining to pay</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                  ¥{(remainingAmount ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </span>
               </div>
             )}

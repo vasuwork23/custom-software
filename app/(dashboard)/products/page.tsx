@@ -36,6 +36,7 @@ interface ProductItem {
   hasNotReceived: boolean
   totalCbm: number
   totalWeight: number
+  remainingAmount: number
 }
 
 interface IndiaProductItem {
@@ -68,7 +69,7 @@ export default function ProductsPage() {
       unpaid: number
     }
     pagination: { page: number; limit: number; total: number; pages: number }
-    totals?: { cbm: number; weight: number }
+    totals?: { cbm: number; weight: number; remainingToPay: number }
   } | null>(null)
   const [indiaData, setIndiaData] = useState<{
     products: IndiaProductItem[]
@@ -77,16 +78,24 @@ export default function ProductsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [indiaDialogOpen, setIndiaDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null)
-  const [chinaFilter, setChinaFilter] = useState<
-    | 'all'
-    | 'chinaFactory'
-    | 'chinaWh'
-    | 'inTransit'
-    | 'inIndia'
-    | 'fullySold'
-    | 'unpaid'
-  >('all')
+  const CHINA_FILTER_KEY = 'products-china-filter'
+  const ALLOWED_FILTERS = ['all', 'chinaFactory', 'chinaWh', 'inTransit', 'inIndia', 'fullySold', 'unpaid'] as const
+  type ChinaFilterType = (typeof ALLOWED_FILTERS)[number]
+  const [chinaFilter, setChinaFilter] = useState<ChinaFilterType>(() => {
+    if (typeof window === 'undefined') return 'all'
+    const s = sessionStorage.getItem(CHINA_FILTER_KEY)
+    return (ALLOWED_FILTERS.includes(s as ChinaFilterType) ? s : 'all') as ChinaFilterType
+  })
   const debouncedSearch = useDebounce(search, 400)
+
+  const handleChinaFilterChange = (value: ChinaFilterType) => {
+    setChinaFilter(value)
+    try {
+      sessionStorage.setItem(CHINA_FILTER_KEY, value)
+    } catch {
+      // ignore
+    }
+  }
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -107,7 +116,7 @@ export default function ProductsPage() {
         unpaid: number
       }
       pagination: { page: number; limit: number; total: number; pages: number }
-      totals?: { cbm: number; weight: number }
+      totals?: { cbm: number; weight: number; remainingToPay: number }
     }>(`/api/products?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
@@ -275,7 +284,7 @@ export default function ProductsPage() {
                   {data.pagination.total} products matching filters
                 </p>
               </div>
-              <div className="flex gap-3 text-right">
+              <div className="flex flex-wrap gap-3 text-right">
                 <div className="rounded-lg border bg-muted/30 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
                     Total CBM
@@ -293,6 +302,16 @@ export default function ProductsPage() {
                   <p className="text-sm font-semibold tabular-nums">
                     {(data.totals?.weight ?? 0).toLocaleString('en-IN', {
                       maximumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 px-3 py-2">
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                    Remaining to pay (¥)
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                    ¥{(data.totals?.remainingToPay ?? 0).toLocaleString('en-IN', {
+                      maximumFractionDigits: 0,
                     })}
                   </p>
                 </div>
@@ -328,7 +347,7 @@ export default function ProductsPage() {
                     <button
                       key={f.id}
                       type="button"
-                      onClick={() => setChinaFilter(f.id as typeof chinaFilter)}
+                      onClick={() => handleChinaFilterChange(f.id as ChinaFilterType)}
                       className={`rounded-full px-3 py-1 text-xs transition-colors ${
                         chinaFilter === f.id
                           ? 'bg-foreground text-background'
@@ -446,6 +465,7 @@ export default function ProductsPage() {
                     hasNotReceived={p.hasNotReceived}
                     totalCbm={p.totalCbm}
                     totalWeight={p.totalWeight}
+                    remainingAmount={p.remainingAmount}
                   />
                 ))}
               </div>
