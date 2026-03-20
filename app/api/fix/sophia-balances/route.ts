@@ -27,11 +27,45 @@ export async function POST(req: NextRequest) {
     const persons = await ChinaPerson.find({}).lean()
     for (const person of persons) {
       const personId = person._id
+      // Recalculate using the same timeline order as the UI ("Date" column).
       const txs = await ChinaPersonTransaction.find({ chinaPerson: personId })
-        .sort({ createdAt: 1 })
+        .sort({ transactionDate: 1, sortOrder: 1, createdAt: 1, _id: 1 })
         .exec()
 
-      let running = 0
+      // Normalize transactionDate time if it looks like date-only (midnight UTC).
+      // This fixes cases where Pay In/Payout were saved with transactionDate=YYYY-MM-DD (no time),
+      // causing wrong ordering inside the same day.
+      for (const tx of txs) {
+        const td = tx.transactionDate
+        const looksLikeDateOnly =
+          td.getUTCHours() === 0 &&
+          td.getUTCMinutes() === 0 &&
+          td.getUTCSeconds() === 0 &&
+          td.getUTCMilliseconds() === 0
+        if (!looksLikeDateOnly) continue
+
+        const ca = tx.createdAt
+        tx.transactionDate = new Date(
+          Date.UTC(
+            td.getUTCFullYear(),
+            td.getUTCMonth(),
+            td.getUTCDate(),
+            ca.getUTCHours(),
+            ca.getUTCMinutes(),
+            ca.getUTCSeconds(),
+            ca.getUTCMilliseconds()
+          )
+        )
+        await tx.save()
+      }
+
+      const anchorBalance = person.currentBalance ?? 0
+      const sumDelta = txs.reduce((acc, tx) => {
+        const delta = tx.type === 'pay_in' ? tx.amount : -tx.amount
+        return acc + delta
+      }, 0)
+      let running = anchorBalance - sumDelta
+
       for (const tx of txs) {
         if (tx.type === 'pay_in') running += tx.amount
         else if (tx.type === 'pay_out') running -= tx.amount
@@ -39,7 +73,8 @@ export async function POST(req: NextRequest) {
         await tx.save()
       }
 
-      await ChinaPerson.findByIdAndUpdate(personId, { currentBalance: running })
+      // running should end at anchorBalance, but keep it explicit.
+      await ChinaPerson.findByIdAndUpdate(personId, { currentBalance: anchorBalance })
     }
 
     return NextResponse.json({

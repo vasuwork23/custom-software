@@ -11,6 +11,17 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  function toDateTimePreservingDate(dateInput: string, baseDateTime: Date): Date {
+    // If client sends only YYYY-MM-DD, JS treats it as UTC midnight.
+    // Convert it into a Date with the SAME calendar date, but use time from baseDateTime.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      const [y, m, d] = dateInput.split('-').map((v) => Number(v))
+      return new Date(Date.UTC(y, m - 1, d, baseDateTime.getUTCHours(), baseDateTime.getUTCMinutes(), baseDateTime.getUTCSeconds(), baseDateTime.getUTCMilliseconds()))
+    }
+    const parsed = new Date(dateInput)
+    return new Date(parsed)
+  }
+
   try {
     const user = await getUserFromRequest(req)
     if (!user) {
@@ -55,11 +66,13 @@ export async function POST(
     const balanceAfter =
       (updatedPerson as { currentBalance?: number } | null)?.currentBalance ?? 0
 
-    // Use transactionDate from client when provided to keep manual entries ordered correctly
+    // Use transactionDate from client when provided. If it's date-only (YYYY-MM-DD),
+    // preserve the date but use the current time so Pay In/Payout order within the same day works.
+    const now = new Date()
     const txDate =
       body.transactionDate && typeof body.transactionDate === 'string'
-        ? new Date(body.transactionDate)
-        : new Date()
+        ? toDateTimePreservingDate(body.transactionDate, now)
+        : now
 
     await ChinaPersonTransaction.create({
       chinaPerson: personId,

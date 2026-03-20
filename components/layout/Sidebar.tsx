@@ -17,6 +17,7 @@ import {
   Flag,
   Users,
   ShieldAlert,
+  Truck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { href: '/containers', label: 'Containers', icon: Ship },
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/sale-bills', label: 'Sale Bills', icon: FileText },
+  { href: '/carrying', label: 'Carrying', icon: Truck },
   { href: '/received-voucher', label: 'Receive Voucher', icon: Wallet },
   { href: '/banks', label: 'Our Banks', icon: Banknote },
   { href: '/reports', label: 'Reports', icon: BarChart3 },

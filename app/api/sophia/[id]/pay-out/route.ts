@@ -11,6 +11,15 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  function toDateTimePreservingDate(dateInput: string, baseDateTime: Date): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      const [y, m, d] = dateInput.split('-').map((v) => Number(v))
+      return new Date(Date.UTC(y, m - 1, d, baseDateTime.getUTCHours(), baseDateTime.getUTCMinutes(), baseDateTime.getUTCSeconds(), baseDateTime.getUTCMilliseconds()))
+    }
+    const parsed = new Date(dateInput)
+    return new Date(parsed)
+  }
+
   try {
     const user = await getUserFromRequest(req)
     if (!user) {
@@ -37,7 +46,10 @@ export async function POST(
         { status: 400 }
       )
     }
-    const transactionDate = transactionDateRaw ? new Date(transactionDateRaw) : new Date()
+    const now = new Date()
+    const transactionDate = transactionDateRaw
+      ? toDateTimePreservingDate(transactionDateRaw, now)
+      : now
     if (Number.isNaN(transactionDate.getTime())) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', message: 'Invalid date' },
@@ -73,6 +85,9 @@ export async function POST(
       transactionDate,
       notes,
       createdBy,
+      // Align createdAt with transactionDate so chronological ordering matches the UI.
+      createdAt: transactionDate,
+      updatedAt: transactionDate,
     })
 
     return NextResponse.json({

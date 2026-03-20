@@ -69,23 +69,26 @@ export async function DELETE(
       }
     }
 
-    const prevTx = await ChinaPersonTransaction.findOne({
-      chinaPerson: personId,
-      createdAt: { $lt: (tx as { createdAt: Date }).createdAt },
-    })
-      .sort({ createdAt: -1 })
-      .lean()
-    let runningBalance = prevTx?.balanceAfter ?? 0
-
-    const subsequentTxs = await ChinaPersonTransaction.find({
-      chinaPerson: personId,
-      createdAt: { $gt: (tx as { createdAt: Date }).createdAt },
-    })
-      .sort({ createdAt: 1 })
+    // Recalculate all remaining balances using the same chronological order
+    // as the UI ("Date" column), so balanceAfter stays consistent after delete.
+    const allTxs = await ChinaPersonTransaction.find({ chinaPerson: personId })
+      .sort({ transactionDate: 1, sortOrder: 1, createdAt: 1, _id: 1 })
       .exec()
 
-    for (const t of subsequentTxs) {
-      runningBalance = t.type === 'pay_in' ? runningBalance + t.amount : runningBalance - t.amount
+    // Anchor balanceAfter recomputation to the stored currentBalance so the top
+    // "Current Balance" stays consistent after delete.
+    const anchorBalance = person.currentBalance ?? 0
+    const sumDeltaAll = allTxs.reduce((acc, t) => {
+      const delta = t.type === 'pay_in' ? t.amount : -t.amount
+      return acc + delta
+    }, 0)
+    const startBalance = anchorBalance - sumDeltaAll
+
+    let runningBalance = startBalance
+    for (const t of allTxs) {
+      if (String(t._id) === String(txId)) continue
+      const delta = t.type === 'pay_in' ? t.amount : -t.amount
+      runningBalance += delta
       t.balanceAfter = runningBalance
       await t.save()
     }

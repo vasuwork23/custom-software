@@ -8,6 +8,24 @@ import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
 
+type TxType = 'pay_in' | 'pay_out'
+
+type LeanTx = {
+  _id: mongoose.Types.ObjectId
+  chinaPerson: mongoose.Types.ObjectId
+  type: TxType
+  amount: number
+  balanceAfter?: number
+  transactionDate: Date
+  notes?: string
+  sourceLabel?: string
+  buyingPayment?: mongoose.Types.ObjectId
+  isReversal?: boolean
+  sortOrder?: number
+  createdAt: Date
+  updatedAt: Date
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -20,6 +38,7 @@ export async function GET(
         { status: 401 }
       )
     }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -27,6 +46,7 @@ export async function GET(
         { status: 400 }
       )
     }
+
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
@@ -35,6 +55,7 @@ export async function GET(
     const exportAll = searchParams.get('exportAll') === '1'
 
     await connectDB()
+
     const personId = new mongoose.Types.ObjectId(id)
     const person = await ChinaPerson.findById(personId).lean()
     if (!person) {
@@ -44,33 +65,62 @@ export async function GET(
       )
     }
 
-    // Fetch ALL transactions for this person, oldest first by createdAt
     const filter: Record<string, unknown> = { chinaPerson: personId }
     if (startDate || endDate) {
-      filter.createdAt = {}
-      if (startDate) (filter.createdAt as Record<string, Date>).$gte = new Date(startDate)
+      filter.transactionDate = {}
+      if (startDate) (filter.transactionDate as Record<string, Date>).$gte = new Date(startDate)
       if (endDate) {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
-        ;(filter.createdAt as Record<string, Date>).$lte = end
+        ;(filter.transactionDate as Record<string, Date>).$lte = end
       }
     }
 
-    const allTransactions = await ChinaPersonTransaction.find(filter)
-      .sort({ createdAt: 1 })
-      .lean()
+    // Timeline order (oldest -> newest): use full transactionDate (time included) + stable tie-breakers.
+    const timelineAsc = (await ChinaPersonTransaction.find(filter)
+      .sort({ transactionDate: 1, sortOrder: 1, createdAt: 1, _id: 1 })
+      .lean()) as LeanTx[]
 
-    const forDisplay = [...allTransactions].reverse()
-    const totalFiltered = allTransactions.length
-    const paginated = exportAll
-      ? forDisplay
-      : forDisplay.slice((page - 1) * limit, page * limit)
-    const transactions = paginated
+    const totalFiltered = timelineAsc.length
 
-    const paymentIds = transactions
-      .map((t) => (t as { buyingPayment?: mongoose.Types.ObjectId }).buyingPayment)
-      .filter((id): id is mongoose.Types.ObjectId => id != null)
-    let paymentMeta = new Map<
+    // Build a deterministic balanceAfter chain using the earliest transaction's stored balanceAfter as anchor.
+    // That keeps the response consistent for the UI even if older records were created out-of-order.
+    let runningBalance = 0
+    if (timelineAsc.length > 0) {
+      const first = timelineAsc[0]
+      const firstDelta = first.type === 'pay_in' ? first.amount : -first.amount
+      const firstBalanceAfter = first.balanceAfter ?? 0
+      // balanceAfter = balanceBefore + firstDelta => balanceBefore = balanceAfter - delta
+      runningBalance = firstBalanceAfter - firstDelta
+    } else {
+      runningBalance = person.currentBalance ?? 0
+    }
+
+    const computedAsc = timelineAsc.map((t) => {
+      const delta = t.type === 'pay_in' ? t.amount : -t.amount
+      runningBalance += delta
+      const sourceLabel = t.sourceLabel ?? ''
+      const notes = t.notes ?? ''
+      const looksLikeReversal = /^Reversal\b/i.test(sourceLabel) || /\bReversal\b/i.test(notes)
+      const isReversal = t.isReversal === true || looksLikeReversal
+
+      return {
+        ...t,
+        balanceAfter: runningBalance,
+        isReversal,
+      }
+    })
+
+    const computedDesc = computedAsc.slice().reverse()
+    const selected = exportAll
+      ? computedDesc
+      : computedDesc.slice((page - 1) * limit, page * limit)
+
+    const paymentIds = selected
+      .map((t) => t.buyingPayment)
+      .filter((pid): pid is mongoose.Types.ObjectId => pid != null)
+
+    const paymentMeta = new Map<
       string,
       { productId: string; productName: string; entryDate: string }
     >()
@@ -79,50 +129,22 @@ export async function GET(
         .populate('product', 'productName')
         .populate('buyingEntry', 'entryDate')
         .lean()
+
       for (const p of payments) {
         const product = p.product as { _id: mongoose.Types.ObjectId; productName?: string } | null
         const entry = p.buyingEntry as { entryDate?: Date } | null
         paymentMeta.set(String(p._id), {
           productId: product ? String(product._id) : '',
           productName: product?.productName ?? '—',
-          entryDate: entry?.entryDate
-            ? new Date(entry.entryDate).toISOString()
-            : '',
+          entryDate: entry?.entryDate ? entry.entryDate.toISOString() : '',
         })
       }
     }
 
-    const list = transactions.map((t) => {
-      const tx = t as {
-        _id: mongoose.Types.ObjectId
-        type: string
-        amount: number
-        balanceAfter?: number
-        transactionDate: Date
-        notes?: string
-        sourceLabel?: string
-        buyingPayment?: mongoose.Types.ObjectId
-        isReversal?: boolean
-      }
-      const meta = tx.buyingPayment ? paymentMeta.get(String(tx.buyingPayment)) : null
-      const sourceLabel = tx.sourceLabel ?? ''
-      const notes = tx.notes ?? ''
-      const looksLikeReversal = /^Reversal\b/i.test(sourceLabel) || /\bReversal\b/i.test(notes)
-      const isReversal = tx.isReversal === true || looksLikeReversal
-      return {
-        _id: tx._id,
-        type: tx.type,
-        amount: tx.amount,
-        balanceAfter: tx.balanceAfter ?? 0,
-        transactionDate: tx.transactionDate,
-        notes: tx.notes,
-        sourceLabel: tx.sourceLabel,
-        productId: meta?.productId,
-        productName: meta?.productName,
-        entryDate: meta?.entryDate,
-        isReversal,
-      }
-    })
+    const computedCurrentBalance =
+      computedAsc.length > 0
+        ? computedAsc[computedAsc.length - 1].balanceAfter ?? 0
+        : person.currentBalance ?? 0
 
     return NextResponse.json({
       success: true,
@@ -131,9 +153,24 @@ export async function GET(
           _id: person._id,
           name: person.name,
           isDefault: person.isDefault,
-          currentBalance: person.currentBalance ?? 0,
+          currentBalance: computedCurrentBalance,
         },
-        transactions: list,
+        transactions: selected.map((t) => {
+          const meta = t.buyingPayment ? paymentMeta.get(String(t.buyingPayment)) : undefined
+          return {
+            _id: t._id,
+            type: t.type,
+            amount: t.amount,
+            balanceAfter: t.balanceAfter ?? 0,
+            transactionDate: t.transactionDate,
+            notes: t.notes,
+            sourceLabel: t.sourceLabel,
+            productId: meta?.productId,
+            productName: meta?.productName,
+            entryDate: meta?.entryDate,
+            isReversal: t.isReversal,
+          }
+        }),
         pagination: {
           page,
           limit,
