@@ -200,6 +200,16 @@ export async function PUT(
     if (body.rate != null) entry.rate = Number(body.rate)
     if (body.cbm != null) entry.cbm = Number(body.cbm)
     if (body.weight != null) entry.weight = Number(body.weight)
+    if (body.mark != null) {
+      const nextMark = String(body.mark).trim()
+      if (!nextMark) {
+        return NextResponse.json(
+          { success: false, error: 'Validation failed', message: 'Mark is required' },
+          { status: 400 }
+        )
+      }
+      entry.mark = nextMark
+    }
     if (body.hasAdvancePayment !== undefined) entry.hasAdvancePayment = Boolean(body.hasAdvancePayment)
     if (body.hasAdvancePayment === false) {
       const oldAdvancePerson = entry.advanceChinaPerson
