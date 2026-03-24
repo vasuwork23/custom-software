@@ -19,8 +19,29 @@ export async function GET(req: NextRequest) {
     }
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
     const search = searchParams.get('search')?.trim() ?? ''
+    const outstandingFilterParam = searchParams.get('outstandingFilter')?.trim() ?? 'all'
+    const outstandingFilter = ['all', 'positive', 'negative', 'clear'].includes(outstandingFilterParam)
+      ? outstandingFilterParam
+      : 'all'
+    const minOutstandingRaw = searchParams.get('minOutstanding')?.trim() ?? ''
+    const maxOutstandingRaw = searchParams.get('maxOutstanding')?.trim() ?? ''
+    const minOutstanding =
+      minOutstandingRaw !== '' &&
+      Number.isFinite(Number(minOutstandingRaw)) &&
+      Number(minOutstandingRaw) >= 0
+        ? Number(minOutstandingRaw)
+        : null
+    const maxOutstanding =
+      maxOutstandingRaw !== '' &&
+      Number.isFinite(Number(maxOutstandingRaw)) &&
+      Number(maxOutstandingRaw) >= 0
+        ? Number(maxOutstandingRaw)
+        : null
+
+    // Floating point safety for "clear" filter (0 outstanding).
+    const epsilon = 0.00001
 
     await connectDB()
 
@@ -37,14 +58,25 @@ export async function GET(req: NextRequest) {
     }
 
     const skip = (page - 1) * limit
-    const [companies, total] = await Promise.all([
-      Company.find(filter).sort({ companyName: 1 }).skip(skip).limit(limit).lean(),
-      Company.countDocuments(filter),
-    ])
 
-    const companyIds = companies.map((c) => c._id)
+    // 1) Get candidate companies for the search filter.
+    // We compute outstanding for these candidates server-side, then apply outstanding filters and pagination.
+    const allCompanies = await Company.find(filter).sort({ companyName: 1 }).lean()
+    if (allCompanies.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          companies: [],
+          pagination: { page, limit, total: 0, pages: 0 },
+          totals: { totalPositiveOutstanding: 0, totalNegativeOutstanding: 0 },
+        },
+      })
+    }
 
-    const [billedAgg, receivedAgg, profitAgg] = await Promise.all([
+    const companyIds = allCompanies.map((c) => c._id)
+
+    // 2) Compute billed/received totals to derive outstanding.
+    const [billedAgg, receivedAgg] = await Promise.all([
       SellBill.aggregate([
         { $match: { company: { $in: companyIds } } },
         { $group: { _id: '$company', total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
@@ -53,26 +85,77 @@ export async function GET(req: NextRequest) {
         { $match: { company: { $in: companyIds } } },
         { $group: { _id: '$company', total: { $sum: '$amount' } } },
       ]),
-      SellBillItem.aggregate([
-        { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
-        { $unwind: '$bill' },
-        { $match: { 'bill.company': { $in: companyIds } } },
-        { $group: { _id: '$bill.company', total: { $sum: '$totalProfit' } } },
-      ]),
     ])
 
     const billedByCompany = Object.fromEntries(billedAgg.map((r) => [String(r._id), r.total]))
     const receivedByCompany = Object.fromEntries(receivedAgg.map((r) => [String(r._id), r.total]))
-    const profitByCompany = Object.fromEntries(profitAgg.map((r) => [String(r._id), r.total]))
 
-    const list = companies.map((c) => {
+    const enriched = allCompanies.map((c) => {
       const totalBilled = billedByCompany[String(c._id)] ?? 0
       const totalReceived = receivedByCompany[String(c._id)] ?? 0
-      const totalProfit = profitByCompany[String(c._id)] ?? 0
       const outstandingBalance = totalBilled - totalReceived
       return {
         ...c,
         outstandingBalance,
+      }
+    })
+
+    // 3) Apply outstanding filters and outstanding amount range.
+    // Range filters use absolute outstanding value so it works for both positive/negative.
+    const filtered = enriched.filter((c) => {
+      const outstanding = c.outstandingBalance as number
+      const absOutstanding = Math.abs(outstanding)
+
+      const statusMatch =
+        outstandingFilter === 'all'
+          ? true
+          : outstandingFilter === 'positive'
+          ? outstanding > epsilon
+          : outstandingFilter === 'negative'
+          ? outstanding < -epsilon
+          : Math.abs(outstanding) <= epsilon
+
+      if (!statusMatch) return false
+
+      if (minOutstanding != null && Number.isFinite(minOutstanding) && absOutstanding < minOutstanding) {
+        return false
+      }
+      if (maxOutstanding != null && Number.isFinite(maxOutstanding) && absOutstanding > maxOutstanding) {
+        return false
+      }
+
+      return true
+    })
+
+    const totalPositiveOutstanding = filtered
+      .filter((c) => (c.outstandingBalance as number) > epsilon)
+      .reduce((sum, c) => sum + (c.outstandingBalance as number), 0)
+
+    const totalNegativeOutstanding = filtered
+      .filter((c) => (c.outstandingBalance as number) < -epsilon)
+      .reduce((sum, c) => sum + Math.abs(c.outstandingBalance as number), 0)
+
+    // 4) Paginate after applying outstanding filters.
+    const total = filtered.length
+    const pages = Math.ceil(total / limit)
+    const pageCompanies = filtered.slice(skip, skip + limit)
+
+    const pageCompanyIds = pageCompanies.map((c) => c._id)
+    let profitByCompany: Record<string, number> = {}
+    if (pageCompanyIds.length > 0) {
+      const profitAgg = await SellBillItem.aggregate([
+        { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
+        { $unwind: '$bill' },
+        { $match: { 'bill.company': { $in: pageCompanyIds } } },
+        { $group: { _id: '$bill.company', total: { $sum: '$totalProfit' } } },
+      ])
+      profitByCompany = Object.fromEntries(profitAgg.map((r) => [String(r._id), r.total]))
+    }
+
+    const list = pageCompanies.map((c) => {
+      const totalProfit = profitByCompany[String(c._id)] ?? 0
+      return {
+        ...c,
         totalProfit,
       }
     })
@@ -81,7 +164,8 @@ export async function GET(req: NextRequest) {
       success: true,
       data: {
         companies: list,
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        pagination: { page, limit, total, pages },
+        totals: { totalPositiveOutstanding, totalNegativeOutstanding },
       },
     })
   } catch (error) {

@@ -112,17 +112,22 @@ export function CompanyFormSheet({
   }, [open, editCompany, reset])
 
   async function onSubmit(values: FormValues) {
+    const normalizeOptional = (value?: string) => {
+      const trimmed = value?.trim() ?? ''
+      return trimmed === '' ? null : trimmed
+    }
+
     const payload = {
       companyName: values.companyName.trim(),
-      ownerName: values.ownerName?.trim() || undefined,
-      contact1Name: values.contact1Name?.trim() || undefined,
-      contact1Mobile: values.contact1Mobile?.trim() || undefined,
-      contact2Name: values.contact2Name?.trim() || undefined,
-      contact2Mobile: values.contact2Mobile?.trim() || undefined,
-      gstNumber: values.gstNumber?.trim() || undefined,
-      address: values.address?.trim() || undefined,
-      city: values.city?.trim() || undefined,
-      primaryMobile: values.primaryMobile?.trim() || undefined,
+      ownerName: normalizeOptional(values.ownerName),
+      contact1Name: normalizeOptional(values.contact1Name),
+      contact1Mobile: normalizeOptional(values.contact1Mobile),
+      contact2Name: normalizeOptional(values.contact2Name),
+      contact2Mobile: normalizeOptional(values.contact2Mobile),
+      gstNumber: normalizeOptional(values.gstNumber),
+      address: normalizeOptional(values.address),
+      city: normalizeOptional(values.city),
+      primaryMobile: normalizeOptional(values.primaryMobile),
     }
     if (isEdit) {
       const result = await apiPut(`/api/companies/${editCompany._id}`, payload)
@@ -155,111 +160,123 @@ export function CompanyFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto w-full sm:max-w-xl">
-        <SheetHeader>
+      <SheetContent
+        side="right"
+        className="flex h-full min-w-0 w-[70vw] max-w-[70vw] flex-col overflow-y-auto overflow-x-hidden p-4 pb-6 pr-14 sm:max-w-[70vw] sm:p-6 sm:pr-14"
+      >
+        <SheetHeader className="shrink-0 space-y-1 pb-3 pr-2">
           <SheetTitle>{isEdit ? 'Edit Company' : 'Add Company'}</SheetTitle>
         </SheetHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Company Name *</Label>
-            <Input
-              id="companyName"
-              {...register('companyName')}
-              className={errors.companyName ? 'border-destructive' : ''}
-              placeholder="Company name"
-            />
-            {errors.companyName && (
-              <p className="text-sm text-destructive">{errors.companyName.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ownerName">Owner Name</Label>
-            <Input id="ownerName" {...register('ownerName')} placeholder="Optional" />
-          </div>
-
-          <div className="space-y-4 rounded-lg border p-4">
-            <div className="font-medium text-sm text-muted-foreground">Contact 1</div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="contact1Name">Name</Label>
-                <Input id="contact1Name" {...register('contact1Name')} placeholder="Optional" />
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex min-w-0 flex-1 flex-col gap-2.5"
+        >
+          <div className="min-w-0 space-y-2.5">
+            <div className="grid min-w-0 gap-2.5 sm:grid-cols-2">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="companyName">Company Name *</Label>
+                <Input
+                  id="companyName"
+                  {...register('companyName')}
+                  className={errors.companyName ? 'border-destructive' : ''}
+                  placeholder="Company name"
+                />
+                {errors.companyName && (
+                  <p className="text-sm text-destructive">{errors.companyName.message}</p>
+                )}
               </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="ownerName">Owner Name</Label>
+                <Input id="ownerName" {...register('ownerName')} placeholder="Optional" />
+              </div>
+            </div>
+
+            <div className="grid min-w-0 gap-2.5 lg:grid-cols-2">
+              <div className="min-w-0 space-y-2 rounded-lg border p-2.5">
+                <div className="text-sm font-medium text-muted-foreground">Contact 1</div>
+                <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="contact1Name">Name</Label>
+                    <Input id="contact1Name" {...register('contact1Name')} placeholder="Optional" />
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="contact1Mobile">Mobile</Label>
+                    <Input id="contact1Mobile" {...register('contact1Mobile')} placeholder="Optional" />
+                  </div>
+                </div>
+              </div>
+              <div className="min-w-0 space-y-2 rounded-lg border p-2.5">
+                <div className="text-sm font-medium text-muted-foreground">Contact 2</div>
+                <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="contact2Name">Name</Label>
+                    <Input id="contact2Name" {...register('contact2Name')} placeholder="Optional" />
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="contact2Mobile">Mobile</Label>
+                    <Input id="contact2Mobile" {...register('contact2Mobile')} placeholder="Optional" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid min-w-0 gap-2.5 sm:grid-cols-2">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="gstNumber">GST Number</Label>
+                <Input id="gstNumber" {...register('gstNumber')} placeholder="Optional" />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="city">City</Label>
+                <Input id="city" {...register('city')} placeholder="Optional" />
+              </div>
+            </div>
+
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor="address">Address</Label>
+              <Input id="address" {...register('address')} placeholder="Optional" />
+            </div>
+
+            <div className="min-w-0 rounded-lg border p-2.5">
               <div className="space-y-2">
-                <Label htmlFor="contact1Mobile">Mobile</Label>
-                <Input id="contact1Mobile" {...register('contact1Mobile')} placeholder="Optional" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="primaryMobile">
+                    WhatsApp Number <span className="ml-1">🟢</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Used for bills and outstanding reminders.
+                  </p>
+                </div>
+                <Input
+                  id="primaryMobile"
+                  className="w-full min-w-0"
+                  {...register('primaryMobile')}
+                  placeholder="WhatsApp mobile (with or without country code)"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={!contact1Mobile}
+                    onClick={() => useContactForWhatsapp('contact1')}
+                  >
+                    Same as Contact 1
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={!contact2Mobile}
+                    onClick={() => useContactForWhatsapp('contact2')}
+                  >
+                    Same as Contact 2
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4 rounded-lg border p-4">
-            <div className="font-medium text-sm text-muted-foreground">Contact 2</div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="contact2Name">Name</Label>
-                <Input id="contact2Name" {...register('contact2Name')} placeholder="Optional" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact2Mobile">Mobile</Label>
-                <Input id="contact2Mobile" {...register('contact2Mobile')} placeholder="Optional" />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="gstNumber">GST Number</Label>
-            <Input id="gstNumber" {...register('gstNumber')} placeholder="Optional" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input id="address" {...register('address')} placeholder="Optional" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="city">City</Label>
-            <Input id="city" {...register('city')} placeholder="Optional" />
-          </div>
-
-          <div className="space-y-3 rounded-lg border p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="primaryMobile">
-                  WhatsApp Number <span className="ml-1">🟢</span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  This number will be used for sending bills and outstanding reminders.
-                </p>
-              </div>
-              <div className="flex flex-col gap-1 text-xs">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  disabled={!contact1Mobile}
-                  onClick={() => useContactForWhatsapp('contact1')}
-                >
-                  Same as Contact 1
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  disabled={!contact2Mobile}
-                  onClick={() => useContactForWhatsapp('contact2')}
-                >
-                  Same as Contact 2
-                </Button>
-              </div>
-            </div>
-            <Input
-              id="primaryMobile"
-              {...register('primaryMobile')}
-              placeholder="WhatsApp mobile (with or without country code)"
-            />
-          </div>
-
-          <div className="flex gap-2 pt-4">
+          <div className="flex shrink-0 gap-2 border-t pt-3">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
             </Button>

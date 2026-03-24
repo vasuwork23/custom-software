@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CompanyFormSheet } from '@/components/companies/CompanyFormSheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
@@ -20,6 +21,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { PaymentFormDialog } from '@/components/received-voucher/PaymentFormDialog'
 
 type ViewMode = 'card' | 'table'
+type OutstandingFilter = 'all' | 'positive' | 'negative' | 'clear'
 
 interface CompanyItem {
   _id: string
@@ -45,11 +47,18 @@ export default function CompaniesPage() {
   const [data, setData] = useState<{
     companies: CompanyItem[]
     pagination: { page: number; limit: number; total: number; pages: number }
+    totals: { totalPositiveOutstanding: number; totalNegativeOutstanding: number }
   } | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [outstandingFilter, setOutstandingFilter] = useState<OutstandingFilter>('all')
+  const [minOutstanding, setMinOutstanding] = useState('')
+  const [maxOutstanding, setMaxOutstanding] = useState('')
   const debouncedSearch = useDebounce(search, 400)
+  const debouncedOutstandingFilter = useDebounce(outstandingFilter, 400)
+  const debouncedMinOutstanding = useDebounce(minOutstanding, 400)
+  const debouncedMaxOutstanding = useDebounce(maxOutstanding, 400)
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true)
@@ -57,18 +66,26 @@ export default function CompaniesPage() {
     params.set('page', String(page))
     params.set('limit', '20')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+    params.set('outstandingFilter', debouncedOutstandingFilter)
+    if (debouncedMinOutstanding.trim() !== '') params.set('minOutstanding', debouncedMinOutstanding)
+    if (debouncedMaxOutstanding.trim() !== '') params.set('maxOutstanding', debouncedMaxOutstanding)
     const result = await apiGet<{
       companies: CompanyItem[]
       pagination: { page: number; limit: number; total: number; pages: number }
+      totals: { totalPositiveOutstanding: number; totalNegativeOutstanding: number }
     }>(`/api/companies?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, debouncedSearch])
+  }, [page, debouncedSearch, debouncedOutstandingFilter, debouncedMinOutstanding, debouncedMaxOutstanding])
 
   useEffect(() => {
     fetchCompanies()
   }, [fetchCompanies])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, debouncedOutstandingFilter, debouncedMinOutstanding, debouncedMaxOutstanding])
 
   function openAdd() {
     setEditingCompany(null)
@@ -112,13 +129,81 @@ export default function CompaniesPage() {
         }
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          placeholder="Search by name, owner, city, mobile..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            <Input
+              placeholder="Search by name, owner, city, mobile..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:max-w-sm"
+            />
+            <Select
+              value={outstandingFilter}
+              onValueChange={(value: OutstandingFilter) => setOutstandingFilter(value)}
+            >
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Outstanding filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Outstanding</SelectItem>
+                <SelectItem value="positive">Positive (To Receive)</SelectItem>
+                <SelectItem value="negative">Negative (Advance/Credit)</SelectItem>
+                <SelectItem value="clear">Clear (Zero)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={minOutstanding}
+              onChange={(e) => setMinOutstanding(e.target.value)}
+              placeholder="Min outstanding"
+              className="w-full sm:w-[150px]"
+            />
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={maxOutstanding}
+              onChange={(e) => setMaxOutstanding(e.target.value)}
+              placeholder="Max outstanding"
+              className="w-full sm:w-[150px]"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setOutstandingFilter('all')
+                setMinOutstanding('')
+                setMaxOutstanding('')
+              }}
+            >
+              Reset Filters
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Total Positive Outstanding (To Receive)</p>
+              <p className="text-lg font-semibold text-red-600">
+                <AmountDisplay amount={data?.totals?.totalPositiveOutstanding ?? 0} />
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Total Negative Outstanding (Advance/Credit)</p>
+              <p className="text-lg font-semibold text-blue-600">
+                <AmountDisplay amount={data?.totals?.totalNegativeOutstanding ?? 0} />
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="flex gap-2">
           <Button
             variant={view === 'card' ? 'secondary' : 'ghost'}
@@ -141,11 +226,15 @@ export default function CompaniesPage() {
 
       {loading ? (
         <TableSkeleton rows={8} columns={6} />
-      ) : !data?.companies.length ? (
+      ) : !(data?.companies?.length ?? 0) ? (
         <EmptyState
           icon={Building2}
-          title="No companies yet"
-          description="Add your first company to start recording sale bills and payments."
+          title={data?.companies?.length ? 'No companies match filters' : 'No companies yet'}
+          description={
+            data?.companies?.length
+              ? 'Try changing outstanding filter or amount range.'
+              : 'Add your first company to start recording sale bills and payments.'
+          }
         >
           <Button onClick={openAdd}>
             <Plus className="mr-2 h-4 w-4" />
@@ -154,30 +243,67 @@ export default function CompaniesPage() {
         </EmptyState>
       ) : view === 'card' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.companies.map((c) => (
+          {data?.companies.map((c) => (
             <Card
               key={c._id}
               className="overflow-hidden cursor-pointer"
               onClick={() => router.push(`/companies/${c._id}`)}
             >
               <CardHeader className="pb-2">
-                <Link
-                  href={`/companies/${c._id}`}
-                  className="font-semibold hover:underline line-clamp-1"
-                >
-                  {c.companyName}
-                </Link>
-                {c.ownerName && (
-                  <p className="text-sm text-muted-foreground">{c.ownerName}</p>
-                )}
-                {(c.contact1Mobile || c.contact2Mobile) && (
-                  <p className="text-xs text-muted-foreground">
-                    {[c.contact1Mobile, c.contact2Mobile].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-                {c.city && (
-                  <p className="text-xs text-muted-foreground">{c.city}</p>
-                )}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/companies/${c._id}`}
+                      className="font-semibold hover:underline line-clamp-1"
+                    >
+                      {c.companyName}
+                    </Link>
+                    {c.ownerName && (
+                      <p className="text-sm text-muted-foreground">{c.ownerName}</p>
+                    )}
+                    {(c.contact1Mobile || c.contact2Mobile) && (
+                      <p className="text-xs text-muted-foreground">
+                        {[c.contact1Mobile, c.contact2Mobile]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    )}
+                    {c.city && (
+                      <p className="text-xs text-muted-foreground">{c.city}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEdit(c)
+                      }}
+                      aria-label="Edit"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <ConfirmDialog
+                      title="Delete company"
+                      description="This cannot be undone. You cannot delete a company that has sale bills or payment receipts."
+                      confirmLabel="Delete"
+                      variant="destructive"
+                      onConfirm={() => handleDelete(c)}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          aria-label="Delete"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
                 <div className="flex justify-between text-sm">
@@ -207,37 +333,6 @@ export default function CompaniesPage() {
                   <span className="text-muted-foreground">Profit</span>
                   <AmountDisplay amount={c.totalProfit} />
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openEdit(c)
-                    }}
-                    aria-label="Edit"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                    <ConfirmDialog
-                      title="Delete company"
-                      description="This cannot be undone. You cannot delete a company that has sale bills or payment receipts."
-                    confirmLabel="Delete"
-                    variant="destructive"
-                    onConfirm={() => handleDelete(c)}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        aria-label="Delete"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    }
-                  />
-                </div>
               </CardContent>
             </Card>
           ))}
@@ -258,7 +353,7 @@ export default function CompaniesPage() {
               </tr>
             </thead>
             <tbody>
-              {data.companies.map((c) => (
+              {data?.companies.map((c) => (
                 <tr
                   key={c._id}
                   className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
