@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * DELETE a cash transaction.
- * Only allows deleting manually added cash-in entries (category === 'cash_in').
+ * Allows deleting manual cash-in and manual withdraw-cash entries.
  * Reverses the effect on both Cash.balance and the default cash BankAccount currentBalance.
  */
 export async function DELETE(
@@ -58,14 +58,17 @@ export async function DELETE(
       )
     }
 
-    // Only allow deleting manually added cash (cash_in).
-    if (tx.category !== 'cash_in') {
+    const isManualCashIn = tx.category === 'cash_in'
+    const isManualWithdraw = typeof tx.description === 'string' && tx.description.startsWith('Withdraw Cash')
+
+    // Only allow deleting manual add/withdraw cash entries.
+    if (!isManualCashIn && !isManualWithdraw) {
       return NextResponse.json(
         {
           success: false,
           error: 'Forbidden',
           message:
-            'Only manually added cash transactions can be deleted. System transactions cannot be removed.',
+            'Only manual Add Cash / Withdraw Cash transactions can be deleted. System transactions cannot be removed.',
         },
         { status: 403 }
       )

@@ -23,6 +23,8 @@ import '@/models/IndiaBuyingPayment'
 import '@/models/Expense'
 import '@/models/Liability'
 import '@/models/CarryingBill'
+import '@/models/Investment'
+import '@/models/InvestmentTransaction'
 
 export {}
 

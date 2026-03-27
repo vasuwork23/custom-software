@@ -101,7 +101,8 @@ export default function CashHistoryPage() {
   const { transactions, currentBalance, page: currentPage, totalPages, total } = data
   const isNegative = currentBalance < 0
 
-  const isDeletable = (tx: CashTransactionRow) => tx.category === 'cash_in'
+  const isDeletable = (tx: CashTransactionRow) =>
+    tx.category === 'cash_in' || tx.description.startsWith('Withdraw Cash')
 
   const pdfColumns = [
     'Date',

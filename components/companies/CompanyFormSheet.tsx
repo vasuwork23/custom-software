@@ -151,7 +151,7 @@ export function CompanyFormSheet({
   const contact1Mobile = watch('contact1Mobile')
   const contact2Mobile = watch('contact2Mobile')
 
-  function useContactForWhatsapp(which: 'contact1' | 'contact2') {
+  function setContactForWhatsapp(which: 'contact1' | 'contact2') {
     const source = which === 'contact1' ? contact1Mobile : contact2Mobile
     if (source && source.trim()) {
       setValue('primaryMobile', source.trim(), { shouldValidate: true })
@@ -258,7 +258,7 @@ export function CompanyFormSheet({
                     variant="outline"
                     size="xs"
                     disabled={!contact1Mobile}
-                    onClick={() => useContactForWhatsapp('contact1')}
+                    onClick={() => setContactForWhatsapp('contact1')}
                   >
                     Same as Contact 1
                   </Button>
@@ -267,7 +267,7 @@ export function CompanyFormSheet({
                     variant="outline"
                     size="xs"
                     disabled={!contact2Mobile}
-                    onClick={() => useContactForWhatsapp('contact2')}
+                    onClick={() => setContactForWhatsapp('contact2')}
                   >
                     Same as Contact 2
                   </Button>

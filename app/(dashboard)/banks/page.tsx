@@ -38,8 +38,24 @@ interface BankAccountRow {
   transactionCount: number
 }
 
+interface InvestmentRow {
+  _id: string
+  investorName: string
+  currentBalance: number
+}
+
+interface InvestmentTransactionRow {
+  _id: string
+  type: 'add' | 'withdraw'
+  amount: number
+  balanceAfter: number
+  transactionDate: string
+  note: string
+}
+
 export default function BanksPage() {
   const [accounts, setAccounts] = useState<BankAccountRow[]>([])
+  const [investments, setInvestments] = useState<InvestmentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
@@ -55,12 +71,30 @@ export default function BanksPage() {
   const [addCashAmount, setAddCashAmount] = useState('')
   const [addCashDate, setAddCashDate] = useState<Date>(new Date())
   const [addCashNote, setAddCashNote] = useState('')
+  const [withdrawCashOpen, setWithdrawCashOpen] = useState(false)
+  const [withdrawCashAmount, setWithdrawCashAmount] = useState('')
+  const [withdrawCashDate, setWithdrawCashDate] = useState<Date>(new Date())
+  const [withdrawCashNote, setWithdrawCashNote] = useState('')
   const [addBankOpen, setAddBankOpen] = useState(false)
   const [selectedBank, setSelectedBank] = useState<BankAccountRow | null>(null)
   const [addBankAmount, setAddBankAmount] = useState('')
   const [addBankDate, setAddBankDate] = useState<Date>(new Date())
   const [addBankNote, setAddBankNote] = useState('')
   const [addBankSubmitting, setAddBankSubmitting] = useState(false)
+  const [investmentDialogOpen, setInvestmentDialogOpen] = useState(false)
+  const [investorName, setInvestorName] = useState('')
+  const [investmentSubmitting, setInvestmentSubmitting] = useState(false)
+  const [investmentTxDialogOpen, setInvestmentTxDialogOpen] = useState(false)
+  const [selectedInvestment, setSelectedInvestment] = useState<InvestmentRow | null>(null)
+  const [investmentTxType, setInvestmentTxType] = useState<'add' | 'withdraw'>('add')
+  const [investmentTxAmount, setInvestmentTxAmount] = useState('')
+  const [investmentTxDate, setInvestmentTxDate] = useState<Date>(new Date())
+  const [investmentTxNote, setInvestmentTxNote] = useState('')
+  const [investmentTxSubmitting, setInvestmentTxSubmitting] = useState(false)
+  const [investmentEditOpen, setInvestmentEditOpen] = useState(false)
+  const [editingInvestment, setEditingInvestment] = useState<InvestmentRow | null>(null)
+  const [editingInvestorName, setEditingInvestorName] = useState('')
+  const [investmentEditSubmitting, setInvestmentEditSubmitting] = useState(false)
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true)
@@ -70,9 +104,16 @@ export default function BanksPage() {
     else toast.error(result.message)
   }, [])
 
+  const fetchInvestments = useCallback(async () => {
+    const result = await apiGet<{ investments: InvestmentRow[] }>('/api/banks/investments')
+    if (result.success) setInvestments(result.data.investments)
+    else toast.error(result.message)
+  }, [])
+
   useEffect(() => {
     fetchAccounts()
-  }, [fetchAccounts])
+    fetchInvestments()
+  }, [fetchAccounts, fetchInvestments])
 
   const cashAccount = accounts.find((a) => a.type === 'cash')
   const onlineAccounts = accounts.filter((a) => a.type === 'online')
@@ -208,6 +249,41 @@ export default function BanksPage() {
     }
   }
 
+  async function handleWithdrawCash() {
+    const amount = Number(withdrawCashAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Enter a valid amount')
+      return
+    }
+    if (!withdrawCashNote.trim()) {
+      toast.error('Note is required')
+      return
+    }
+    if (amount > cashBalance) {
+      toast.error(`Insufficient cash balance. Available: ₹${cashBalance.toLocaleString('en-IN')}`)
+      return
+    }
+
+    setSubmitting(true)
+    const result = await apiPost('/api/our-banks/cash/withdraw', {
+      amount,
+      date: withdrawCashDate.toISOString(),
+      note: withdrawCashNote.trim() || undefined,
+    })
+    setSubmitting(false)
+
+    if (result.success) {
+      toast.success('Cash withdrawn')
+      setWithdrawCashOpen(false)
+      setWithdrawCashAmount('')
+      setWithdrawCashDate(new Date())
+      setWithdrawCashNote('')
+      fetchAccounts()
+    } else {
+      toast.error(result.message)
+    }
+  }
+
   async function handleAddBankAmount() {
     const amount = Number(addBankAmount)
     if (!selectedBank) {
@@ -244,6 +320,125 @@ export default function BanksPage() {
     }
   }
 
+  async function handleAddInvestment() {
+    const name = investorName.trim()
+
+    if (!name) {
+      toast.error('Investor name is required')
+      return
+    }
+
+    setInvestmentSubmitting(true)
+    const result = await apiPost('/api/banks/investments', {
+      investorName: name,
+    })
+    setInvestmentSubmitting(false)
+
+    if (result.success) {
+      toast.success('Investor added')
+      setInvestmentDialogOpen(false)
+      setInvestorName('')
+      fetchInvestments()
+    } else {
+      toast.error(result.message)
+    }
+  }
+
+  function openInvestmentTransactionDialog(investment: InvestmentRow, type: 'add' | 'withdraw') {
+    setSelectedInvestment(investment)
+    setInvestmentTxType(type)
+    setInvestmentTxAmount('')
+    setInvestmentTxDate(new Date())
+    setInvestmentTxNote('')
+    setInvestmentTxDialogOpen(true)
+  }
+
+  async function handleInvestmentTransaction() {
+    if (!selectedInvestment) {
+      toast.error('Investor not selected')
+      return
+    }
+    const amount = Number(investmentTxAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Enter a valid amount')
+      return
+    }
+    if (investmentTxType === 'withdraw' && amount > selectedInvestment.currentBalance) {
+      toast.error(
+        `Withdraw amount exceeds balance. Available: ₹${selectedInvestment.currentBalance.toLocaleString('en-IN')}`
+      )
+      return
+    }
+
+    setInvestmentTxSubmitting(true)
+    const result = await apiPost(`/api/banks/investments/${selectedInvestment._id}/transactions`, {
+      type: investmentTxType,
+      amount,
+      date: investmentTxDate.toISOString(),
+      note: investmentTxNote.trim() || undefined,
+    })
+    setInvestmentTxSubmitting(false)
+
+    if (result.success) {
+      toast.success(
+        investmentTxType === 'add'
+          ? 'Investment amount added'
+          : 'Investment amount withdrawn'
+      )
+      setInvestmentTxDialogOpen(false)
+      setSelectedInvestment(null)
+      fetchAccounts()
+      fetchInvestments()
+    } else {
+      toast.error(result.message)
+    }
+  }
+
+  function openEditInvestment(investment: InvestmentRow) {
+    setEditingInvestment(investment)
+    setEditingInvestorName(investment.investorName)
+    setInvestmentEditOpen(true)
+  }
+
+  async function handleSaveInvestmentEdit() {
+    if (!editingInvestment) return
+    const name = editingInvestorName.trim()
+    if (!name) {
+      toast.error('Investor name is required')
+      return
+    }
+    setInvestmentEditSubmitting(true)
+    const result = await apiPut(`/api/banks/investments/${editingInvestment._id}`, {
+      investorName: name,
+    })
+    setInvestmentEditSubmitting(false)
+    if (result.success) {
+      toast.success('Investor updated')
+      setInvestmentEditOpen(false)
+      setEditingInvestment(null)
+      setEditingInvestorName('')
+      fetchInvestments()
+    } else {
+      toast.error(result.message)
+    }
+  }
+
+  async function handleDeleteInvestment(investment: InvestmentRow) {
+    if ((investment.currentBalance ?? 0) !== 0) {
+      toast.error(
+        `Cannot delete "${investment.investorName}" — balance is ₹${investment.currentBalance.toLocaleString('en-IN')}. Please clear balance to ₹0 first.`
+      )
+      return
+    }
+    const result = await apiDelete(`/api/banks/investments/${investment._id}`)
+    if (result.success) {
+      toast.success('Investor deleted')
+      fetchInvestments()
+    } else {
+      toast.error(result.message)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -254,6 +449,10 @@ export default function BanksPage() {
             <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
               <ArrowLeftRight className="mr-2 h-4 w-4" />
               Transfer
+            </Button>
+            <Button variant="outline" onClick={() => setInvestmentDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Investment
             </Button>
             <Button onClick={openAddAccount}>
               <Plus className="mr-2 h-4 w-4" />
@@ -300,6 +499,13 @@ export default function BanksPage() {
                   onClick={() => setAddCashOpen(true)}
                 >
                   + Add Cash
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setWithdrawCashOpen(true)}
+                >
+                  - Withdraw Cash
                 </Button>
               </div>
             </div>
@@ -430,6 +636,91 @@ export default function BanksPage() {
                           acc.currentBalance !== 0
                             ? 'Balance must be zero to delete'
                             : 'Delete bank'
+                        }
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    }
+                  />
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground">Investors</h2>
+        {investments.length === 0 ? (
+          <EmptyState
+            icon={Banknote}
+            title="No investors yet"
+            description="Add an investor to track investment balance and cashbook movement."
+          >
+            <Button variant="outline" onClick={() => setInvestmentDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Investment
+            </Button>
+          </EmptyState>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {investments.map((inv) => (
+              <Card key={inv._id} className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <span className="font-semibold">{inv.investorName}</span>
+                </CardHeader>
+                <CardContent className="pb-4">
+                  <div className="text-xl font-semibold">
+                    <AmountDisplay amount={inv.currentBalance} />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">Current investment balance</p>
+                </CardContent>
+                <div className="flex flex-wrap gap-2 px-6 pb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openInvestmentTransactionDialog(inv, 'add')}
+                  >
+                    + Add Amount
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openInvestmentTransactionDialog(inv, 'withdraw')}
+                  >
+                    Withdraw
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                  >
+                    <Link href={`/banks/investments/${inv._id}`}>History</Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openEditInvestment(inv)}
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                  <ConfirmDialog
+                    title="Delete investor"
+                    description="This will delete the investor and all investment transactions. Balance must be ₹0."
+                    confirmLabel="Delete"
+                    variant="destructive"
+                    onConfirm={() => handleDeleteInvestment(inv)}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive"
+                        title={
+                          inv.currentBalance !== 0
+                            ? 'Balance must be zero to delete'
+                            : 'Delete investor'
                         }
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
@@ -611,6 +902,69 @@ export default function BanksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={withdrawCashOpen} onOpenChange={setWithdrawCashOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Withdraw Cash</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Amount (₹) *</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={withdrawCashAmount}
+                onChange={(e) => setWithdrawCashAmount(e.target.value)}
+                placeholder="Enter amount"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn('w-full justify-start text-left font-normal')}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(withdrawCashDate, 'PPP')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={withdrawCashDate}
+                    onSelect={(d) => d && setWithdrawCashDate(d)}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1">
+              <Label>
+                Note <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={withdrawCashNote}
+                onChange={(e) => setWithdrawCashNote(e.target.value)}
+                placeholder="Reason for withdrawal..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setWithdrawCashOpen(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleWithdrawCash} disabled={submitting}>
+              Withdraw
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={addBankOpen} onOpenChange={setAddBankOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -676,6 +1030,152 @@ export default function BanksPage() {
               disabled={addBankSubmitting}
             >
               {addBankSubmitting ? 'Adding...' : 'Add Amount'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={investmentDialogOpen} onOpenChange={setInvestmentDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Investment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Investor Name *</Label>
+              <Input
+                value={investorName}
+                onChange={(e) => setInvestorName(e.target.value)}
+                placeholder="e.g. Rahul Shah"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInvestmentDialogOpen(false)}
+              disabled={investmentSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAddInvestment}
+              disabled={investmentSubmitting}
+            >
+              {investmentSubmitting ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={investmentTxDialogOpen} onOpenChange={setInvestmentTxDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {investmentTxType === 'add' ? 'Add Amount' : 'Withdraw Amount'}
+              {selectedInvestment ? ` — ${selectedInvestment.investorName}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Amount (₹) *</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={investmentTxAmount}
+                onChange={(e) => setInvestmentTxAmount(e.target.value)}
+                placeholder={
+                  investmentTxType === 'add'
+                    ? 'Enter amount to add'
+                    : 'Enter amount to withdraw'
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn('w-full justify-start text-left font-normal')}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(investmentTxDate, 'PPP')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={investmentTxDate}
+                    onSelect={(d) => d && setInvestmentTxDate(d)}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1">
+              <Label>Note</Label>
+              <Input
+                value={investmentTxNote}
+                onChange={(e) => setInvestmentTxNote(e.target.value)}
+                placeholder="Optional note"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This also updates cashbook automatically.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInvestmentTxDialogOpen(false)}
+              disabled={investmentTxSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleInvestmentTransaction}
+              disabled={investmentTxSubmitting}
+            >
+              {investmentTxSubmitting ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={investmentEditOpen} onOpenChange={setInvestmentEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Investor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Investor Name *</Label>
+              <Input
+                value={editingInvestorName}
+                onChange={(e) => setEditingInvestorName(e.target.value)}
+                placeholder="Investor name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInvestmentEditOpen(false)}
+              disabled={investmentEditSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveInvestmentEdit}
+              disabled={investmentEditSubmitting}
+            >
+              {investmentEditSubmitting ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
