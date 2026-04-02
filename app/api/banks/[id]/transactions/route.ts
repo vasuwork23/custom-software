@@ -164,13 +164,18 @@ export async function GET(
       notes: t.notes ?? '',
     }))
 
+    const ledgerBalance =
+      allWithBalance.length > 0
+        ? allWithBalance[allWithBalance.length - 1].runningBalance
+        : 0
+
     return NextResponse.json({
       success: true,
       data: {
         account: {
           _id: account._id,
           accountName: account.accountName,
-          currentBalance: account.currentBalance ?? 0,
+          currentBalance: ledgerBalance,
         },
         transactions: list,
         pagination: { page, limit, total: totalFiltered, pages: Math.ceil(totalFiltered / limit) },

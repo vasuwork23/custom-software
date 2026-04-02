@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction, { type IBankTransaction } from '@/models/BankTransaction'
 import mongoose from 'mongoose'
@@ -73,26 +74,34 @@ export async function DELETE(
       )
     }
 
-    const balanceChange = tx.type === 'credit' ? -tx.amount : tx.amount
-    const updatedBy = await resolveCreatedBy(user.id)
-    const updated = await BankAccount.findByIdAndUpdate(
-      accountId,
-      { $inc: { currentBalance: balanceChange }, updatedBy },
-      { new: true }
-    ).lean()
-
-    if (!updated) {
+    const accountExists = await BankAccount.findById(accountId).select('_id').lean()
+    if (!accountExists) {
       return NextResponse.json(
         { success: false, error: 'Not found', message: 'Bank account not found' },
         { status: 404 }
       )
     }
 
-    await BankTransaction.findByIdAndDelete(txObjectId)
+    const updatedBy = await resolveCreatedBy(user.id)
+
+    // No Mongo multi-doc transaction: standalone MongoDB (typical local dev) does not
+    // support sessions/replica-set transactions ("Transaction numbers are only allowed...").
+    const deleted = await BankTransaction.findOneAndDelete({
+      _id: txObjectId,
+      bankAccount: accountId,
+    })
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: 'Not found', message: 'Transaction not found' },
+        { status: 404 }
+      )
+    }
+
+    const newBalance = await recalculateBankAccountLedger(accountId, { updatedBy })
 
     return NextResponse.json({
       success: true,
-      data: { newBalance: updated.currentBalance },
+      data: { newBalance },
       message: 'Transaction deleted',
     })
   } catch (error) {
