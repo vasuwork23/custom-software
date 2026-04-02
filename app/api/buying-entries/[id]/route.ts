@@ -471,7 +471,9 @@ export async function DELETE(
           type: 'pay_in',
           amount: advanceAmount,
           balanceAfter: newBalance,
-          transactionDate: entryDate ? new Date(entryDate) : new Date(),
+          // Use delete date (today) so the reversal appears on the actual delete day
+          // and keeps chronological ledger ordering consistent.
+          transactionDate: new Date(),
           sourceLabel: description,
           notes: 'Advance restored (entry deleted)',
           isReversal: true,
@@ -509,7 +511,8 @@ export async function DELETE(
         type: 'pay_in',
         amount: payment.amount,
         balanceAfter: newBalance,
-        transactionDate: originalDate ? new Date(originalDate) : new Date(),
+        // Use delete date (today) so this restored payment appears when the entry was deleted.
+        transactionDate: new Date(),
         sourceLabel: description,
         notes: 'Payment restored (entry deleted)',
         isReversal: true,

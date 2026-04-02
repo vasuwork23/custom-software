@@ -3,6 +3,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import ChinaPerson from '@/models/ChinaPerson'
 import ChinaPersonTransaction from '@/models/ChinaPersonTransaction'
+import BuyingEntry from '@/models/BuyingEntry'
 import BuyingPayment from '@/models/BuyingPayment'
 import { recalcBuyingEntryGivenAndStatus } from '@/lib/buying-entry-payments'
 import mongoose from 'mongoose'
@@ -66,6 +67,72 @@ export async function DELETE(
         const entryId = payment.buyingEntry as mongoose.Types.ObjectId
         await BuyingPayment.findByIdAndDelete(buyingPaymentId)
         await recalcBuyingEntryGivenAndStatus(entryId)
+      }
+    }
+
+    // If this is a BuyingEntry *advance* payment, we need to update the BuyingEntry too.
+    // Advance transactions are created as ChinaPersonTransaction(type='pay_out') without a
+    // `buyingPayment` reference, while recalcBuyingEntryGivenAndStatus() depends on:
+    // - `entry.hasAdvancePayment`
+    // - `entry.advanceAmount`
+    if (!buyingPaymentId && tx.type === 'pay_out') {
+      const candidates = await BuyingEntry.find({
+        hasAdvancePayment: true,
+        advanceChinaPerson: personId,
+        advanceAmount: tx.amount,
+      })
+        .lean()
+        .exec()
+
+      if (candidates.length > 0) {
+        const txMs = tx.transactionDate ? new Date(tx.transactionDate).getTime() : Date.now()
+
+        // Pick the closest entry by date (advanceDate if present; otherwise entryDate).
+        // Tie-breaker: exact advanceNote match.
+        let bestId: mongoose.Types.ObjectId | null = null
+        let bestScore = Number.POSITIVE_INFINITY
+        let bestNoteMatch = false
+
+        for (const c of candidates) {
+          const cDate = c.advanceDate ?? c.entryDate
+          const cMs = cDate ? new Date(cDate).getTime() : 0
+          const diffMs = Math.abs(cMs - txMs)
+          const noteMatch = String(c.advanceNote ?? '') === String(tx.notes ?? '')
+
+          // Prefer note matches; if both are same category choose smaller time diff.
+          const score = diffMs
+          if (!bestId) {
+            bestId = c._id as mongoose.Types.ObjectId
+            bestScore = score
+            bestNoteMatch = noteMatch
+            continue
+          }
+
+          if (noteMatch && !bestNoteMatch) {
+            bestId = c._id as mongoose.Types.ObjectId
+            bestScore = score
+            bestNoteMatch = noteMatch
+            continue
+          }
+
+          if (noteMatch === bestNoteMatch && score < bestScore) {
+            bestId = c._id as mongoose.Types.ObjectId
+            bestScore = score
+          }
+        }
+
+        if (bestId) {
+          await BuyingEntry.findByIdAndUpdate(bestId, {
+            $set: { hasAdvancePayment: false, givenAmount: 0 },
+            $unset: {
+              advanceAmount: '',
+              advanceChinaPerson: '',
+              advanceDate: '',
+              advanceNote: '',
+            },
+          })
+          await recalcBuyingEntryGivenAndStatus(bestId)
+        }
       }
     }
 

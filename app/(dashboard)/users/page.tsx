@@ -133,6 +133,7 @@ export default function UsersPage() {
         apiPost<{ fixed: boolean }>('/api/fix/sophia-balances', {}),
         apiPost<{ fixed: boolean }>('/api/fix/bank-balances', {}),
         apiPost<{ fixed: boolean }>('/api/fix/china-bank-balances', {}),
+        apiPost('/api/fix/fix-buying-entry-reversal-transaction-dates', {}),
       ]
       const results = await Promise.all(calls)
       const ok = results.every((r) => r.success)
