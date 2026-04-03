@@ -323,7 +323,7 @@ export default function EditSellBillPage() {
     setSaving(true)
     const payload = {
       companyId,
-      billDate: billDate.toISOString().slice(0, 10),
+      billDate: format(billDate, 'yyyy-MM-dd'),
       notes: notes.trim() || undefined,
       extraCharges,
       extraChargesNote: extraChargesNote.trim() || undefined,

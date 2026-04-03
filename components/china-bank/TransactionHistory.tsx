@@ -49,8 +49,8 @@ export function TransactionHistory({
     const params = new URLSearchParams()
     params.set('page', String(page))
     params.set('limit', '10')
-    if (dateRange?.from) params.set('startDate', dateRange.from.toISOString())
-    if (dateRange?.to) params.set('endDate', dateRange.to.toISOString())
+    if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
+    if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     const result = await apiGet<{ transactions: Transaction[]; pagination: Pagination }>(
       `/api/china-bank/transactions?${params}`
     )

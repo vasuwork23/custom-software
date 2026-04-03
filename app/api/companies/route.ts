@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
     const enriched = allCompanies.map((c) => {
       const totalBilled = billedByCompany[String(c._id)] ?? 0
       const totalReceived = receivedByCompany[String(c._id)] ?? 0
-      const outstandingBalance = totalBilled - totalReceived
+      const outstandingBalance = totalBilled - totalReceived + (c.openingBalance || 0)
       return {
         ...c,
         outstandingBalance,
@@ -184,6 +184,8 @@ export async function GET(req: NextRequest) {
 const createSchema = {
   companyName: (v: unknown) => typeof v === 'string' && v.trim().length > 0,
   ownerName: (v: unknown) => v == null || typeof v === 'string',
+  openingBalance: (v: unknown) => v == null || typeof v === 'number',
+  openingBalanceNotes: (v: unknown) => v == null || typeof v === 'string',
   contact1Name: (v: unknown) => v == null || typeof v === 'string',
   contact1Mobile: (v: unknown) => v == null || typeof v === 'string',
   contact2Name: (v: unknown) => v == null || typeof v === 'string',
@@ -219,6 +221,11 @@ export async function POST(req: NextRequest) {
       ownerName:
         body.ownerName != null && body.ownerName !== ''
           ? String(body.ownerName).trim()
+          : undefined,
+      openingBalance: typeof body.openingBalance === 'number' ? body.openingBalance : 0,
+      openingBalanceNotes:
+        body.openingBalanceNotes != null && body.openingBalanceNotes !== ''
+          ? String(body.openingBalanceNotes).trim()
           : undefined,
       contact1Name:
         body.contact1Name != null && body.contact1Name !== ''

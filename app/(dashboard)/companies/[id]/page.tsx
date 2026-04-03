@@ -51,6 +51,8 @@ interface CompanyDetailData {
     address?: string
     city?: string
     primaryMobile?: string
+    openingBalance?: number
+    openingBalanceNotes?: string
     lastWhatsappSentAt?: string
   }
   totalBilled: number
@@ -522,6 +524,9 @@ export default function CompanyDetailPage() {
           gstNumber: company.gstNumber,
           address: company.address,
           city: company.city,
+          primaryMobile: company.primaryMobile,
+          openingBalance: company.openingBalance,
+          openingBalanceNotes: company.openingBalanceNotes,
         }}
       />
     </div>

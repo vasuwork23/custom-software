@@ -34,6 +34,8 @@ interface CompanyItem {
   gstNumber?: string
   address?: string
   city?: string
+  openingBalance?: number
+  openingBalanceNotes?: string
   outstandingBalance: number
   totalProfit: number
 }
@@ -435,10 +437,10 @@ export default function CompaniesPage() {
 
       {(data?.pagination?.pages ?? 0) > 1 && (
         <Pagination
-          page={data.pagination.page}
-          totalPages={data.pagination.pages}
-          total={data.pagination.total}
-          pageSize={data.pagination.limit}
+          page={data?.pagination?.page ?? 1}
+          totalPages={data?.pagination?.pages ?? 1}
+          total={data?.pagination?.total ?? 0}
+          pageSize={data?.pagination?.limit ?? 20}
           onPageChange={setPage}
         />
       )}

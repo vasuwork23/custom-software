@@ -19,6 +19,8 @@ import { toast } from 'sonner'
 const schema = z.object({
   companyName: z.string().min(1, 'Company name is required'),
   ownerName: z.string().optional(),
+  openingBalance: z.string().optional(),
+  openingBalanceNotes: z.string().optional(),
   contact1Name: z.string().optional(),
   contact1Mobile: z.string().optional(),
   contact2Name: z.string().optional(),
@@ -39,6 +41,8 @@ export interface CompanyFormSheetProps {
     _id: string
     companyName: string
     ownerName?: string
+    openingBalance?: number
+    openingBalanceNotes?: string
     contact1Name?: string
     contact1Mobile?: string
     contact2Name?: string
@@ -70,6 +74,8 @@ export function CompanyFormSheet({
     defaultValues: {
       companyName: '',
       ownerName: '',
+      openingBalance: '',
+      openingBalanceNotes: '',
       contact1Name: '',
       contact1Mobile: '',
       contact2Name: '',
@@ -86,6 +92,8 @@ export function CompanyFormSheet({
       reset({
         companyName: editCompany.companyName,
         ownerName: editCompany.ownerName ?? '',
+        openingBalance: editCompany.openingBalance !== undefined ? String(editCompany.openingBalance) : '',
+        openingBalanceNotes: editCompany.openingBalanceNotes ?? '',
         contact1Name: editCompany.contact1Name ?? '',
         contact1Mobile: editCompany.contact1Mobile ?? '',
         contact2Name: editCompany.contact2Name ?? '',
@@ -99,6 +107,8 @@ export function CompanyFormSheet({
       reset({
         companyName: '',
         ownerName: '',
+        openingBalance: '',
+        openingBalanceNotes: '',
         contact1Name: '',
         contact1Mobile: '',
         contact2Name: '',
@@ -120,6 +130,8 @@ export function CompanyFormSheet({
     const payload = {
       companyName: values.companyName.trim(),
       ownerName: normalizeOptional(values.ownerName),
+      openingBalance: values.openingBalance?.trim() ? Number(values.openingBalance) : 0,
+      openingBalanceNotes: normalizeOptional(values.openingBalanceNotes),
       contact1Name: normalizeOptional(values.contact1Name),
       contact1Mobile: normalizeOptional(values.contact1Mobile),
       contact2Name: normalizeOptional(values.contact2Name),
@@ -188,6 +200,17 @@ export function CompanyFormSheet({
               <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="ownerName">Owner Name</Label>
                 <Input id="ownerName" {...register('ownerName')} placeholder="Optional" />
+              </div>
+            </div>
+
+            <div className="grid min-w-0 gap-2.5 sm:grid-cols-2">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="openingBalance">Opening Balance (₹)</Label>
+                <Input id="openingBalance" {...register('openingBalance')} type="number" step="any" placeholder="Optional" />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="openingBalanceNotes">Opening Balance Notes</Label>
+                <Input id="openingBalanceNotes" {...register('openingBalanceNotes')} placeholder="Optional" />
               </div>
             </div>
 

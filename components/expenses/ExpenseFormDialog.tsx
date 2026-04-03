@@ -107,7 +107,7 @@ export function ExpenseFormDialog({
       title: title.trim(),
       amount: numAmount,
       paidFrom: paidFromId,
-      expenseDate: expenseDate.toISOString().slice(0, 10),
+      expenseDate: format(expenseDate, 'yyyy-MM-dd'),
       remark: remark.trim() || undefined,
     }
     if (editExpense) {

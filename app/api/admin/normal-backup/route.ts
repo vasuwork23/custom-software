@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       await atlasColl.insertMany(docs)
     }
 
-  return NextResponse.json({
+    return NextResponse.json({
       success: true,
       message: 'Backup completed',
       timestamp: new Date().toISOString(),

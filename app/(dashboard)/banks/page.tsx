@@ -187,7 +187,7 @@ export default function BanksPage() {
       fromAccountId,
       toAccountId,
       amount,
-      date: transferDate.toISOString().slice(0, 10),
+      date: format(transferDate, 'yyyy-MM-dd'),
       notes: transferNotes.trim() || undefined,
     })
     setSubmitting(false)
@@ -233,7 +233,7 @@ export default function BanksPage() {
     setSubmitting(true)
     const result = await apiPost('/api/our-banks/cash/add', {
       amount,
-      date: addCashDate.toISOString(),
+      date: format(addCashDate, 'yyyy-MM-dd'),
       note: addCashNote.trim() || undefined,
     })
     setSubmitting(false)
@@ -267,7 +267,7 @@ export default function BanksPage() {
     setSubmitting(true)
     const result = await apiPost('/api/our-banks/cash/withdraw', {
       amount,
-      date: withdrawCashDate.toISOString(),
+      date: format(withdrawCashDate, 'yyyy-MM-dd'),
       note: withdrawCashNote.trim() || undefined,
     })
     setSubmitting(false)
@@ -301,7 +301,7 @@ export default function BanksPage() {
     setAddBankSubmitting(true)
     const result = await apiPost(`/api/banks/${selectedBank._id}/add-amount`, {
       amount,
-      date: addBankDate.toISOString(),
+      date: format(addBankDate, 'yyyy-MM-dd'),
       note: addBankNote.trim() || undefined,
     })
     setAddBankSubmitting(false)
@@ -374,7 +374,7 @@ export default function BanksPage() {
     const result = await apiPost(`/api/banks/investments/${selectedInvestment._id}/transactions`, {
       type: investmentTxType,
       amount,
-      date: investmentTxDate.toISOString(),
+      date: format(investmentTxDate, 'yyyy-MM-dd'),
       note: investmentTxNote.trim() || undefined,
     })
     setInvestmentTxSubmitting(false)

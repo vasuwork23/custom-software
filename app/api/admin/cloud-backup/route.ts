@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     await localDb
       .collection('backuplogs')
       .drop()
-      .catch(() => {})
+      .catch(() => { })
 
     // ============================================
     // STEP 4: Secure delete script file and scripts folder (macOS-focused)

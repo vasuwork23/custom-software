@@ -109,7 +109,7 @@ export function MakeIndiaPaymentDialog({
       buyingEntryId: values.buyingEntryId,
       bankAccountId: values.bankAccountId,
       amount: values.amount ?? 0,
-      paymentDate: values.paymentDate.toISOString(),
+      paymentDate: format(values.paymentDate, 'yyyy-MM-dd'),
       notes: values.notes || undefined,
     })
     if (!result.success) {

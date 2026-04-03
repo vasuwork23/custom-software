@@ -9,7 +9,7 @@ import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
 
-async function getOutstanding(companyId: mongoose.Types.ObjectId): Promise<{ totalBilled: number; totalReceived: number; outstanding: number }> {
+async function getOutstanding(companyId: mongoose.Types.ObjectId, openingBalance: number = 0): Promise<{ totalBilled: number; totalReceived: number; outstanding: number }> {
   const [billedRes, receivedRes] = await Promise.all([
     SellBill.aggregate([
       { $match: { company: companyId } },
@@ -22,7 +22,7 @@ async function getOutstanding(companyId: mongoose.Types.ObjectId): Promise<{ tot
   ])
   const totalBilled = billedRes[0]?.total ?? 0
   const totalReceived = receivedRes[0]?.total ?? 0
-  const outstanding = totalBilled - totalReceived
+  const outstanding = totalBilled - totalReceived + openingBalance
   return { totalBilled, totalReceived, outstanding }
 }
 
@@ -67,7 +67,7 @@ export async function GET(
     }
 
     const [{ totalBilled, totalReceived, outstanding }, totalProfit, sellingHistory, paymentHistory] = await Promise.all([
-      getOutstanding(companyId),
+      getOutstanding(companyId, company.openingBalance || 0),
       getTotalProfit(companyId),
       SellBill.find({ company: companyId }).sort({ billDate: -1, createdAt: -1 }).limit(50).lean().populate('items'),
       PaymentReceipt.find({ company: companyId }).sort({ paymentDate: -1 }).limit(50).lean().populate('bankAccount', 'accountName'),
@@ -160,6 +160,13 @@ export async function PUT(
         body.ownerName == null || body.ownerName === ''
           ? undefined
           : String(body.ownerName).trim()
+    if (body.openingBalance !== undefined)
+      company.openingBalance = typeof body.openingBalance === 'number' ? body.openingBalance : 0
+    if (body.openingBalanceNotes !== undefined)
+      company.openingBalanceNotes =
+        body.openingBalanceNotes == null || body.openingBalanceNotes === ''
+          ? undefined
+          : String(body.openingBalanceNotes).trim()
     if (body.contact1Name !== undefined)
       company.contact1Name =
         body.contact1Name == null || body.contact1Name === ''

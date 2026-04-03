@@ -156,7 +156,7 @@ export function PaymentFormDialog({
       amount: numAmount,
       paymentMode,
       bankAccountId: paymentMode === 'online' ? bankAccountId : undefined,
-      paymentDate: paymentDate.toISOString().slice(0, 10),
+      paymentDate: format(paymentDate, 'yyyy-MM-dd'),
       remark: remark.trim() || undefined,
     }
     if (editPayment) {

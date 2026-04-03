@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { FileText, Plus, Pencil, Trash2, Eye } from 'lucide-react'
+import { format } from 'date-fns'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,8 +50,8 @@ export default function SellBillsPage() {
     params.set('page', String(page))
     params.set('limit', '20')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
-    if (dateRange?.from) params.set('startDate', dateRange.from.toISOString().slice(0, 10))
-    if (dateRange?.to) params.set('endDate', dateRange.to.toISOString().slice(0, 10))
+    if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
+    if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     const result = await apiGet<{ bills: BillRow[]; pagination: { page: number; limit: number; total: number; pages: number } }>(
       `/api/sell-bills?${params}`
     )

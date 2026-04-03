@@ -341,7 +341,7 @@ export function BuyingEntryForm({
     const payload = {
       product: productId,
       mark: values.mark.trim(),
-      entryDate: values.entryDate.toISOString(),
+      entryDate: format(values.entryDate, 'yyyy-MM-dd'),
       totalCtn: values.totalCtn ?? 0,
       qty: values.qty ?? 0,
       rate: values.rate ?? 0,
@@ -350,7 +350,7 @@ export function BuyingEntryForm({
       hasAdvancePayment: values.hasAdvancePayment,
       advanceAmount: values.hasAdvancePayment ? (values.advanceAmount ?? null) : null,
       advanceChinaPerson: values.hasAdvancePayment && values.advanceChinaPerson ? values.advanceChinaPerson : null,
-      advanceDate: values.hasAdvancePayment && values.advanceDate ? values.advanceDate.toISOString() : null,
+      advanceDate: values.hasAdvancePayment && values.advanceDate ? format(values.advanceDate, 'yyyy-MM-dd') : null,
       advanceNote: values.hasAdvancePayment ? (values.advanceNote ?? null) : null,
       carryingRate: values.carryingRate,
       avgRmbRate: values.avgRmbRate,

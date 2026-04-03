@@ -45,7 +45,7 @@ export async function GET(
     void Company
 
     const company = await Company.findById(id)
-      .select('companyName ownerName contact1Mobile contact1Name address')
+      .select('companyName ownerName contact1Mobile contact1Name address openingBalance openingBalanceNotes')
       .lean()
     if (!company) {
       return NextResponse.json(
@@ -62,7 +62,7 @@ export async function GET(
         .sort({ billDate: 1, createdAt: 1 })
         .lean(),
       PaymentReceipt.find({ company: companyId })
-        .sort({ date: 1, createdAt: 1 })
+        .sort({ paymentDate: 1, createdAt: 1 })
         .lean(),
     ])
 
@@ -79,7 +79,7 @@ export async function GET(
         credit: null as number | null,
       })),
       ...payments.map((p) => ({
-        date: p.date,
+        date: (p as any).paymentDate || (p as any).date,
         createdAt: p.createdAt,
         description: `Payment received${
           (p as { notes?: string }).notes
@@ -90,12 +90,16 @@ export async function GET(
         credit: p.amount,
       })),
     ].sort((a, b) => {
+      const aDate = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime()
+      const bDate = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime()
+      if (aDate !== bDate) return aDate - bDate
+      
       const ad = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
       const bd = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
       return ad - bd
     })
 
-    let balance = 0
+    let balance = company.openingBalance || 0
     const transactions = allTx.map((tx) => {
       if (tx.debit) balance += tx.debit
       if (tx.credit) balance -= tx.credit
@@ -118,6 +122,8 @@ export async function GET(
         ownerName: company.ownerName,
         contact1Mobile: company.contact1Mobile,
         contact1Name: company.contact1Name,
+        openingBalance: company.openingBalance,
+        openingBalanceNotes: company.openingBalanceNotes,
       },
       transactions,
       generatedDate,

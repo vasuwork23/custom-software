@@ -298,10 +298,10 @@ export function ContainerFormSheet({
       containerName: containerName.trim(),
       remarks: remarks.trim() || undefined,
       status,
-      loadingDate: loadingDate ? loadingDate.toISOString() : undefined,
-      dispatchDate: dispatchDate ? dispatchDate.toISOString() : undefined,
-      estimatedArrival: estimatedArrival ? estimatedArrival.toISOString() : undefined,
-      arrivedDate: arrivedDate ? arrivedDate.toISOString() : undefined,
+      loadingDate: loadingDate ? format(loadingDate, 'yyyy-MM-dd') : undefined,
+      dispatchDate: dispatchDate ? format(dispatchDate, 'yyyy-MM-dd') : undefined,
+      estimatedArrival: estimatedArrival ? format(estimatedArrival, 'yyyy-MM-dd') : undefined,
+      arrivedDate: arrivedDate ? format(arrivedDate, 'yyyy-MM-dd') : undefined,
       entries: mergedEntries,
     }
     if (isEdit) {

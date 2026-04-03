@@ -114,6 +114,8 @@ export interface OutstandingTemplateProps {
     ownerName?: string
     contact1Mobile?: string
     contact1Name?: string
+    openingBalance?: number
+    openingBalanceNotes?: string
   }
   /** Full statement transactions with running balance. */
   transactions: {
@@ -271,25 +273,27 @@ export function OutstandingTemplate({
                 fontFamily: 'Helvetica-Bold',
               }}
             >
-              Opening Balance
+              {company.openingBalanceNotes || 'Opening Balance'}
             </Text>
             <Text
               style={{
                 width: '15%',
                 fontSize: 9,
                 textAlign: 'right',
+                color: (company.openingBalance || 0) > 0 ? '#dc2626' : '#9ca3af',
               }}
             >
-              —
+              {(company.openingBalance || 0) > 0 ? formatINR(company.openingBalance || 0) : '—'}
             </Text>
             <Text
               style={{
                 width: '15%',
                 fontSize: 9,
                 textAlign: 'right',
+                color: (company.openingBalance || 0) < 0 ? '#16a34a' : '#9ca3af',
               }}
             >
-              —
+              {(company.openingBalance || 0) < 0 ? formatINR(Math.abs(company.openingBalance || 0)) : '—'}
             </Text>
             <Text
               style={{
@@ -297,9 +301,11 @@ export function OutstandingTemplate({
                 fontSize: 9,
                 textAlign: 'right',
                 fontFamily: 'Helvetica-Bold',
+                color: (company.openingBalance || 0) < 0 ? '#16a34a' : '#111827',
               }}
             >
-              ₹0.00
+              {formatINR(Math.abs(company.openingBalance || 0))}
+              {(company.openingBalance || 0) < 0 ? ' CR' : ''}
             </Text>
           </View>
 

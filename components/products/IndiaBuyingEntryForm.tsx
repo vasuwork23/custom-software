@@ -172,14 +172,14 @@ export function IndiaBuyingEntryForm({
 
     const payload = {
       product: productId,
-      entryDate: values.entryDate.toISOString(),
+      entryDate: format(values.entryDate, 'yyyy-MM-dd'),
       totalCtn: values.totalCtn ?? 0,
       qty: values.qty ?? 0,
       rate: values.rate ?? 0,
       hasAdvancePayment: values.hasAdvancePayment,
       advanceBankAccount: values.hasAdvancePayment && values.advanceBankAccount ? values.advanceBankAccount : null,
       advanceAmount: values.hasAdvancePayment ? (values.advanceAmount ?? null) : null,
-      advanceDate: values.hasAdvancePayment && values.advanceDate ? values.advanceDate.toISOString() : null,
+      advanceDate: values.hasAdvancePayment && values.advanceDate ? format(values.advanceDate, 'yyyy-MM-dd') : null,
       advanceNote: values.hasAdvancePayment ? (values.advanceNote ?? null) : null,
     }
     if (isEdit) {

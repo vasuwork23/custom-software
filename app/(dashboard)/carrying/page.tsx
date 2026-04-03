@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useCallback } from 'react'
 import { DateRange } from 'react-day-picker'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
@@ -57,8 +58,8 @@ export default function CarryingPage() {
       startTransition(async () => {
         const params = new URLSearchParams()
         if (s.trim()) params.set('search', s.trim())
-        if (r?.from) params.set('from', r.from.toISOString())
-        if (r?.to) params.set('to', r.to.toISOString())
+        if (r?.from) params.set('from', format(r.from, 'yyyy-MM-dd'))
+        if (r?.to) params.set('to', format(r.to, 'yyyy-MM-dd'))
 
         const res = await apiGet<CarryingListResponse>(`/api/carrying?${params.toString()}`)
         if (res.success) {

@@ -108,7 +108,7 @@ export function AddPaymentDialog({
     const payload = {
       inrAmount: values.inrAmount,
       payFromSource: values.payFromSource,
-      date: values.transactionDate.toISOString(),
+      date: format(values.transactionDate, 'yyyy-MM-dd'),
       note: values.notes || undefined,
     }
     const result = await apiPost('/api/china-bank/payment', payload)

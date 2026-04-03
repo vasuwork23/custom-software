@@ -64,7 +64,7 @@ export function PayInOutDialog({
       `/api/sophia/${personId}/${path}`,
       {
         amount: num,
-        transactionDate: transactionDate.toISOString().slice(0, 10),
+        transactionDate: format(transactionDate, 'yyyy-MM-dd'),
         notes: notes.trim() || undefined,
       }
     )

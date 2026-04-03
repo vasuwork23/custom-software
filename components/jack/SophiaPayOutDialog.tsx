@@ -153,7 +153,7 @@ export function SophiaPayOutDialog({
         productId,
         chinaPersonId: personId,
         amount: amountNum,
-        paymentDate: paymentDate.toISOString(),
+        paymentDate: format(paymentDate, 'yyyy-MM-dd'),
         notes: notes.trim() || undefined,
       }
     )

@@ -136,7 +136,7 @@ export function MakePaymentDialog({
       productId,
       chinaPersonId: values.chinaPersonId,
       amount: values.amount ?? 0,
-      paymentDate: values.paymentDate.toISOString(),
+      paymentDate: format(values.paymentDate, 'yyyy-MM-dd'),
       notes: values.notes || undefined,
     })
     if (!result.success) {

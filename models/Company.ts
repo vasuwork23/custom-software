@@ -11,6 +11,8 @@ export interface ICompany {
   gstNumber?: string
   address?: string
   city?: string
+  openingBalance?: number
+  openingBalanceNotes?: string
   // WhatsApp / reminders
   primaryMobile?: string
   lastWhatsappSentAt?: Date
@@ -32,6 +34,8 @@ const CompanySchema = new Schema<ICompany>(
     gstNumber: { type: String },
     address: { type: String },
     city: { type: String },
+    openingBalance: { type: Number, default: 0 },
+    openingBalanceNotes: { type: String },
     primaryMobile: { type: String },
     lastWhatsappSentAt: { type: Date },
     lastWhatsappMessage: { type: String },
