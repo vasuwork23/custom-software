@@ -423,7 +423,7 @@ export async function PUT(
 
     const populated = await SellBill.findById(id)
       .lean()
-      .populate('company', 'companyName ownerName contact1Mobile contact2Mobile address city')
+      .populate('company', 'companyName ownerName contact1Mobile contact2Mobile primaryMobile address city openingBalance')
       .populate({ path: 'items', populate: { path: 'product', select: 'productName' } })
 
     return NextResponse.json({ success: true, data: populated })

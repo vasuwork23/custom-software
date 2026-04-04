@@ -3,6 +3,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import SellBill from '@/models/SellBill'
 import PaymentReceipt from '@/models/PaymentReceipt'
+import Company from '@/models/Company'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
@@ -30,7 +31,7 @@ export async function GET(
     await connectDB()
     const companyId = new mongoose.Types.ObjectId(id)
 
-    const [billedRes, receivedRes] = await Promise.all([
+    const [billedRes, receivedRes, company] = await Promise.all([
       SellBill.aggregate([
         { $match: { company: companyId } },
         { $group: { _id: null, total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
@@ -39,10 +40,12 @@ export async function GET(
         { $match: { company: companyId } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
+      Company.findById(companyId).select('openingBalance').lean(),
     ])
     const totalBilled = billedRes[0]?.total ?? 0
     const totalReceived = receivedRes[0]?.total ?? 0
-    const outstanding = totalBilled - totalReceived
+    const openingBalance = company?.openingBalance ?? 0
+    const outstanding = totalBilled - totalReceived + openingBalance
 
     return NextResponse.json({
       success: true,

@@ -22,16 +22,13 @@ export function generateBillFileName(input: {
   return `${companyName}_BILL-${input.billNumber}_${date}.pdf`
 }
 
-/** Format bill number for display as INV-YYYY-NNN. */
+/** Format bill number for display as INV-NNN. */
 export function formatBillNumber(
   billNumber: number,
   billDate?: string | Date
 ): string {
-  const baseDate =
-    billDate != null ? new Date(billDate) : new Date()
-  const year = baseDate.getFullYear()
   const padded = String(billNumber).padStart(3, '0')
-  return `INV-${year}-${padded}`
+  return `INV-${padded}`
 }
 
 /** Grand total = subtotal + extraCharges - discount. Use for all sell bill balance logic. */

@@ -32,7 +32,7 @@ export async function POST(
     const bill = await SellBill.findById(id)
       .lean()
       .populate('company', 'companyName ownerName contact1Mobile contact2Mobile address city')
-      .populate({ path: 'items', populate: { path: 'product', select: 'productName' } })
+      .populate({ path: 'items', populate: [{ path: 'product', select: 'productName' }, { path: 'indiaProduct', select: 'productName' }] })
 
     if (!bill) {
       return NextResponse.json(
@@ -55,7 +55,7 @@ export async function POST(
         address?: string
         city?: string
       },
-      items: (bill.items as { product?: { productName?: string }; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number }[]) ?? [],
+      items: (bill.items as { product?: { productName?: string }; indiaProduct?: { productName?: string }; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number }[]) ?? [],
     })
 
     if (!result.success) {

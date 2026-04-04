@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Pencil, FileText, Wallet, Plus, Trash2, MessageCircle, Download, Phone } from 'lucide-react'
+import { Building2, Pencil, FileText, Wallet, Plus, Trash2, MessageCircle, Download, Phone, Copy, Check } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -77,6 +78,8 @@ export default function CompanyDetailPage() {
   const [whatsappMessage, setWhatsappMessage] = useState('')
   const [downloadingOutstanding, setDownloadingOutstanding] = useState(false)
   const [sendingOutstanding, setSendingOutstanding] = useState(false)
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const fetchCompany = useCallback(async () => {
     if (!id) return
@@ -104,7 +107,7 @@ export default function CompanyDetailPage() {
   }
 
   const { company, totalBilled, totalReceived, outstanding, totalProfit, sellingHistory, paymentHistory } = data
-  const mobiles = [company.contact1Mobile, company.contact2Mobile].filter(Boolean).join(', ')
+  const mobiles = [company.primaryMobile, company.contact1Mobile, company.contact2Mobile].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ')
 
   function buildOutstandingMessage(): string {
     const formatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })
@@ -157,6 +160,10 @@ export default function CompanyDetailPage() {
         a.remove()
         URL.revokeObjectURL(url)
         toast.success('Outstanding statement downloaded')
+        if (mobiles) {
+          setDownloadModalOpen(true)
+          setCopied(false)
+        }
       })
       .catch((err) => {
         console.error(err)
@@ -231,8 +238,6 @@ export default function CompanyDetailPage() {
         }
         action={
           <div className="flex flex-wrap gap-2">
-            {outstanding > 0 && (
-              <>
                 <Button
                   type="button"
                   variant="outline"
@@ -254,8 +259,6 @@ export default function CompanyDetailPage() {
                   <MessageCircle className="mr-2 h-4 w-4" />
                   {sendingOutstanding ? 'Sending...' : 'Send Outstanding'}
                 </Button>
-              </>
-            )}
             <Button variant="outline" size="sm" onClick={() => setSheetOpen(true)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit Company
@@ -529,6 +532,38 @@ export default function CompanyDetailPage() {
           openingBalanceNotes: company.openingBalanceNotes,
         }}
       />
+
+      <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>PDF Downloaded</DialogTitle>
+            <DialogDescription>
+              The Outstanding Statement has been successfully downloaded. Use the WhatsApp button to share directly, or copy the customer's mobile number below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 my-2">
+            <div className="flex-1 bg-muted px-4 py-2 rounded-md font-medium text-base border">
+              {mobiles || 'No mobile number added'}
+            </div>
+            {mobiles && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  navigator.clipboard.writeText(mobiles)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+              >
+                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDownloadModalOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

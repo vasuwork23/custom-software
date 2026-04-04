@@ -15,64 +15,34 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'Helvetica',
     backgroundColor: '#ffffff',
+    textTransform: 'uppercase',
   },
-  // Header
-  header: {
+  // Bill to section
+  toSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  logoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  billInfo: {
+    alignItems: 'flex-end',
   },
-  logo: {
-    width: 48,
-    height: 48,
-    marginRight: 12,
-  },
-  companyName: {
-    fontSize: 16,
+  billNoText: {
+    fontSize: 11,
     fontFamily: 'Helvetica-Bold',
     color: '#111827',
+  },
+  billDateText: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginTop: 4,
   },
   companyAddress: {
     fontSize: 8,
     color: '#6b7280',
     marginTop: 2,
-  },
-  companyPhone: {
-    fontSize: 8,
-    color: '#6b7280',
-  },
-  companyGstin: {
-    fontSize: 8,
-    color: '#6b7280',
-  },
-  billInfo: {
-    alignItems: 'flex-end',
-  },
-  billTitle: {
-    fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
-    color: '#111827',
-  },
-  billNumberText: {
-    fontSize: 10,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  billDate: {
-    fontSize: 10,
-    color: '#6b7280',
-  },
-  // Bill to section
-  toSection: {
-    marginBottom: 16,
   },
   toLabel: {
     fontSize: 8,
@@ -112,12 +82,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f3f4f6',
   },
   colNo: {
-    width: '5%',
+    width: '10%',
     fontSize: 9,
     color: '#6b7280',
   },
   colProduct: {
-    width: '35%',
+    width: '30%',
     fontSize: 9,
   },
   colCtnPcs: {
@@ -185,47 +155,38 @@ const styles = StyleSheet.create({
   },
   // Outstanding box
   outstandingBox: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#f59e0b',
+    borderColor: '#000000',
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginBottom: 16,
+    marginBottom: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   outstandingLabel: {
     fontSize: 9,
-    color: '#92400e',
+    color: '#000000',
   },
   outstandingValue: {
     fontSize: 12,
     fontFamily: 'Helvetica-Bold',
-    color: '#92400e',
+    color: '#000000',
   },
-  // Footer
-  footer: {
-    marginTop: 'auto',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  footerText: {
+  outstandingFooterText: {
     fontSize: 8,
-    color: '#9ca3af',
+    color: '#6b7280',
+    textAlign: 'right',
   },
 })
 
 const formatINR = (n: number | undefined | null): string =>
-  'Rs ' +
-  (Number(n) || 0).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  Math.round(Number(n) || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }) + '/-'
 
 const formatDate = (d: string | Date | undefined | null): string => {
   if (!d) return ''
@@ -259,6 +220,7 @@ export interface BillTemplateProps {
     } | null
     items: {
       product?: { productName?: string }
+      indiaProduct?: { productName?: string }
       ctnSold: number
       pcsSold: number
       ratePerPcs: number
@@ -303,66 +265,41 @@ export function BillTemplate({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View style={styles.logoSection}>
-            {/* Optional logo; ensure the referenced file exists in your project */}
-            <Image style={styles.logo} src="/public/logo.svg" />
-            <View>
-              {headerCompanyName ? (
-                <Text style={styles.companyName}>{headerCompanyName}</Text>
-              ) : null}
-              {headerAddress ? (
-                <Text style={styles.companyAddress}>{headerAddress}</Text>
-              ) : null}
-              {headerPhone ? (
-                <Text style={styles.companyPhone}>📞 {headerPhone}</Text>
-              ) : null}
-              {headerGstin && headerGstin !== 'N/A' ? (
-                <Text style={styles.companyGstin}>GSTIN: {headerGstin}</Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.billInfo}>
-            {/* Intentionally no hard-coded title like "INVOICE" */}
-            <Text style={styles.billNumberText}>{displayBillNumber}</Text>
-            <Text style={styles.billDate}>{billDateStr}</Text>
-          </View>
-        </View>
-
         {/* BILL TO */}
         <View style={styles.toSection}>
-          <Text style={styles.toLabel}>Bill To</Text>
-          <Text style={styles.toName}>
-            {bill.isCashbook ? 'Cash Sale' : company.companyName ?? '—'}
-          </Text>
-          {company.address ? (
-            <Text style={styles.companyAddress}>{company.address}</Text>
-          ) : null}
-          {toMobile ? (
-            <Text style={styles.companyAddress}>📞 {toMobile}</Text>
-          ) : null}
+          <View>
+            <Text style={styles.toLabel}>Bill To</Text>
+            <Text style={styles.toName}>
+              {bill.isCashbook ? 'Cash Sale' : company.companyName ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.billInfo}>
+            <Text style={styles.billNoText}>INVOICE NO: {displayBillNumber}</Text>
+            <Text style={styles.billDateText}>DATE: {billDateStr}</Text>
+          </View>
         </View>
 
         {/* ITEMS TABLE */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.colNo, styles.colHeader]}>#</Text>
-            <Text style={[styles.colProduct, styles.colHeader]}>Product</Text>
-            <Text style={[styles.colCtnPcs, styles.colHeader]}>CTN / PCS</Text>
-            <Text style={[styles.colRate, styles.colHeader]}>Rate/Pc</Text>
-            <Text style={[styles.colTotal, styles.colHeader]}>Total</Text>
+            <Text style={[styles.colNo, styles.colHeader]}>SR. NO.</Text>
+            <Text style={[styles.colProduct, styles.colHeader]}>PRODUCT</Text>
+            <Text style={[styles.colCtnPcs, styles.colHeader]}>QUANTITY</Text>
+            <Text style={[styles.colRate, styles.colHeader]}>RATE</Text>
+            <Text style={[styles.colTotal, styles.colHeader]}>AMOUNT</Text>
           </View>
           {bill.items.map((item, i) => {
             const rowStyle = i % 2 === 0 ? styles.tableRow : styles.tableRowAlt
             const productName =
-              (item.product as { productName?: string })?.productName ?? ''
+              (item.product as { productName?: string })?.productName ??
+              (item.indiaProduct as { productName?: string })?.productName ??
+              ''
             return (
               <View key={i} style={rowStyle}>
                 <Text style={styles.colNo}>{i + 1}</Text>
                 <Text style={styles.colProduct}>{productName}</Text>
                 <Text style={styles.colCtnPcs}>
-                  {String(item.ctnSold ?? 0)} CTN / {String(item.pcsSold ?? 0)} PCS
+                  {String(item.pcsSold ?? 0)}
                 </Text>
                 <Text style={styles.colRate}>{formatINR(item.ratePerPcs)}</Text>
                 <Text style={styles.colTotal}>{formatINR(item.totalAmount)}</Text>
@@ -417,26 +354,17 @@ export function BillTemplate({
         </View>
 
         {/* OUTSTANDING BOX — only for company bills when provided */}
-        {!bill.isCashbook &&
-          typeof companyOutstanding === 'number' && (
+        {!bill.isCashbook && typeof companyOutstanding === 'number' && (
+          <View style={{ marginTop: 'auto' }}>
             <View style={styles.outstandingBox}>
-              <Text style={styles.outstandingLabel}>
-                Current Outstanding Balance
-              </Text>
-              <Text style={styles.outstandingValue}>
-                {formatINR(companyOutstanding)}
-              </Text>
+              <Text style={styles.outstandingLabel}>CURRENT OUTSTANDING BALANCE</Text>
+              <Text style={styles.outstandingValue}>{formatINR(companyOutstanding)}</Text>
             </View>
-          )}
-
-        {/* FOOTER */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Thank you for your business!</Text>
-          <Text style={styles.footerText}>
-            {displayBillNumber}
-            {billDateStr ? ` • ${billDateStr}` : ''}
-          </Text>
-        </View>
+            <Text style={styles.outstandingFooterText}>
+              AS ON PRINTED DATE AND TIME: {formatDate(new Date())}, {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+        )}
       </Page>
     </Document>
   )

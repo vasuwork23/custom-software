@@ -261,33 +261,33 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
           </div>
         ) : (
           <div className="overflow-x-auto">
-              <table className="w-full min-w-[1200px] text-xs">
+              <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="h-10 w-10 px-2" />
-                <th className="h-10 px-4 text-left font-medium whitespace-nowrap">Mark</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">CTN</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">QTY/Pcs</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Available CTN</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Available pcs</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Total CBM</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Total weight</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Rate (¥)</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Total Amount (¥)</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Final Cost (₹)</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Total Expense (₹)</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Given (¥)</th>
-                <th className="h-10 px-4 text-right font-medium whitespace-nowrap">Remaining (¥)</th>
-                <th className="h-10 px-4 text-center font-medium whitespace-nowrap">Status</th>
-                <th className="h-10 px-4 text-center font-medium whitespace-nowrap">Lock</th>
-                <th className="h-10 w-24 px-4" />
+                <th className="h-10 w-8 px-1" />
+                <th className="h-10 px-2 text-left font-medium">Mark</th>
+                <th className="h-10 px-2 text-right font-medium">CTN</th>
+                <th className="h-10 px-2 text-right font-medium">QTY/Pcs</th>
+                <th className="h-10 px-2 text-right font-medium">Available CTN</th>
+                <th className="h-10 px-2 text-right font-medium">Available pcs</th>
+                <th className="h-10 px-2 text-right font-medium">Total CBM</th>
+                <th className="h-10 px-2 text-right font-medium">Total weight</th>
+                <th className="h-10 px-2 text-right font-medium">Rate (¥)</th>
+                <th className="h-10 px-2 text-right font-medium">Total Amount (¥)</th>
+                <th className="h-10 px-2 text-right font-medium">Final Cost (₹)</th>
+                <th className="h-10 px-2 text-right font-medium">Total Expense (₹)</th>
+                <th className="h-10 px-2 text-right font-medium">Given (¥)</th>
+                <th className="h-10 px-2 text-right font-medium">Remaining (¥)</th>
+                <th className="h-10 px-2 text-center font-medium">Status</th>
+                <th className="h-10 px-2 text-center font-medium">Lock</th>
+                <th className="h-10 w-20 px-2" />
               </tr>
             </thead>
                 <tbody>
               {filteredEntries.map((entry) => (
                 <React.Fragment key={entry._id}>
                   <tr className="border-b hover:bg-muted/50">
-                    <td className="p-2">
+                    <td className="p-1">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -302,72 +302,67 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                         )}
                       </Button>
                     </td>
-                    <td className="p-4 whitespace-nowrap font-medium">
+                    <td className="p-2 font-medium break-words min-w-[80px]">
                       <span>{entry.mark}</span>
                       {(entry.inTransitCtn ?? 0) > 0 && (!entry.containers || entry.containers.length === 0) && (
-                        <Badge variant="outline" className="ml-1 text-[10px] border-amber-500 text-amber-700">
+                        <Badge variant="outline" className="ml-1 text-[10px] border-amber-500 text-amber-700 whitespace-nowrap">
                           ⚠️ Not in container
                         </Badge>
                       )}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap">
+                    <td className="p-2 text-right">
                       {entry.totalCtn}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap">{entry.totalQty}</td>
-                    <td className="p-4 text-right whitespace-nowrap font-medium">
+                    <td className="p-2 text-right">{entry.totalQty}</td>
+                    <td className="p-2 text-right font-medium whitespace-nowrap">
                       {entry.chinaWarehouseReceived === 'no' ? (
-                        <span className="text-xs text-gray-500">🏭 At Factory</span>
+                        <span className="text-[10px] text-gray-500">🏭 At Factory</span>
                       ) : (
                         <span className={availableCtnClass(entry)}>{calculatedAvailableCtn(entry)}</span>
                       )}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap">
+                    <td className="p-2 text-right whitespace-nowrap">
                       {entry.chinaWarehouseReceived === 'no' ? (
                         <span className="text-xs text-gray-500">—</span>
                       ) : (
                         Math.round(calculatedAvailableCtn(entry) * (entry.qty ?? 0))
                       )}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap tabular-nums">{entry.totalCbm ?? 0}</td>
-                    <td className="p-4 text-right whitespace-nowrap tabular-nums">{entry.totalWeight ?? 0}</td>
-                    <td className="p-4 text-right whitespace-nowrap">
-                      ¥
-                      {new Intl.NumberFormat('en-IN', {
+                    <td className="p-2 text-right tabular-nums">{entry.totalCbm ?? 0}</td>
+                    <td className="p-2 text-right tabular-nums">{entry.totalWeight ?? 0}</td>
+                    <td className="p-2 text-right whitespace-nowrap">
+                      ¥{new Intl.NumberFormat('en-IN', {
                         maximumFractionDigits: 0,
                       }).format(entry.rate)}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap">
-                      ¥
-                      {new Intl.NumberFormat('en-IN', {
+                    <td className="p-2 text-right whitespace-nowrap">
+                      ¥{new Intl.NumberFormat('en-IN', {
                         maximumFractionDigits: 0,
                       }).format(entry.totalAmount)}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap tabular-nums">
-                      ₹{Number(entry.finalCost).toFixed(5)}
+                    <td className="p-2 text-right tabular-nums whitespace-nowrap">
+                      ₹{Number(entry.finalCost).toFixed(2)}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap">
-                      ₹
-                      {new Intl.NumberFormat('en-IN', {
+                    <td className="p-2 text-right whitespace-nowrap">
+                      ₹{new Intl.NumberFormat('en-IN', {
                         maximumFractionDigits: 0,
                       }).format(entry.totalExpenseINR ?? 0)}
                     </td>
-                    <td className="p-4 text-right whitespace-nowrap">
-                      ¥
-                      {new Intl.NumberFormat('en-IN', {
+                    <td className="p-2 text-right whitespace-nowrap">
+                      ¥{new Intl.NumberFormat('en-IN', {
                         maximumFractionDigits: 0,
                       }).format(entry.givenAmount)}
                     </td>
                     <td
-                      className={`p-4 text-right whitespace-nowrap ${
+                      className={`p-2 text-right whitespace-nowrap ${
                         entry.remainingAmount > 0 ? 'text-red-600' : 'text-green-600'
                       }`}
                     >
-                      ¥
-                      {new Intl.NumberFormat('en-IN', {
+                      ¥{new Intl.NumberFormat('en-IN', {
                         maximumFractionDigits: 0,
                       }).format(entry.remainingAmount)}
                     </td>
-                    <td className="p-4 text-center whitespace-nowrap">
+                    <td className="p-2 text-center whitespace-nowrap">
                       <StatusBadge
                         status={
                           entry.currentStatus as
@@ -377,7 +372,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                         }
                       />
                     </td>
-                    <td className="p-4 whitespace-nowrap">
+                    <td className="p-2 whitespace-nowrap">
                       <div className="flex justify-center">
                         <LockButton
                           entryId={entry._id}
@@ -404,7 +399,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                         />
                       </div>
                     </td>
-                    <td className="p-4">
+                    <td className="p-1">
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"
@@ -412,6 +407,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                           onClick={() => onEdit(entry)}
                           aria-label="Edit"
                           disabled={entry.isLocked}
+                          className="h-8 w-8"
                           title={entry.isLocked ? 'Unlock entry first to edit' : 'Edit'}
                         >
                           <Pencil className="h-4 w-4" />
@@ -441,7 +437,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive"
+                              className="text-destructive h-8 w-8"
                               aria-label="Delete"
                               disabled={entry.isLocked || deleteSummaryLoading}
                               title={entry.isLocked ? 'Unlock entry first to delete' : 'Delete'}

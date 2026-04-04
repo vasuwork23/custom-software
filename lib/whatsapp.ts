@@ -41,6 +41,7 @@ export interface BillDataForWhatsApp {
   }
   items: {
     product?: { productName?: string }
+    indiaProduct?: { productName?: string }
     ctnSold: number
     pcsSold: number
     ratePerPcs: number
@@ -204,7 +205,7 @@ export async function sendOutstandingReminder(
 
   const totalBilled = billedRes[0]?.total ?? 0
   const totalReceived = receivedRes[0]?.total ?? 0
-  const outstanding = totalBilled - totalReceived
+  const outstanding = totalBilled - totalReceived + ((company as any).openingBalance || 0)
 
   if (outstanding <= 0) {
     return {
@@ -326,7 +327,7 @@ export async function sendOutstandingOnWhatsApp(
 
   const company = await Company.findById(id)
     .select(
-      'companyName ownerName primaryMobile contact1Mobile contact2Mobile contact1Name'
+      'companyName ownerName primaryMobile contact1Mobile contact2Mobile contact1Name openingBalance openingBalanceNotes'
     )
     .lean()
   if (!company) {
@@ -364,7 +365,7 @@ export async function sendOutstandingOnWhatsApp(
 
   const totalBilled = billedRes[0]?.total ?? 0
   const totalReceived = receivedRes[0]?.total ?? 0
-  const totalOutstanding = totalBilled - totalReceived
+  const totalOutstanding = totalBilled - totalReceived + ((company as any).openingBalance || 0)
 
   if (totalOutstanding <= 0) {
     return {
@@ -397,7 +398,7 @@ export async function sendOutstandingOnWhatsApp(
       credit: null as number | null,
     })),
     ...payments.map((p) => ({
-      date: p.date,
+      date: (p as any).paymentDate || (p as any).date,
       createdAt: p.createdAt,
       description: `Payment received${
         (p as { notes?: string }).notes
@@ -413,10 +414,13 @@ export async function sendOutstandingOnWhatsApp(
     return ad - bd
   })
 
-  let running = 0
-  const transactions = allTx.map((tx) => {
+  let running = (company as any).openingBalance || 0
+  let lastZeroBalanceIndex = -1
+
+  const computedTransactions = allTx.map((tx, index) => {
     if (tx.debit) running += tx.debit
     if (tx.credit) running -= tx.credit
+    if (Math.abs(running) < 0.001) lastZeroBalanceIndex = index
     return {
       date: tx.date,
       description: tx.description,
@@ -426,6 +430,16 @@ export async function sendOutstandingOnWhatsApp(
     }
   })
 
+  let transactions = computedTransactions
+  let modifiedOpeningBalance = (company as any).openingBalance || 0
+  let modifiedOpeningBalanceNotes = (company as any).openingBalanceNotes
+
+  if (lastZeroBalanceIndex !== -1) {
+    transactions = computedTransactions.slice(lastZeroBalanceIndex + 1)
+    modifiedOpeningBalance = 0
+    modifiedOpeningBalanceNotes = 'Balance Brought Forward (Cleared)'
+  }
+
   const doc = React.createElement(OutstandingTemplate, {
     company: {
       companyName: company.companyName,
@@ -434,6 +448,8 @@ export async function sendOutstandingOnWhatsApp(
       ownerName: company.ownerName,
       contact1Mobile: (company as { contact1Mobile?: string }).contact1Mobile,
       contact1Name: (company as { contact1Name?: string }).contact1Name,
+      openingBalance: modifiedOpeningBalance,
+      openingBalanceNotes: modifiedOpeningBalanceNotes,
     },
     transactions,
     generatedDate,

@@ -35,8 +35,8 @@ export async function GET(
 
     const bill = await SellBill.findById(id)
       .lean()
-      .populate('company', 'companyName ownerName contact1Mobile contact2Mobile address city')
-      .populate({ path: 'items', populate: { path: 'product', select: 'productName' } })
+      .populate('company', 'companyName ownerName contact1Mobile contact2Mobile address city openingBalance')
+      .populate({ path: 'items', populate: [{ path: 'product', select: 'productName' }, { path: 'indiaProduct', select: 'productName' }] })
 
     if (!bill) {
       return NextResponse.json(
@@ -79,7 +79,8 @@ export async function GET(
         ])
         const totalBilled = billedRes[0]?.total ?? 0
         const totalReceived = receivedRes[0]?.total ?? 0
-        companyOutstanding = totalBilled - totalReceived
+        const openingBalance = (bill.company as { openingBalance?: number }).openingBalance || 0
+        companyOutstanding = totalBilled - totalReceived + openingBalance
       }
     }
     const doc = React.createElement(BillTemplate, {
@@ -101,7 +102,7 @@ export async function GET(
           address?: string
           city?: string
         },
-        items: (bill.items as { product?: { productName?: string }; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number }[]) ?? [],
+        items: (bill.items as { product?: { productName?: string }; indiaProduct?: { productName?: string }; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number }[]) ?? [],
       },
       yourCompanyName: process.env.COMPANY_NAME ?? '',
       yourAddress: process.env.COMPANY_ADDRESS ?? '',

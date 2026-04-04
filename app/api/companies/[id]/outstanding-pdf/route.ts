@@ -100,9 +100,17 @@ export async function GET(
     })
 
     let balance = company.openingBalance || 0
-    const transactions = allTx.map((tx) => {
+    let lastZeroBalanceIndex = -1
+
+    const computedTransactions = allTx.map((tx, index) => {
       if (tx.debit) balance += tx.debit
       if (tx.credit) balance -= tx.credit
+      
+      // If balance hits zero (safely comparing floating point), we keep track of this index.
+      if (Math.abs(balance) < 0.001) {
+        lastZeroBalanceIndex = index
+      }
+
       return {
         date: tx.date,
         description: tx.description,
@@ -111,6 +119,16 @@ export async function GET(
         balance,
       }
     })
+
+    let transactions = computedTransactions
+    let modifiedOpeningBalance = company.openingBalance || 0
+    let modifiedOpeningBalanceNotes = company.openingBalanceNotes
+
+    if (lastZeroBalanceIndex !== -1) {
+      transactions = computedTransactions.slice(lastZeroBalanceIndex + 1)
+      modifiedOpeningBalance = 0
+      modifiedOpeningBalanceNotes = 'Balance Brought Forward (Cleared)'
+    }
 
     const generatedDate = new Date()
 
@@ -122,8 +140,8 @@ export async function GET(
         ownerName: company.ownerName,
         contact1Mobile: company.contact1Mobile,
         contact1Name: company.contact1Name,
-        openingBalance: company.openingBalance,
-        openingBalanceNotes: company.openingBalanceNotes,
+        openingBalance: modifiedOpeningBalance,
+        openingBalanceNotes: modifiedOpeningBalanceNotes,
       },
       transactions,
       generatedDate,

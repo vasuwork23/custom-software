@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { FileText, Pencil, Trash2, Download, MessageCircle } from 'lucide-react'
+import { FileText, Pencil, Trash2, Download, MessageCircle, Copy, Check } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -72,6 +73,8 @@ export default function SellBillDetailPage() {
   const [loading, setLoading] = useState(true)
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const fetchBill = useCallback(async () => {
     if (!id) return
@@ -111,6 +114,10 @@ export default function SellBillDetailPage() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success('PDF downloaded')
+    if (mobile !== '—') {
+      setDownloadModalOpen(true)
+      setCopied(false)
+    }
   }
 
   async function handleSendWhatsApp() {
@@ -153,13 +160,13 @@ export default function SellBillDetailPage() {
     )
   }
 
-  const mobile = bill.company ? [bill.company.contact1Mobile, bill.company.contact2Mobile].filter(Boolean).join(', ') || '—' : '—'
+  const mobile = bill.company ? [(bill.company as any).primaryMobile, bill.company.contact1Mobile, bill.company.contact2Mobile].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ') || '—' : '—'
 
   function formatCtnPcs(ctn: number, pcs: number): string {
     const isWhole = Number.isInteger(ctn)
-    return isWhole
-      ? `${ctn} CTN (${pcs} pcs)`
-      : `${ctn.toFixed(2)} CTN (${pcs} pcs)`
+    const formattedCtn = isWhole ? String(ctn) : ctn.toFixed(2)
+    const perCtn = ctn > 0 ? Math.round(pcs / ctn) : 0
+    return `${formattedCtn} CTN (${perCtn} pcs/ctn)`
   }
 
   return (
@@ -365,6 +372,38 @@ export default function SellBillDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>PDF Downloaded</DialogTitle>
+            <DialogDescription>
+              The Bill PDF has been successfully downloaded. Copy the customer's mobile number below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 my-2">
+            <div className="flex-1 bg-muted px-4 py-2 rounded-md font-medium text-base border">
+              {mobile === '—' ? 'No mobile number added' : mobile}
+            </div>
+            {mobile !== '—' && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  navigator.clipboard.writeText(mobile)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+              >
+                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDownloadModalOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
