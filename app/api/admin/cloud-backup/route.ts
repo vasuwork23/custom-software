@@ -37,6 +37,9 @@ const COLLECTIONS_TO_DROP = [
   'chinapersons',
   'chinapersontransactions',
   'expenses',
+  'investments',
+  'investmenttransactions',
+  'carryingbills',
 ]
 
 // Secure permanent delete for macOS
