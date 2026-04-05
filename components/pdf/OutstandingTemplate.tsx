@@ -55,6 +55,16 @@ const formatINR = (n: number | undefined | null): string =>
     maximumFractionDigits: 0,
   }) + '/-'
 
+// Rate formatter — shows decimals when the rate is not a whole number
+const formatRate = (n: number | undefined | null): string => {
+  const val = Number(n) || 0
+  const hasDecimal = val % 1 !== 0
+  return val.toLocaleString('en-IN', {
+    minimumFractionDigits: hasDecimal ? 2 : 0,
+    maximumFractionDigits: 2,
+  }) + '/-'
+}
+
 const formatDate = (d: string | Date | null | undefined): string => {
   if (!d) return ''
   const date = typeof d === 'string' ? new Date(d) : d
@@ -105,7 +115,9 @@ export function OutstandingTemplate({
   yourAddress = '',
   yourPhone = '',
 }: OutstandingTemplateProps) {
-  const generatedAtStr = formatDate(generatedDate)
+  const genDate = generatedDate instanceof Date ? generatedDate : new Date(generatedDate)
+  const generatedAtStr = formatDate(genDate)
+  const generatedAtTime = genDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
   const headerCompanyName =
     yourCompanyName || process.env.COMPANY_NAME || ''
   const headerAddress =
@@ -135,7 +147,7 @@ export function OutstandingTemplate({
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#111827' }}>ACCOUNT STATEMENT</Text>
-            <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>DATE: {generatedAtStr}</Text>
+            <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>DATE: {generatedAtStr}, {generatedAtTime}</Text>
           </View>
         </View>
 
@@ -298,7 +310,7 @@ export function OutstandingTemplate({
                     {item.pcsSold > 0 ? `${item.pcsSold} PCS` : '-'}
                   </Text>
                   <Text style={{ width: '15%', fontSize: 8, color: '#374151', textAlign: 'right' }}>
-                    {'@ '}{formatINR(item.ratePerPcs)}
+                    {'@ '}{formatRate(item.ratePerPcs)}
                   </Text>
                   <Text style={{ width: '15%', fontSize: 8, color: '#9ca3af', textAlign: 'right' }}>{''}</Text>
                 </View>
@@ -324,7 +336,7 @@ export function OutstandingTemplate({
             }}
           >
             <Text style={{ fontSize: 10, color: '#000000' }}>
-              {currentOutstanding > 0 ? 'Total Outstanding' : 'Balance Clear ✓'}
+              {currentOutstanding > 0 ? 'Current Outstanding' : 'Balance Clear ✓'}
             </Text>
             <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#000000' }}>
               {formatINR(Math.abs(currentOutstanding))}

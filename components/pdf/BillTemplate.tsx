@@ -188,6 +188,16 @@ const formatINR = (n: number | undefined | null): string =>
     maximumFractionDigits: 0,
   }) + '/-'
 
+// Rate formatter — preserves decimals when rate is not a whole number
+const formatRate = (n: number | undefined | null): string => {
+  const val = Number(n) || 0
+  const hasDecimal = val % 1 !== 0
+  return val.toLocaleString('en-IN', {
+    minimumFractionDigits: hasDecimal ? 2 : 0,
+    maximumFractionDigits: 2,
+  }) + '/-'
+}
+
 const formatDate = (d: string | Date | undefined | null): string => {
   if (!d) return ''
   const date = typeof d === 'string' ? new Date(d) : d
@@ -274,7 +284,7 @@ export function BillTemplate({
             </Text>
           </View>
           <View style={styles.billInfo}>
-            <Text style={styles.billNoText}>INVOICE NO: {displayBillNumber}</Text>
+            <Text style={styles.billNoText}>{displayBillNumber}</Text>
             <Text style={styles.billDateText}>DATE: {billDateStr}</Text>
           </View>
         </View>
@@ -301,7 +311,7 @@ export function BillTemplate({
                 <Text style={styles.colCtnPcs}>
                   {String(item.pcsSold ?? 0)}
                 </Text>
-                <Text style={styles.colRate}>{formatINR(item.ratePerPcs)}</Text>
+                <Text style={styles.colRate}>{formatRate(item.ratePerPcs)}</Text>
                 <Text style={styles.colTotal}>{formatINR(item.totalAmount)}</Text>
               </View>
             )
@@ -357,7 +367,7 @@ export function BillTemplate({
         {!bill.isCashbook && typeof companyOutstanding === 'number' && (
           <View style={{ marginTop: 'auto' }}>
             <View style={styles.outstandingBox}>
-              <Text style={styles.outstandingLabel}>CURRENT OUTSTANDING BALANCE</Text>
+              <Text style={styles.outstandingLabel}>CURRENT OUTSTANDING</Text>
               <Text style={styles.outstandingValue}>{formatINR(companyOutstanding)}</Text>
             </View>
             <Text style={styles.outstandingFooterText}>

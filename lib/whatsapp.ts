@@ -241,7 +241,7 @@ export async function sendOutstandingReminder(
             : new Date(bill.billDate).toISOString().slice(0, 10)
         const billAmount = (bill as { grandTotal?: number }).grandTotal ?? bill.totalAmount
         lines.push(
-          `- Bill #${bill.billNumber} dated ${date}: ₹${formatter.format(
+          `- INV-${bill.billNumber} dated ${date}: ₹${formatter.format(
             billAmount
           )}`
         )
@@ -389,7 +389,7 @@ export async function sendOutstandingOnWhatsApp(
     ...allBills.map((b) => ({
       date: b.billDate,
       createdAt: b.createdAt,
-      description: `Invoice ${b.billNumber}${
+      description: `INV-${b.billNumber}${
         (b as { notes?: string }).notes
           ? ` — ${(b as { notes?: string }).notes}`
           : ''

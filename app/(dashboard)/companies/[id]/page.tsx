@@ -122,7 +122,7 @@ export default function CompanyDetailPage() {
       lines.push('Bill wise breakdown:')
       sellingHistory.slice(0, 10).forEach((row) => {
         const date = format(new Date(row.billDate), 'dd MMM yyyy')
-        lines.push(`- Bill #${row.billNumber} dated ${date}: ₹${formatter.format(row.totalAmount)}`)
+        lines.push(`- INV-${row.billNumber} dated ${date}: ₹${formatter.format(row.totalAmount)}`)
       })
     }
     lines.push('')

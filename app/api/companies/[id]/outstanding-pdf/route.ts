@@ -96,7 +96,7 @@ export async function GET(
         return {
           date: b.billDate,
           createdAt: b.createdAt,
-          description: `Invoice ${b.billNumber}${
+          description: `INV-${b.billNumber}${
             (b as { notes?: string }).notes
               ? ` — ${(b as { notes?: string }).notes}`
               : ''
