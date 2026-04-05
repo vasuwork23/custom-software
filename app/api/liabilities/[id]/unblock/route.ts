@@ -54,6 +54,31 @@ export async function PUT(
       )
     }
 
+    if (liability.source === 'cash') {
+      liability.status = 'unblocked'
+      liability.unblockedAt = new Date()
+      liability.unblockedReason =
+        (typeof unblockedReason === 'string' && unblockedReason.trim()) ||
+        'Unblocked'
+      await liability.save()
+
+      const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+      await createCashTransaction({
+        type: 'credit', // Credit cash because unblocking adds it back to available cash stack
+        amount: liability.amount,
+        description: `Liability unblocked: ${liability.reason}`,
+        date: new Date(),
+        category: 'other',
+        referenceId: liability._id as any,
+        referenceType: 'liability_unblock',
+      })
+
+      return NextResponse.json({
+        success: true,
+        data: liability,
+      })
+    }
+
     const bankAccount = await BankAccount.findById(liability.bankAccountId)
     if (!bankAccount) {
       return NextResponse.json(

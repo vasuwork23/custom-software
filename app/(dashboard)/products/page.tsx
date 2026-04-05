@@ -127,7 +127,7 @@ export default function ProductsPage() {
     setIndiaLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(indiaPage))
-    params.set('limit', '20')
+    params.set('limit', '150')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     const result = await apiGet<{ products: IndiaProductItem[]; pagination: { page: number; limit: number; total: number; pages: number } }>(
       `/api/india-products?${params}`
@@ -348,17 +348,15 @@ export default function ProductsPage() {
                       key={f.id}
                       type="button"
                       onClick={() => handleChinaFilterChange(f.id as ChinaFilterType)}
-                      className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                        chinaFilter === f.id
+                      className={`rounded-full px-3 py-1 text-xs transition-colors ${chinaFilter === f.id
                           ? 'bg-foreground text-background'
                           : 'bg-muted text-muted-foreground'
-                      }`}
+                        }`}
                     >
                       <span>{f.label}</span>
                       <span
-                        className={`ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] ${
-                          chinaFilter === f.id ? 'bg-white/20' : 'bg-background/60'
-                        }`}
+                        className={`ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] ${chinaFilter === f.id ? 'bg-white/20' : 'bg-background/60'
+                          }`}
                       >
                         {f.count}
                       </span>
@@ -473,79 +471,77 @@ export default function ProductsPage() {
           ) : (
             <div className="w-full overflow-hidden rounded-md border">
               <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-4 text-left font-medium">Product Name</th>
-                    <th className="h-10 px-4 text-right font-medium">Total CTN</th>
-                    <th className="h-10 px-4 text-right font-medium text-amber-600">China WH</th>
-                    <th className="h-10 px-4 text-right font-medium text-blue-600">In Transit</th>
-                    <th className="h-10 px-4 text-right font-medium text-emerald-600">Available</th>
-                    <th className="h-10 px-4 text-right font-medium text-red-500">Sold</th>
-                    <th className="h-10 px-4 text-right font-medium">Entries</th>
-                    <th className="h-10 px-4 text-left font-medium">Status</th>
-                    <th className="h-10 w-24 px-4" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredChinaProducts.map((p) => (
-                    <tr key={p._id} className="border-b transition-colors hover:bg-muted/50">
-                      <td className="p-4 font-medium">
-                        <Link href={`/products/${p._id}`} className="hover:underline">
-                          {p.productName}
-                        </Link>
-                      </td>
-                      <td className="p-4 text-right">{p.totalCtn}</td>
-                      <td className="p-4 text-right text-amber-600">{p.chinaWarehouseCtn}</td>
-                      <td className="p-4 text-right text-blue-600">{p.inTransitCtn}</td>
-                      <td
-                        className={`p-4 text-right ${
-                          p.availableCtn > 0 ? 'text-emerald-600' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {p.availableCtn}
-                      </td>
-                      <td
-                        className={`p-4 text-right ${
-                          p.soldCtn > 0 ? 'text-red-500' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {p.soldCtn}
-                      </td>
-                      <td className="p-4 text-right">{p.buyingEntriesCount}</td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1">
-                          {p.chinaWarehouseReceived === 'yes' && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                              WH Received
-                            </span>
-                          )}
-                          {p.inTransitCtn > 0 && (
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                              In Transit
-                            </span>
-                          )}
-                          {p.chinaWarehouseCtn > 0 && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                              China WH
-                            </span>
-                          )}
-                          {p.hasUnpaidEntries && (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                              Unpaid
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/products/${p._id}`}>View</Link>
-                        </Button>
-                      </td>
+                <table className="w-full min-w-[800px] text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="h-10 px-4 text-left font-medium">Product Name</th>
+                      <th className="h-10 px-4 text-right font-medium">Total CTN</th>
+                      <th className="h-10 px-4 text-right font-medium text-amber-600">China WH</th>
+                      <th className="h-10 px-4 text-right font-medium text-blue-600">In Transit</th>
+                      <th className="h-10 px-4 text-right font-medium text-emerald-600">Available</th>
+                      <th className="h-10 px-4 text-right font-medium text-red-500">Sold</th>
+                      <th className="h-10 px-4 text-right font-medium">Entries</th>
+                      <th className="h-10 px-4 text-left font-medium">Status</th>
+                      <th className="h-10 w-24 px-4" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredChinaProducts.map((p) => (
+                      <tr key={p._id} className="border-b transition-colors hover:bg-muted/50">
+                        <td className="p-4 font-medium">
+                          <Link href={`/products/${p._id}`} className="hover:underline">
+                            {p.productName}
+                          </Link>
+                        </td>
+                        <td className="p-4 text-right">{p.totalCtn}</td>
+                        <td className="p-4 text-right text-amber-600">{p.chinaWarehouseCtn}</td>
+                        <td className="p-4 text-right text-blue-600">{p.inTransitCtn}</td>
+                        <td
+                          className={`p-4 text-right ${p.availableCtn > 0 ? 'text-emerald-600' : 'text-muted-foreground'
+                            }`}
+                        >
+                          {p.availableCtn}
+                        </td>
+                        <td
+                          className={`p-4 text-right ${p.soldCtn > 0 ? 'text-red-500' : 'text-muted-foreground'
+                            }`}
+                        >
+                          {p.soldCtn}
+                        </td>
+                        <td className="p-4 text-right">{p.buyingEntriesCount}</td>
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-1">
+                            {p.chinaWarehouseReceived === 'yes' && (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                WH Received
+                              </span>
+                            )}
+                            {p.inTransitCtn > 0 && (
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                In Transit
+                              </span>
+                            )}
+                            {p.chinaWarehouseCtn > 0 && (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                China WH
+                              </span>
+                            )}
+                            {p.hasUnpaidEntries && (
+                              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                Unpaid
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/products/${p._id}`}>View</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

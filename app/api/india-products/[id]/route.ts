@@ -69,16 +69,16 @@ export async function GET(
     const stats = entryStats[0] ?? { totalCtn: 0, availableCtn: 0, count: 0 }
     const totalCtn = stats.totalCtn ?? 0
     const availableCtn = stats.availableCtn ?? 0
-    const totalProfit = profitAgg[0]?.totalProfit ?? 0
+    const totalProfit = Math.round(profitAgg[0]?.totalProfit ?? 0)
     const totalInvested = await IndiaBuyingEntry.aggregate([
       { $match: { product: productId } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-    ]).then((r) => r[0]?.total ?? 0)
+    ]).then((r) => Math.round(r[0]?.total ?? 0))
 
     const sellingHistoryList = sellingHistory
       .filter((item) => item.sellBill && typeof item.sellBill === 'object')
       .map((item) => {
-        const sellBill = item.sellBill as { _id: mongoose.Types.ObjectId; billNumber: number; billDate: Date; company: { _id: mongoose.Types.ObjectId; companyName: string } }
+        const sellBill = item.sellBill as unknown as { _id: mongoose.Types.ObjectId; billNumber: number; billDate: Date; company: { _id: mongoose.Types.ObjectId; companyName: string } }
         return {
           _id: item._id,
           sellBillId: sellBill._id,

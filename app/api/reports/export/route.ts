@@ -66,18 +66,19 @@ export async function GET(req: NextRequest) {
         )
       }
 
-      let doc: React.ReactElement | null = null
+      let doc: React.ReactElement<any> | null = null
 
       if (reportType === 'pnl') {
-        const d = data as { summary: unknown; byProduct: unknown[]; byCompany: unknown[] }
-        doc = React.createElement(PnlPdfDocument, { data: d })
+        doc = React.createElement(PnlPdfDocument, {
+          data: data as Parameters<typeof PnlPdfDocument>[0]['data'],
+        })
       } else if (reportType === 'stock') {
         doc = React.createElement(StockPdfDocument, {
           data: data as Parameters<typeof StockPdfDocument>[0]['data'],
         })
       } else if (reportType === 'selling') {
         const d = data as {
-          summary: unknown
+          summary: { totalBills: number; totalRevenue: number; totalProfit: number; avgBillValue: number }
           bills: {
             billNumber: number
             billDate: Date | string
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
         doc = React.createElement(SellingPdfDocument, { data: { summary: d.summary, bills } })
       } else {
         const d = data as {
-          summary: unknown
+          summary: { totalEntries: number; totalAmount: number; totalGiven: number; totalRemaining: number }
           entries: {
             entryDate: Date | string
             productName: string

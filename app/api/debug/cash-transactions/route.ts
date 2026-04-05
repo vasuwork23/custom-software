@@ -19,19 +19,13 @@ export async function GET(req: NextRequest) {
 
     const all = await CashTransaction.find({}).lean()
 
-    all.forEach((tx, i) => {
-        `[${i}] type:${(tx as { type?: string }).type} amount:${(tx as { amount?: number }).amount} date:${(tx as { date?: unknown }).date} (typeof: ${typeof (tx as { date?: unknown }).date}) createdAt:${(tx as { createdAt?: unknown }).createdAt} sortOrder:${(tx as { sortOrder?: number }).sortOrder} isReversal:${(tx as { isReversal?: boolean }).isReversal} desc:${(tx as { description?: string }).description?.slice(0, 40)}`
-      )
-    })
+
 
     const sorted = await CashTransaction.find({})
       .sort({ date: 1, sortOrder: 1, createdAt: 1 })
       .lean()
 
-    sorted.forEach((tx, i) => {
-        `[${i}] type:${(tx as { type?: string }).type} amount:${(tx as { amount?: number }).amount} date:${(tx as { date?: unknown }).date}`
-      )
-    })
+
 
     return NextResponse.json({
       success: true,

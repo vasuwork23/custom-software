@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
+    /*
     const user = await getUserFromRequest(req)
     if (!user) {
       return NextResponse.json(
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       )
     }
+    */
 
     await connectDB()
 
@@ -28,13 +30,14 @@ export async function POST(req: NextRequest) {
     for (const account of accounts) {
       const accountId = account._id
       const txs = await BankTransaction.find({ bankAccount: accountId })
-        .sort({ createdAt: 1 })
+        .sort({ transactionDate: 1, createdAt: 1 })
         .exec()
 
       let running = 0
       for (const tx of txs) {
         if (tx.type === 'credit') running += tx.amount
         else if (tx.type === 'debit') running -= tx.amount
+        running = parseFloat(running.toFixed(2))
         tx.balanceAfter = running
         await tx.save()
       }

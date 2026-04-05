@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/mongodb'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import CashTransaction from '@/models/CashTransaction'
+import Cash from '@/models/Cash'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
@@ -45,6 +46,8 @@ export async function GET(req: NextRequest) {
 
     // Cash account uses CashTransaction ledger, not BankTransaction
     const cashTransactionCount = await CashTransaction.countDocuments()
+    const cashDoc = await Cash.findOne().lean()
+    const trueCashBalance = cashDoc?.balance ?? 0
 
     const list = accounts.map((a) => {
       const isCash = (a as { type?: string }).type === 'cash'
@@ -53,7 +56,7 @@ export async function GET(req: NextRequest) {
         accountName: a.accountName,
         type: a.type,
         isDefault: a.isDefault,
-        currentBalance: a.currentBalance ?? 0,
+        currentBalance: isCash ? trueCashBalance : (a.currentBalance ?? 0),
         transactionCount: isCash ? cashTransactionCount : (countByAccount[String(a._id)] ?? 0),
       }
     })

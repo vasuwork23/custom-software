@@ -86,7 +86,7 @@ export async function sendBillOnWhatsApp(
       yourAddress: process.env.COMPANY_ADDRESS ?? '',
       yourPhone: process.env.COMPANY_PHONE ?? '',
     })
-    const pdfBuffer = await renderToBuffer(doc)
+    const pdfBuffer = await renderToBuffer(doc as any)
 
     const filename = generateBillFileName({
       companyName: billData.company.companyName,
@@ -95,7 +95,7 @@ export async function sendBillOnWhatsApp(
     })
 
     const formData = new FormData()
-    formData.append('file', new Blob([pdfBuffer], { type: 'application/pdf' }), filename)
+    formData.append('file', new Blob([pdfBuffer as any], { type: 'application/pdf' }), filename)
 
     const uploadRes = await fetch(`${BASE_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`, {
       method: 'POST',
@@ -459,14 +459,14 @@ export async function sendOutstandingOnWhatsApp(
   })
 
   try {
-    const pdfBuffer = await renderToBuffer(doc)
+    const pdfBuffer = await renderToBuffer(doc as any)
 
     const filename = generateOutstandingFileName(company.companyName)
 
     const formData = new FormData()
     formData.append(
       'file',
-      new Blob([pdfBuffer], { type: 'application/pdf' }),
+      new Blob([pdfBuffer as any], { type: 'application/pdf' }),
       filename
     )
 

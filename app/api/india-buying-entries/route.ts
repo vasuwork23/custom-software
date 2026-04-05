@@ -107,6 +107,8 @@ export async function POST(req: NextRequest) {
         ? body.advanceBankAccount
         : undefined
 
+    const calculatedTotalAmount = Math.round(Number(body.totalCtn) * Number(body.qty) * Number(body.rate))
+
     if (hasAdvance && (advanceAmt ?? 0) > 0) {
       if (!advanceBankId) {
         return NextResponse.json(
@@ -148,26 +150,42 @@ export async function POST(req: NextRequest) {
       const productName = product?.productName ?? 'India Product'
       const sourceLabel = `Advance for India Product: ${productName}`
 
-      const lastTx = await BankTransaction.findOne({ bankAccount: advanceBankId })
-        .sort({ transactionDate: -1, createdAt: -1 })
-        .select('balanceAfter')
-        .lean()
-      const lastBalance = lastTx?.balanceAfter ?? 0
-      const newBalance = lastBalance - advanceAmt
+      const bankAcct = await BankAccount.findById(advanceBankId).select('type').lean()
+      const isCash = bankAcct?.type === 'cash'
 
-      await BankTransaction.create({
-        bankAccount: advanceBankId,
-        type: 'debit',
-        amount: advanceAmt,
-        balanceAfter: newBalance,
-        source: 'india_buying_advance',
-        sourceRef: entry._id,
-        sourceLabel,
-        transactionDate: entry.advanceDate ?? new Date(),
-        notes: entry.advanceNote,
-        createdBy,
-      })
-      await BankAccount.findByIdAndUpdate(advanceBankId, { currentBalance: newBalance })
+      if (isCash) {
+        const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+        await createCashTransaction({
+          type: 'debit',
+          amount: advanceAmt,
+          description: sourceLabel + (entry.advanceNote ? ` - ${entry.advanceNote}` : ''),
+          date: entry.advanceDate ?? new Date(),
+          category: 'other',
+          referenceId: entry._id as mongoose.Types.ObjectId,
+          referenceType: 'india_buying_advance',
+        })
+      } else {
+        const lastTx = await BankTransaction.findOne({ bankAccount: advanceBankId })
+          .sort({ transactionDate: -1, createdAt: -1 })
+          .select('balanceAfter')
+          .lean()
+        const lastBalance = lastTx?.balanceAfter ?? 0
+        const newBalance = lastBalance - advanceAmt
+
+        await BankTransaction.create({
+          bankAccount: advanceBankId,
+          type: 'debit',
+          amount: advanceAmt,
+          balanceAfter: newBalance,
+          source: 'india_buying_advance',
+          sourceRef: entry._id,
+          sourceLabel,
+          transactionDate: entry.advanceDate ?? new Date(),
+          notes: entry.advanceNote,
+          createdBy,
+        })
+        await BankAccount.findByIdAndUpdate(advanceBankId, { currentBalance: newBalance })
+      }
     }
 
     const populated = await IndiaBuyingEntry.findById(entry._id).lean().populate('product', 'productName')

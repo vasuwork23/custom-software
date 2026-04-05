@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     let migrated = 0
 
     for (const entry of entries) {
-      // @ts-expect-error legacy field
+      // legacy field
       const legacyStatus: string | undefined = (entry as any).warehouseStatus
 
       if (legacyStatus === 'india_warehouse') {
@@ -59,9 +59,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Remove legacy field if present
-      // @ts-expect-error legacy field removal
       if ((entry as any).warehouseStatus !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete (entry as any).warehouseStatus
       }
 

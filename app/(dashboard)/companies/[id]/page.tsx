@@ -538,7 +538,7 @@ export default function CompanyDetailPage() {
           <DialogHeader>
             <DialogTitle>PDF Downloaded</DialogTitle>
             <DialogDescription>
-              The Outstanding Statement has been successfully downloaded. Use the WhatsApp button to share directly, or copy the customer's mobile number below.
+              The Outstanding Statement has been successfully downloaded. Use the WhatsApp button to share directly, or copy the customer&apos;s mobile number below.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center space-x-2 my-2">

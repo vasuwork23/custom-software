@@ -37,8 +37,8 @@ export async function GET(
         { status: 404 }
       )
     }
-    const company = payment.company as { _id: mongoose.Types.ObjectId; companyName: string } | null
-    const bankAccount = payment.bankAccount as { _id: mongoose.Types.ObjectId; accountName: string } | null
+    const company = payment.company as unknown as { _id: mongoose.Types.ObjectId; companyName: string } | null
+    const bankAccount = payment.bankAccount as unknown as { _id: mongoose.Types.ObjectId; accountName: string } | null
     return NextResponse.json({
       success: true,
       data: {

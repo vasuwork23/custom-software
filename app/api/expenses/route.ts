@@ -88,8 +88,8 @@ export async function GET(req: NextRequest) {
       amount: e.amount,
       expenseDate: e.expenseDate,
       remark: e.remark,
-      paidFromId: (e.paidFrom as { _id: mongoose.Types.ObjectId })?._id ?? e.paidFrom,
-      paidFromName: (e.paidFrom as { accountName: string })?.accountName ?? '—',
+      paidFromId: (e.paidFrom as unknown as { _id: mongoose.Types.ObjectId })?._id ?? e.paidFrom,
+      paidFromName: (e.paidFrom as unknown as { accountName: string })?.accountName ?? '—',
     }))
 
     return NextResponse.json({

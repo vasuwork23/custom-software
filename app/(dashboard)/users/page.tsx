@@ -405,7 +405,7 @@ export default function UsersPage() {
                             {canEdit() && canManageThisUser && (
                               <Button
                                 variant="outline"
-                                size="xs"
+                                size="sm"
                                 onClick={() => openEditDialog(user)}
                               >
                                 Edit
@@ -415,7 +415,7 @@ export default function UsersPage() {
                             {currentRole === 'owner' && user.role !== 'owner' && (
                               <Button
                                 variant="outline"
-                                size="xs"
+                                size="sm"
                                 onClick={() => openResetDialog(user)}
                               >
                                 Reset Password
@@ -425,7 +425,7 @@ export default function UsersPage() {
                             {currentRole === 'owner' && user.isBlocked && (
                               <ConfirmDialog
                                 trigger={
-                                  <Button variant="outline" size="xs">
+                                  <Button variant="outline" size="sm">
                                     Unblock
                                   </Button>
                                 }
@@ -440,7 +440,7 @@ export default function UsersPage() {
                             {user.role !== 'owner' && canDelete() && canManageThisUser && (
                               <ConfirmDialog
                                 trigger={
-                                  <Button variant="destructive" size="xs">
+                                  <Button variant="destructive" size="sm">
                                     Delete
                                   </Button>
                                 }

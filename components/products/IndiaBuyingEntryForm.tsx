@@ -126,7 +126,7 @@ export function IndiaBuyingEntryForm({
 
   const watched = watch()
   const totalQty = (watched.totalCtn ?? 0) * (watched.qty ?? 0)
-  const totalAmount = totalQty * (watched.rate ?? 0)
+  const totalAmount = Math.round(totalQty * (watched.rate ?? 0))
   const givenDisplay = isEdit ? (editEntry?.givenAmount ?? 0) : (watched.hasAdvancePayment ? (watched.advanceAmount ?? 0) : 0)
   const remainingAmount = totalAmount - givenDisplay
 
@@ -167,6 +167,9 @@ export function IndiaBuyingEntryForm({
       if (!values.advanceAmount || values.advanceAmount <= 0) {
         toast.error('Please enter a positive advance amount')
         return
+      }
+      if (values.advanceAmount > totalAmount) {
+        toast.warning(`Note: Advance amount (₹${values.advanceAmount}) exceeds total amount (₹${totalAmount})`)
       }
     }
 

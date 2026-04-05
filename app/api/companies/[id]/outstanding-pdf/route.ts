@@ -150,11 +150,11 @@ export async function GET(
       yourPhone: process.env.COMPANY_PHONE ?? '',
     })
 
-    const pdfBuffer = await renderToBuffer(doc)
+    const pdfBuffer = await renderToBuffer(doc as any)
 
     const filename = generateOutstandingFileName(company.companyName)
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as any, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,

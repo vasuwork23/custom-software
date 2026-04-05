@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       amount: p.amount,
       paymentMode: p.paymentMode,
       companyId: (p.company as { _id: mongoose.Types.ObjectId })._id,
-      companyName: (p.company as { companyName: string }).companyName,
+      companyName: (p.company as unknown as { companyName: string }).companyName,
       bankAccountId: (p.bankAccount as { _id?: mongoose.Types.ObjectId } | undefined)?._id,
       bankAccountName: (p.bankAccount as { accountName?: string } | undefined)?.accountName,
       remark: p.remark,

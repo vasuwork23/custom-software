@@ -1,0 +1,142 @@
+app/api/china-bank/payment/route.ts(124,48): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(docs: IChinaBankTransaction[], options?: CreateOptions | undefined): Promise<(Document<unknown, {}, IChinaBankTransaction, {}, {}> & IChinaBankTransaction & Required<...> & { ...; })[]>', gave the following error.
+    Object literal may only specify known properties, and 'type' does not exist in type 'IChinaBankTransaction[]'.
+  Overload 2 of 4, '(doc: IChinaBankTransaction): Promise<Document<unknown, {}, IChinaBankTransaction, {}, {}> & IChinaBankTransaction & Required<...> & { ...; }>', gave the following error.
+    Argument of type '{ type: "credit"; amount: number; balanceAfter: number; reference: string | undefined; notes: string; transactionDate: Date; sortOrder: number; payFrom: "cash" | "bank"; sourceBankAccountId: Types.ObjectId | null; createdBy: Types.ObjectId; }' is not assignable to parameter of type 'IChinaBankTransaction'.
+      Type '{ type: "credit"; amount: number; balanceAfter: number; reference: string | undefined; notes: string; transactionDate: Date; sortOrder: number; payFrom: "cash" | "bank"; sourceBankAccountId: ObjectId | null; createdBy: ObjectId; }' is missing the following properties from type 'IChinaBankTransaction': createdAt, updatedAt
+  Overload 3 of 4, '(...docs: IChinaBankTransaction[]): Promise<(Document<unknown, {}, IChinaBankTransaction, {}, {}> & IChinaBankTransaction & Required<...> & { ...; })[]>', gave the following error.
+    Argument of type '{ type: "credit"; amount: number; balanceAfter: number; reference: string | undefined; notes: string; transactionDate: Date; sortOrder: number; payFrom: "cash" | "bank"; sourceBankAccountId: Types.ObjectId | null; createdBy: Types.ObjectId; }' is not assignable to parameter of type 'IChinaBankTransaction'.
+      Type '{ type: "credit"; amount: number; balanceAfter: number; reference: string | undefined; notes: string; transactionDate: Date; sortOrder: number; payFrom: "cash" | "bank"; sourceBankAccountId: ObjectId | null; createdBy: ObjectId; }' is missing the following properties from type 'IChinaBankTransaction': createdAt, updatedAt
+app/api/china-bank/payment/route.ts(140,36): error TS2339: Property '_id' does not exist on type '(Error | (Document<unknown, {}, IChinaBankTransaction, {}, {}> & IChinaBankTransaction & Required<{ _id: ObjectId; }> & { ...; }))[]'.
+app/api/companies/[id]/outstanding-pdf/route.ts(153,44): error TS2345: Argument of type 'FunctionComponentElement<OutstandingTemplateProps>' is not assignable to parameter of type 'ReactElement<DocumentProps, string | JSXElementConstructor<any>>'.
+  Types of property 'props' are incompatible.
+    Type 'OutstandingTemplateProps' has no properties in common with type 'DocumentProps'.
+app/api/companies/[id]/outstanding-pdf/route.ts(157,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+  Type 'Buffer<ArrayBufferLike>' is missing the following properties from type 'URLSearchParams': size, append, delete, get, and 2 more.
+app/api/companies/[id]/route.ts(77,22): error TS2352: Conversion of type 'FlattenMaps<{ _id?: ObjectId | undefined; billNumber: number; company: ObjectId | null; isCashbook: boolean; companyName?: string | null | undefined; billDate: Date; ... 13 more ...; updatedAt: Date; }> & Required<...> & { ...; }' to type '{ items?: { totalAmount: number; totalProfit: number; ctnSold?: number | undefined; product?: unknown; }[] | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'items' are incompatible.
+    Type 'ObjectId[]' is not comparable to type '{ totalAmount: number; totalProfit: number; ctnSold?: number | undefined; product?: unknown; }[]'.
+      Type 'ObjectId' is missing the following properties from type '{ totalAmount: number; totalProfit: number; ctnSold?: number | undefined; product?: unknown; }': totalAmount, totalProfit
+app/api/containers/[id]/route.ts(63,117): error TS18047: 'buyingEntryId' is possibly 'null'.
+app/api/expenses/[id]/route.ts(51,22): error TS2352: Conversion of type 'ObjectId' to type '{ _id: ObjectId; accountName: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'accountName' is missing in type 'ObjectId' but required in type '{ _id: ObjectId; accountName: string; }'.
+app/api/expenses/route.ts(92,22): error TS2352: Conversion of type 'ObjectId' to type '{ accountName: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'accountName' is missing in type 'ObjectId' but required in type '{ accountName: string; }'.
+app/api/fix/fix-india-advance-txns/route.ts(78,26): error TS2802: Type 'Set<string>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+app/api/fix/migrate-warehouse-fields/route.ts(30,7): error TS2578: Unused '@ts-expect-error' directive.
+app/api/fix/migrate-warehouse-fields/route.ts(62,7): error TS2578: Unused '@ts-expect-error' directive.
+app/api/india-products/[id]/route.ts(81,26): error TS2352: Conversion of type 'ObjectId' to type '{ _id: ObjectId; billNumber: number; billDate: Date; company: { _id: ObjectId; companyName: string; }; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'ObjectId' is missing the following properties from type '{ _id: ObjectId; billNumber: number; billDate: Date; company: { _id: ObjectId; companyName: string; }; }': billNumber, billDate, company
+app/api/products/[id]/route.ts(128,26): error TS2352: Conversion of type 'ObjectId' to type '{ _id: ObjectId; billNumber: number; billDate: Date; company: { _id: ObjectId; companyName: string; }; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'ObjectId' is missing the following properties from type '{ _id: ObjectId; billNumber: number; billDate: Date; company: { _id: ObjectId; companyName: string; }; }': billNumber, billDate, company
+app/api/products/china-with-pending-entries/route.ts(34,28): error TS2802: Type 'Set<string>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+app/api/received-voucher/[id]/route.ts(40,21): error TS2352: Conversion of type 'ObjectId' to type '{ _id: ObjectId; companyName: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'companyName' is missing in type 'ObjectId' but required in type '{ _id: ObjectId; companyName: string; }'.
+app/api/received-voucher/[id]/route.ts(41,25): error TS2352: Conversion of type 'ObjectId | undefined' to type '{ _id: ObjectId; accountName: string; } | null' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'accountName' is missing in type 'ObjectId' but required in type '{ _id: ObjectId; accountName: string; }'.
+app/api/received-voucher/route.ts(113,21): error TS2352: Conversion of type 'ObjectId' to type '{ companyName: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'companyName' is missing in type 'ObjectId' but required in type '{ companyName: string; }'.
+app/api/reports/export/route.ts(73,53): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type '{ summary: unknown; byProduct: unknown[]; byCompany: unknown[]; }' is not assignable to type '{ summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number; }; byProduct: { productName: string; revenue: number; cost: number; profit: number; marginPct: number; }[]; byCompany: { ...; }[]; }'.
+      Types of property 'summary' are incompatible.
+        Type 'unknown' is not assignable to type '{ revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number; }'.
+app/api/reports/export/route.ts(97,65): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type 'unknown' is not assignable to type '{ totalBills: number; totalRevenue: number; totalProfit: number; avgBillValue: number; }'.
+app/api/reports/export/route.ts(118,64): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type 'unknown' is not assignable to type '{ totalEntries: number; totalAmount: number; totalGiven: number; totalRemaining: number; }'.
+app/api/reports/export/route.ts(136,45): error TS2345: Argument of type 'ReactElement<unknown, string | JSXElementConstructor<any>>' is not assignable to parameter of type 'ReactElement<DocumentProps, string | JSXElementConstructor<any>>'.
+  Type 'unknown' is not assignable to type 'DocumentProps'.
+app/api/reports/export/route.ts(138,33): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+  Type 'Buffer<ArrayBufferLike>' is missing the following properties from type 'URLSearchParams': size, append, delete, get, and 2 more.
+app/api/sell-bills/[id]/pdf/route.ts(105,17): error TS2352: Conversion of type 'ObjectId[]' to type '{ product?: { productName?: string | undefined; } | undefined; indiaProduct?: { productName?: string | undefined; } | undefined; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number; }[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'ObjectId' is missing the following properties from type '{ product?: { productName?: string | undefined; } | undefined; indiaProduct?: { productName?: string | undefined; } | undefined; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number; }': ctnSold, pcsSold, ratePerPcs, totalAmount
+app/api/sell-bills/[id]/pdf/route.ts(112,44): error TS2345: Argument of type 'FunctionComponentElement<BillTemplateProps>' is not assignable to parameter of type 'ReactElement<DocumentProps, string | JSXElementConstructor<any>>'.
+  Types of property 'props' are incompatible.
+    Type 'BillTemplateProps' has no properties in common with type 'DocumentProps'.
+app/api/sell-bills/[id]/pdf/route.ts(120,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+  Type 'Buffer<ArrayBufferLike>' is missing the following properties from type 'URLSearchParams': size, append, delete, get, and 2 more.
+app/api/sell-bills/[id]/route.ts(349,27): error TS2345: Argument of type '{ buyingEntry?: ObjectId | undefined; indiaBuyingEntry?: ObjectId | undefined; ctnConsumed: number; }[]' is not assignable to parameter of type '(IFifoBreakdownItem & Record<string, unknown>)[]'.
+  Type '{ buyingEntry?: ObjectId | undefined; indiaBuyingEntry?: ObjectId | undefined; ctnConsumed: number; }' is not assignable to type 'IFifoBreakdownItem & Record<string, unknown>'.
+    Type '{ buyingEntry?: ObjectId | undefined; indiaBuyingEntry?: ObjectId | undefined; ctnConsumed: number; }' is missing the following properties from type 'IFifoBreakdownItem': pcsConsumed, finalCost, profit
+app/api/sell-bills/[id]/route.ts(350,32): error TS2345: Argument of type '{ buyingEntry?: ObjectId | undefined; indiaBuyingEntry?: ObjectId | undefined; ctnConsumed: number; }[]' is not assignable to parameter of type '(IFifoBreakdownItem & Record<string, unknown>)[]'.
+  Type '{ buyingEntry?: ObjectId | undefined; indiaBuyingEntry?: ObjectId | undefined; ctnConsumed: number; }' is not assignable to type 'IFifoBreakdownItem & Record<string, unknown>'.
+    Type '{ buyingEntry?: ObjectId | undefined; indiaBuyingEntry?: ObjectId | undefined; ctnConsumed: number; }' is missing the following properties from type 'IFifoBreakdownItem': pcsConsumed, finalCost, profit
+app/api/sell-bills/[id]/whatsapp/route.ts(58,15): error TS2352: Conversion of type 'ObjectId[]' to type '{ product?: { productName?: string | undefined; } | undefined; indiaProduct?: { productName?: string | undefined; } | undefined; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number; }[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'ObjectId' is missing the following properties from type '{ product?: { productName?: string | undefined; } | undefined; indiaProduct?: { productName?: string | undefined; } | undefined; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number; }': ctnSold, pcsSold, ratePerPcs, totalAmount
+app/api/sell-bills/route.ts(101,14): error TS1252: Function declarations are not allowed inside blocks in strict mode when targeting 'ES5'. Modules are automatically in strict mode.
+components/companies/CompanyFormSheet.tsx(282,21): error TS2322: Type '"xs"' is not assignable to type '"default" | "sm" | "lg" | "icon" | null | undefined'.
+components/companies/CompanyFormSheet.tsx(291,21): error TS2322: Type '"xs"' is not assignable to type '"default" | "sm" | "lg" | "icon" | null | undefined'.
+components/layout/ChangePasswordDialog.tsx(54,27): error TS2339: Property 'message' does not exist on type '{ success: true; data: { message: string; }; }'.
+components/ui/PageHeader.tsx(4,18): error TS2430: Interface 'PageHeaderProps' incorrectly extends interface 'HTMLAttributes<HTMLDivElement>'.
+  Types of property 'title' are incompatible.
+    Type 'ReactNode' is not assignable to type 'string | undefined'.
+      Type 'null' is not assignable to type 'string | undefined'.
+lib/bank-ledger.ts(35,37): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(writes: AnyBulkWriteOperation<Document>[], options: BulkWriteOptions & MongooseBulkWriteOptions & { ...; }): Promise<...>', gave the following error.
+    Argument of type 'import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>[]' is not assignable to parameter of type 'import("mongoose").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>[]'.
+      Type 'import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>' is not assignable to type 'import("mongoose").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>'.
+        Type '{ replaceOne: ReplaceOneModel<Document>; }' is not assignable to type 'AnyBulkWriteOperation<Document>'.
+          Type '{ replaceOne: import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>; }' is not assignable to type '{ replaceOne: import("mongoose").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>; }'.
+            Types of property 'replaceOne' are incompatible.
+              Type 'import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>' is not assignable to type 'import("mongoose").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>'.
+                Type 'ReplaceOneModel<Document>' is not assignable to type '{ filter: FilterQuery<Document>; }'.
+                  Types of property 'filter' are incompatible.
+                    Type 'Filter<Document>' is not assignable to type 'FilterQuery<Document>'.
+                      Type 'Filter<Document>' is not assignable to type 'RootQuerySelector<Document>'.
+                        Types of property '$and' are incompatible.
+                          Type 'Filter<WithId<Document>>[] | undefined' is not assignable to type 'FilterQuery<Document>[] | undefined'.
+                            Type 'Filter<WithId<Document>>[]' is not assignable to type 'FilterQuery<Document>[]'.
+                              Type 'Filter<WithId<Document>>' is not assignable to type 'FilterQuery<Document>'.
+                                Type 'Filter<WithId<Document>>' is not assignable to type 'RootQuerySelector<Document>'.
+                                  Types of property '$comment' are incompatible.
+                                    Type 'string | Document | undefined' is not assignable to type 'string | undefined'.
+                                      Type 'Document' is not assignable to type 'string'.
+  Overload 2 of 2, '(writes: AnyBulkWriteOperation<Document>[], options?: (BulkWriteOptions & MongooseBulkWriteOptions) | undefined): Promise<...>', gave the following error.
+    Argument of type 'import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>[]' is not assignable to parameter of type 'import("mongoose").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>[]'.
+      Type 'import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>' is not assignable to type 'import("mongoose").AnyBulkWriteOperation<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>'.
+        Type '{ replaceOne: ReplaceOneModel<Document>; }' is not assignable to type 'AnyBulkWriteOperation<Document>'.
+          Type '{ replaceOne: import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>; }' is not assignable to type '{ replaceOne: import("mongoose").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>; }'.
+            Types of property 'replaceOne' are incompatible.
+              Type 'import("/Users/nexus/Desktop/custom-software/node_modules/mongoose/node_modules/mongodb/mongodb").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>' is not assignable to type 'import("mongoose").ReplaceOneModel<import("/Users/nexus/Desktop/custom-software/node_modules/bson/bson").Document>'.
+                Type 'ReplaceOneModel<Document>' is not assignable to type '{ filter: FilterQuery<Document>; }'.
+                  Types of property 'filter' are incompatible.
+                    Type 'Filter<Document>' is not assignable to type 'FilterQuery<Document>'.
+                      Type 'Filter<Document>' is not assignable to type 'RootQuerySelector<Document>'.
+                        Types of property '$and' are incompatible.
+                          Type 'Filter<WithId<Document>>[] | undefined' is not assignable to type 'FilterQuery<Document>[] | undefined'.
+                            Type 'Filter<WithId<Document>>[]' is not assignable to type 'FilterQuery<Document>[]'.
+                              Type 'Filter<WithId<Document>>' is not assignable to type 'FilterQuery<Document>'.
+                                Type 'Filter<WithId<Document>>' is not assignable to type 'RootQuerySelector<Document>'.
+                                  Types of property '$comment' are incompatible.
+                                    Type 'string | Document | undefined' is not assignable to type 'string | undefined'.
+                                      Type 'Document' is not assignable to type 'string'.
+lib/carrying-types.ts(43,5): error TS1117: An object literal cannot have multiple properties with the same name.
+lib/carrying-types.ts(44,5): error TS1117: An object literal cannot have multiple properties with the same name.
+lib/carrying-types.ts(65,5): error TS1117: An object literal cannot have multiple properties with the same name.
+lib/fifo.ts(85,23): error TS2345: Argument of type 'IFifoBreakdownItem[]' is not assignable to parameter of type '(IFifoBreakdownItem & Record<string, unknown>)[]'.
+  Type 'IFifoBreakdownItem' is not assignable to type 'IFifoBreakdownItem & Record<string, unknown>'.
+    Type 'IFifoBreakdownItem' is not assignable to type 'Record<string, unknown>'.
+      Index signature for type 'string' is missing in type 'IFifoBreakdownItem'.
+lib/india-fifo.ts(83,28): error TS2345: Argument of type 'IFifoBreakdownItem[]' is not assignable to parameter of type '(IFifoBreakdownItem & Record<string, unknown>)[]'.
+  Type 'IFifoBreakdownItem' is not assignable to type 'IFifoBreakdownItem & Record<string, unknown>'.
+    Type 'IFifoBreakdownItem' is not assignable to type 'Record<string, unknown>'.
+      Index signature for type 'string' is missing in type 'IFifoBreakdownItem'.
+lib/whatsapp.ts(89,44): error TS2345: Argument of type 'FunctionComponentElement<BillTemplateProps>' is not assignable to parameter of type 'ReactElement<DocumentProps, string | JSXElementConstructor<any>>'.
+  Types of property 'props' are incompatible.
+    Type 'BillTemplateProps' has no properties in common with type 'DocumentProps'.
+lib/whatsapp.ts(98,39): error TS2322: Type 'Buffer<ArrayBufferLike>' is not assignable to type 'BlobPart'.
+  Type 'Buffer<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+    Types of property 'buffer' are incompatible.
+      Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+        Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer': resizable, resize, detached, transfer, transferToFixedLength
+lib/whatsapp.ts(462,44): error TS2345: Argument of type 'FunctionComponentElement<OutstandingTemplateProps>' is not assignable to parameter of type 'ReactElement<DocumentProps, string | JSXElementConstructor<any>>'.
+  Types of property 'props' are incompatible.
+    Type 'OutstandingTemplateProps' has no properties in common with type 'DocumentProps'.
+lib/whatsapp.ts(469,17): error TS2322: Type 'Buffer<ArrayBufferLike>' is not assignable to type 'BlobPart'.
+  Type 'Buffer<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+    Types of property 'buffer' are incompatible.
+      Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+        Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer': resizable, resize, detached, transfer, transferToFixedLength

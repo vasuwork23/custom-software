@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     const lastBalance = lastTx?.balanceAfter ?? 0
     const chinaBalanceAfter = lastBalance + inrAmount
 
-    const chinaTx = await ChinaBankTransaction.create<IChinaBankTransaction>({
+    const chinaTx = await ChinaBankTransaction.create({
       type: 'credit',
       amount: inrAmount,
       balanceAfter: chinaBalanceAfter,

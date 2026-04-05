@@ -93,15 +93,15 @@ export async function POST(req: NextRequest) {
 
     const [lastFrom, lastTo] = await Promise.all([
       fromIsCash
-        ? Promise.resolve<Pick<BankTransaction, 'balanceAfter'> | null>(null)
+        ? Promise.resolve<{ balanceAfter: number } | null>(null)
         : BankTransaction.findOne({ bankAccount: fromId })
-            .sort({ createdAt: -1 })
+            .sort({ transactionDate: -1, createdAt: -1 })
             .select('balanceAfter')
             .lean(),
       toIsCash
-        ? Promise.resolve<Pick<BankTransaction, 'balanceAfter'> | null>(null)
+        ? Promise.resolve<{ balanceAfter: number } | null>(null)
         : BankTransaction.findOne({ bankAccount: toId })
-            .sort({ createdAt: -1 })
+            .sort({ transactionDate: -1, createdAt: -1 })
             .select('balanceAfter')
             .lean(),
     ])

@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Rebuild balanceAfter and currentBalance for each affected bank account.
-    for (const bankId of affectedBankIds) {
+    for (const bankId of Array.from(affectedBankIds)) {
       const txns = await BankTransaction.find({ bankAccount: bankId })
         .sort({ transactionDate: 1, createdAt: 1, _id: 1 })
         .lean()

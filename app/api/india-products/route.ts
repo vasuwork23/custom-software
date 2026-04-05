@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '10', 10)))
+    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '150', 10)))
     const search = searchParams.get('search')?.trim() ?? ''
 
     await connectDB()

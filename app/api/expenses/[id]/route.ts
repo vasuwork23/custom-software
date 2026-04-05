@@ -48,7 +48,7 @@ export async function GET(
         { status: 404 }
       )
     }
-    const paidFrom = expense.paidFrom as { _id: mongoose.Types.ObjectId; accountName: string } | null
+    const paidFrom = expense.paidFrom as unknown as { _id: mongoose.Types.ObjectId; accountName: string } | null
     return NextResponse.json({
       success: true,
       data: {

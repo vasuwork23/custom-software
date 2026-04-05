@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       .sort({ entryDate: 1, createdAt: 1 })
       .lean()
 
-    const productIds = [...new Set(pendingEntries.map((e) => String(e.product)))]
+    const productIds = Array.from(new Set(pendingEntries.map((e) => String(e.product))))
     if (productIds.length === 0) {
       return NextResponse.json({
         success: true,

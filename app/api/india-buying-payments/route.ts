@@ -124,26 +124,40 @@ export async function POST(req: NextRequest) {
     const entryDateStr = format(new Date(entry.entryDate), 'dd MMM yyyy')
     const sourceLabel = `Payment for India Product: ${productName} - ${entryDateStr}`
 
-    const lastTx = await BankTransaction.findOne({ bankAccount: bankAccountId })
-      .sort({ transactionDate: -1, createdAt: -1 })
-      .select('balanceAfter')
-      .lean()
-    const lastBalance = lastTx?.balanceAfter ?? 0
-    const newBalance = lastBalance - amount
+    const bankAcct = await BankAccount.findById(bankAccountId).select('type').lean()
+    if (bankAcct?.type === 'cash') {
+      const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+      await createCashTransaction({
+        type: 'debit',
+        amount,
+        description: sourceLabel + (notes ? ` - ${notes}` : ''),
+        date: paymentDate,
+        category: 'other',
+        referenceId: entry._id as mongoose.Types.ObjectId,
+        referenceType: 'india_buying_payment',
+      })
+    } else {
+      const lastTx = await BankTransaction.findOne({ bankAccount: bankAccountId })
+        .sort({ transactionDate: -1, createdAt: -1 })
+        .select('balanceAfter')
+        .lean()
+      const lastBalance = lastTx?.balanceAfter ?? 0
+      const newBalance = lastBalance - amount
 
-    await BankTransaction.create({
-      bankAccount: bankAccountId,
-      type: 'debit',
-      amount,
-      balanceAfter: newBalance,
-      source: 'india_buying_payment',
-      sourceRef: entry._id,
-      sourceLabel,
-      transactionDate: paymentDate,
-      notes,
-      createdBy,
-    })
-    await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: newBalance })
+      await BankTransaction.create({
+        bankAccount: bankAccountId,
+        type: 'debit',
+        amount,
+        balanceAfter: newBalance,
+        source: 'india_buying_payment',
+        sourceRef: entry._id,
+        sourceLabel,
+        transactionDate: paymentDate,
+        notes,
+        createdBy,
+      })
+      await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: newBalance })
+    }
 
     await IndiaBuyingPayment.create({
       buyingEntry: buyingEntryId,

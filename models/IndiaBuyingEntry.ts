@@ -61,7 +61,7 @@ function round2(n: number) {
 IndiaBuyingEntrySchema.pre('save', function (next) {
   const doc = this
   doc.totalQty = doc.totalCtn * doc.qty
-  doc.totalAmount = round2(doc.totalQty * doc.rate)
+  doc.totalAmount = Math.round(doc.totalQty * doc.rate)
   doc.finalCost = doc.rate
   doc.remainingAmount = round2(doc.totalAmount - (doc.givenAmount ?? 0))
   if (doc.totalAmount === 0) doc.currentStatus = 'unpaid'

@@ -74,7 +74,7 @@ export async function GET(
     ])
 
     const sellingRows = sellingHistory.map((bill) => {
-      const items = (bill as { items?: { totalAmount: number; totalProfit: number; ctnSold?: number; product?: unknown }[] })?.items ?? []
+      const items = (bill as unknown as { items?: { totalAmount: number; totalProfit: number; ctnSold?: number; product?: unknown }[] })?.items ?? []
       const totalCtn = items.reduce((s, i) => s + (i.ctnSold ?? 0), 0)
       const billAmount = (bill as { grandTotal?: number }).grandTotal ?? bill.totalAmount
       const profit = items.reduce((s, i) => s + (i.totalProfit ?? 0), 0)

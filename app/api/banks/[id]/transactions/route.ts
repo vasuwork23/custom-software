@@ -50,12 +50,12 @@ export async function GET(
     if ((account as { type?: string }).type === 'cash') {
       const cashQuery: Record<string, unknown> = {}
       if (startDate || endDate) {
-        cashQuery.createdAt = {}
-        if (startDate) (cashQuery.createdAt as Record<string, Date>).$gte = new Date(startDate)
+        cashQuery.date = {}
+        if (startDate) (cashQuery.date as Record<string, Date>).$gte = new Date(startDate)
         if (endDate) {
           const end = new Date(endDate)
           end.setHours(23, 59, 59, 999)
-          ;(cashQuery.createdAt as Record<string, Date>).$lte = end
+          ;(cashQuery.date as Record<string, Date>).$lte = end
         }
       }
       if (typeFilter && typeFilter !== 'all') {
@@ -63,7 +63,7 @@ export async function GET(
       }
       const total = await CashTransaction.countDocuments(cashQuery)
       const allInRange = await CashTransaction.find(cashQuery)
-        .sort({ createdAt: 1 })
+        .sort({ date: 1, createdAt: 1 })
         .lean()
       let running = 0
       const withBalance = allInRange.map((tx) => {
@@ -79,9 +79,9 @@ export async function GET(
               return haystack.includes(search.toLowerCase())
             })
           : withBalance
+      const forDisplay = exportAll ? searchFiltered : [...searchFiltered].reverse()
       const skip = (page - 1) * limit
-      const pageSlice = exportAll ? searchFiltered : searchFiltered.slice(skip, skip + limit)
-      const transactions = [...pageSlice].reverse()
+      const transactions = exportAll ? forDisplay : forDisplay.slice(skip, skip + limit)
       const cashDoc = await Cash.findOne().lean()
       const currentBalance = cashDoc?.balance ?? 0
       const list = transactions.map((t) => ({
@@ -105,10 +105,10 @@ export async function GET(
       })
     }
 
-    // Non-cash: BankTransaction — fetch all for account, sort oldest first by createdAt, compute running balance, then filter, reverse for display, paginate
+    // Non-cash: BankTransaction — fetch all for account, sort oldest first by transactionDate then createdAt
     const accountIdObj = new mongoose.Types.ObjectId(id)
     const allTransactions = await BankTransaction.find({ bankAccount: accountIdObj })
-      .sort({ createdAt: 1 })
+      .sort({ transactionDate: 1, createdAt: 1 })
       .lean()
 
     let runningBalance = 0
@@ -129,7 +129,7 @@ export async function GET(
       const endMs = endObj ? endObj.getTime() : null
 
       filtered = filtered.filter((tx) => {
-        const created = new Date((tx as { createdAt?: Date }).createdAt ?? tx.transactionDate)
+        const created = new Date((tx as { transactionDate?: Date }).transactionDate ?? tx.createdAt)
         const tMs = created.getTime()
         if (startMs != null && tMs < startMs) return false
         if (endMs != null && tMs > endMs) return false
@@ -137,7 +137,7 @@ export async function GET(
       })
     }
 
-    const forDisplay = [...filtered].reverse()
+    const forDisplay = exportAll ? [...filtered] : [...filtered].reverse()
     const totalFiltered = filtered.length
     const paginated = forDisplay.slice((page - 1) * limit, page * limit)
 

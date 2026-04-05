@@ -344,7 +344,7 @@ export default function ContainerDetailPage() {
                           </Link>
                         </td>
                         <td className="p-3">{mark(e)}</td>
-                        <td className="p-3">{entryDate(e) ? format(new Date(entryDate(e)), 'dd MMM yyyy') : '—'}</td>
+                        <td className="p-3">{entryDate(e) ? format(new Date(entryDate(e) as string), 'dd MMM yyyy') : '—'}</td>
                         <td className="p-3 text-right text-blue-600">{inTransitCtn(e)} CTN</td>
                         <td className="p-3 text-right">
                           {isEditing ? (

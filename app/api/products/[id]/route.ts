@@ -125,7 +125,7 @@ export async function GET(
     const sellingHistoryList = sellingHistory
       .filter((item) => item.sellBill && typeof item.sellBill === 'object')
       .map((item) => {
-        const sellBill = item.sellBill as { _id: mongoose.Types.ObjectId; billNumber: number; billDate: Date; company: { _id: mongoose.Types.ObjectId; companyName: string } }
+        const sellBill = item.sellBill as unknown as { _id: mongoose.Types.ObjectId; billNumber: number; billDate: Date; company: { _id: mongoose.Types.ObjectId; companyName: string } }
         const breakdown = (item.fifoBreakdown ?? []) as {
           buyingEntry: mongoose.Types.ObjectId
           ctnConsumed: number

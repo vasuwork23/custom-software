@@ -195,6 +195,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    if (!billDoc) {
+      return NextResponse.json(
+        { success: false, error: 'Not found', message: 'Carrying bill not found' },
+        { status: 404 }
+      )
+    }
+
     const bill = billDoc.toObject()
     const mapped = {
       id: String(bill._id),

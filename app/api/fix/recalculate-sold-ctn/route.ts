@@ -42,10 +42,10 @@ export async function POST(req: NextRequest) {
         for (const fb of item.fifoBreakdown as Record<string, unknown>[]) {
           const fbEntryId = (
             fb.buyingEntry != null ? String(fb.buyingEntry) :
-            fb.buyingEntryId != null ? String(fb.buyingEntryId) :
-            fb.entryId != null ? String(fb.entryId) :
-            fb.entry != null ? String(fb.entry) :
-            null
+              fb.buyingEntryId != null ? String(fb.buyingEntryId) :
+                fb.entryId != null ? String(fb.entryId) :
+                  fb.entry != null ? String(fb.entry) :
+                    null
           )
           if (fbEntryId !== entryIdStr) continue
 
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
 
       const oldSoldCtn = entry.soldCtn ?? 0
       if (actualSoldCtn !== oldSoldCtn || processed < 5) {
+        console.log(
           `[recalculate-sold-ctn] Entry ${entry.mark ?? entry._id}: totalCtn=${totalCtn} actualSoldCtn=${soldCtnRounded} availableCtn=${availableCtn} OLD soldCtn=${oldSoldCtn}`
         )
       }

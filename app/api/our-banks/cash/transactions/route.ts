@@ -33,12 +33,12 @@ export async function GET(req: NextRequest) {
     const query: Record<string, unknown> = {}
 
     if (startDate || endDate) {
-      query.createdAt = {}
-      if (startDate) (query.createdAt as Record<string, Date>).$gte = new Date(startDate)
+      query.date = {}
+      if (startDate) (query.date as Record<string, Date>).$gte = new Date(startDate)
       if (endDate) {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
-        ;(query.createdAt as Record<string, Date>).$lte = end
+        ;(query.date as Record<string, Date>).$lte = end
       }
     }
 
@@ -48,9 +48,9 @@ export async function GET(req: NextRequest) {
 
     const total = await CashTransaction.countDocuments(query)
 
-    // Single query — sort oldest first for running balance calculation using createdAt
+    // Single query — sort oldest first for running balance calculation using date then createdAt
     const allInRange = await CashTransaction.find(query)
-      .sort({ createdAt: 1 })
+      .sort({ date: 1, createdAt: 1 })
       .lean()
 
     let runningBalance = 0
@@ -66,10 +66,10 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Paginate: take page slice, then reverse for display (newest first on page)
+    // Reverse first for display so page 1 gets newest items
+    const forDisplay = exportAll ? allWithBalance : [...allWithBalance].reverse()
     const skip = (page - 1) * limit
-    const pageSlice = exportAll ? allWithBalance : allWithBalance.slice(skip, skip + limit)
-    const transactions = [...pageSlice].reverse()
+    const transactions = exportAll ? forDisplay : forDisplay.slice(skip, skip + limit)
 
     const cashDoc = await Cash.findOne().lean()
     const currentBalance = cashDoc?.balance ?? 0

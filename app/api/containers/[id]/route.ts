@@ -60,7 +60,7 @@ export async function GET(
             .lean()
           const loadedElsewhere = (otherContainers as { entries: { buyingEntry: mongoose.Types.ObjectId; ctnCount: number }[] }[]).reduce(
             (sum, c) => {
-              const found = c.entries.find((e) => e.buyingEntry.toString() === (typeof buyingEntryId === 'object' ? buyingEntryId.toString() : buyingEntryId))
+              const found = c.entries.find((e) => e.buyingEntry.toString() === (typeof buyingEntryId === 'object' ? buyingEntryId?.toString() : buyingEntryId))
               return sum + (found?.ctnCount ?? 0)
             },
             0

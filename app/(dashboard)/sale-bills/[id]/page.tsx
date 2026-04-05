@@ -378,7 +378,7 @@ export default function SellBillDetailPage() {
           <DialogHeader>
             <DialogTitle>PDF Downloaded</DialogTitle>
             <DialogDescription>
-              The Bill PDF has been successfully downloaded. Copy the customer's mobile number below.
+              The Bill PDF has been successfully downloaded. Copy the customer&apos;s mobile number below.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center space-x-2 my-2">

@@ -114,23 +114,48 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let bankAccount = null
-
     if (source === 'cash') {
-      bankAccount = await BankAccount.findOne({ type: 'cash', isDefault: true })
-    } else {
-      if (!bankAccountId) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Validation failed',
-            message: 'Bank account is required for bank source',
-          },
-          { status: 400 }
-        )
-      }
-      bankAccount = await BankAccount.findById(bankAccountId)
+      const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+
+      const liability = await Liability.create({
+        amount: numericAmount,
+        reason: reason.trim(),
+        source,
+        bankAccountId: null,
+        bankAccountName: 'Cash',
+        status: 'blocked',
+        blockedAt: new Date(),
+        createdBy,
+      })
+
+      await createCashTransaction({
+        type: 'debit',
+        amount: numericAmount,
+        description: `Liability blocked: ${reason.trim()}`,
+        date: new Date(),
+        category: 'other',
+        referenceId: liability._id as any,
+        referenceType: 'liability_block',
+      })
+
+      return NextResponse.json({
+        success: true,
+        data: liability,
+      })
     }
+
+    let bankAccount = null
+    if (!bankAccountId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Validation failed',
+          message: 'Bank account is required for bank source',
+        },
+        { status: 400 }
+      )
+    }
+    bankAccount = await BankAccount.findById(bankAccountId)
 
     if (!bankAccount) {
       return NextResponse.json(

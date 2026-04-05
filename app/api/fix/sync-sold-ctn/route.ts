@@ -96,8 +96,6 @@ export async function POST(req: NextRequest) {
         matchingItems,
       })
 
-        `Entry ${entry.mark ?? entry._id}: soldCtn ${soldCtnBefore} → ${actualSoldCtn}, availableCtn → ${correctAvailableCtn}, matchingItems=${matchingItems}`
-      )
     }
 
     return NextResponse.json({
