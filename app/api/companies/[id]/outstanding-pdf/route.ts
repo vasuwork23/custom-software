@@ -6,6 +6,9 @@ import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import Company from '@/models/Company'
 import SellBill from '@/models/SellBill'
+import SellBillItem from '@/models/SellBillItem'
+import Product from '@/models/Product'
+import IndiaProduct from '@/models/IndiaProduct'
 import PaymentReceipt from '@/models/PaymentReceipt'
 import { OutstandingTemplate } from '@/components/pdf/OutstandingTemplate'
 import { generateOutstandingFileName } from '@/lib/utils'
@@ -43,6 +46,9 @@ export async function GET(
 
     await connectDB()
     void Company
+    void SellBillItem
+    void Product
+    void IndiaProduct
 
     const company = await Company.findById(id)
       .select('companyName ownerName contact1Mobile contact1Name address openingBalance openingBalanceNotes')
@@ -60,6 +66,14 @@ export async function GET(
     const [bills, payments] = await Promise.all([
       SellBill.find({ company: companyId })
         .sort({ billDate: 1, createdAt: 1 })
+        .populate({
+          path: 'items',
+          model: 'SellBillItem',
+          populate: [
+            { path: 'product', model: 'Product', select: 'productName' },
+            { path: 'indiaProduct', model: 'IndiaProduct', select: 'productName' },
+          ],
+        })
         .lean(),
       PaymentReceipt.find({ company: companyId })
         .sort({ paymentDate: 1, createdAt: 1 })
@@ -67,18 +81,33 @@ export async function GET(
     ])
 
     const allTx = [
-      ...bills.map((b) => ({
-        date: b.billDate,
-        createdAt: b.createdAt,
-        description: `Invoice ${b.billNumber}${
-          (b as { notes?: string }).notes
-            ? ` — ${(b as { notes?: string }).notes}`
-            : ''
-        }`,
-        debit: (b as { grandTotal?: number }).grandTotal ?? b.totalAmount,
-        credit: null as number | null,
-      })),
+      ...bills.map((b) => {
+        const bAny = b as any
+        const items: { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[] =
+          (bAny.items || []).map((item: any) => ({
+            productName:
+              item.product?.productName ||
+              item.indiaProduct?.productName ||
+              'Product',
+            ctnSold: item.ctnSold ?? 0,
+            pcsSold: item.pcsSold ?? 0,
+            ratePerPcs: item.ratePerPcs ?? 0,
+          }))
+        return {
+          date: b.billDate,
+          createdAt: b.createdAt,
+          description: `Invoice ${b.billNumber}${
+            (b as { notes?: string }).notes
+              ? ` — ${(b as { notes?: string }).notes}`
+              : ''
+          }`,
+          debit: bAny.grandTotal ?? b.totalAmount,
+          credit: null as number | null,
+          items,
+        }
+      }),
       ...payments.map((p) => ({
+        items: [] as { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[],
         date: (p as any).paymentDate || (p as any).date,
         createdAt: p.createdAt,
         description: `Payment received${
@@ -117,6 +146,7 @@ export async function GET(
         debit: tx.debit,
         credit: tx.credit,
         balance,
+        items: tx.items,
       }
     })
 

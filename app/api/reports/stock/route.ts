@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
       })
     )
 
-    const indiaRows = (indiaByProduct as {
+    const rawIndiaRows = (indiaByProduct as {
       _id: mongoose.Types.ObjectId
       productName?: string
       totalCtnBought: number
@@ -196,8 +196,46 @@ export async function GET(req: NextRequest) {
       availableCtn: r.availableCtn,
     }))
 
+    // Enrich India rows with PCS, cost/piece, and total cost (same logic as China)
+    const indiaRows = await Promise.all(
+      rawIndiaRows.map(async (row) => {
+        const entries = await IndiaBuyingEntry.find({ product: row.productId }).lean()
+
+        let availablePcs = 0
+        let totalCostRaw = 0
+        let weightedNumerator = 0
+        let weightedDenominator = 0
+
+        for (const entry of entries) {
+          const avail = Number(entry.availableCtn) || 0
+          const qtyPerCtn = Number(entry.qty) || 0
+          const pcs = roundQty(avail * qtyPerCtn)
+          availablePcs += pcs
+
+          const cost = Number(entry.finalCost) || 0
+          if (cost <= 0) continue
+
+          totalCostRaw += pcs * cost
+          weightedNumerator += pcs * cost
+          weightedDenominator += pcs
+        }
+
+        const costPerPiece =
+          weightedDenominator > 0
+            ? Number((weightedNumerator / weightedDenominator).toFixed(5))
+            : 0
+        const totalCost = Number(totalCostRaw.toFixed(2))
+
+        return { ...row, availablePcs, costPerPiece, totalCost }
+      })
+    )
+
     const totalIndiaProducts = indiaTotals[0]?.totalProducts?.length ?? 0
     const totalIndiaAvailableCtn = indiaTotals[0]?.totalAvailableCtn ?? 0
+    const totalIndiaAvailablePcs = indiaRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0)
+    const totalIndiaStockCost = Number(
+      indiaRows.reduce((s, r) => s + (r.totalCost ?? 0), 0).toFixed(2)
+    )
 
     const grandTotalCost = Number(
       enrichedRows.reduce((s, r) => s + (r.totalCost ?? 0), 0).toFixed(2)
@@ -209,13 +247,12 @@ export async function GET(req: NextRequest) {
       totalInTransit,
       totalInChina,
       totalInIndia,
-      totalAvailablePcs: enrichedRows.reduce(
-        (s, r) => s + (r.availablePcs ?? 0),
-        0
-      ),
+      totalAvailablePcs: enrichedRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0),
       totalStockCost: grandTotalCost,
       totalIndiaProducts,
       totalIndiaAvailableCtn,
+      totalIndiaAvailablePcs,
+      totalIndiaStockCost,
     }
 
     return NextResponse.json({

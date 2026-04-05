@@ -274,6 +274,19 @@ export async function DELETE(
       )
     }
 
+    // Block deletion if outstanding balance is not zero
+    const { outstanding } = await getOutstanding(companyId, company.openingBalance || 0)
+    if (Math.abs(outstanding) > 0.001) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden',
+          message: `Cannot delete company because it has a pending outstanding balance of ₹${Math.abs(outstanding).toLocaleString('en-IN')}. Clear the outstanding first.`,
+        },
+        { status: 403 }
+      )
+    }
+
     await Company.findByIdAndDelete(id)
     return NextResponse.json({ success: true, data: { deleted: id } })
   } catch (error) {

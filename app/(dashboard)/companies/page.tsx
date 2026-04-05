@@ -288,7 +288,7 @@ export default function CompaniesPage() {
                     </Button>
                     <ConfirmDialog
                       title="Delete company"
-                      description="This cannot be undone. You cannot delete a company that has sale bills or payment receipts."
+                      description="This cannot be undone. The company must have zero outstanding balance, and no linked sale bills or payment receipts."
                       confirmLabel="Delete"
                       variant="destructive"
                       onConfirm={() => handleDelete(c)}
@@ -298,6 +298,12 @@ export default function CompaniesPage() {
                           size="icon"
                           className="text-destructive"
                           aria-label="Delete"
+                          disabled={c.outstandingBalance !== 0}
+                          title={
+                            c.outstandingBalance !== 0
+                              ? 'Cannot delete: company has a pending outstanding balance'
+                              : 'Delete company'
+                          }
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -409,7 +415,7 @@ export default function CompaniesPage() {
                       </Button>
                       <ConfirmDialog
                         title="Delete company"
-                        description="This cannot be undone. You cannot delete a company that has sale bills or payment receipts."
+                        description="This cannot be undone. The company must have zero outstanding balance, and no linked sale bills or payment receipts."
                         confirmLabel="Delete"
                         variant="destructive"
                         onConfirm={() => handleDelete(c)}
@@ -419,6 +425,12 @@ export default function CompaniesPage() {
                             size="icon"
                             className="text-destructive"
                             aria-label="Delete"
+                            disabled={c.outstandingBalance !== 0}
+                            title={
+                              c.outstandingBalance !== 0
+                                ? 'Cannot delete: company has a pending outstanding balance'
+                                : 'Delete company'
+                            }
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Trash2 className="h-4 w-4" />

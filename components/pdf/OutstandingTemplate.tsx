@@ -84,6 +84,12 @@ export interface OutstandingTemplateProps {
     debit?: number | null
     credit?: number | null
     balance: number
+    items?: {
+      productName: string
+      ctnSold: number
+      pcsSold: number
+      ratePerPcs: number
+    }[]
   }[]
   generatedDate: Date | string
   yourCompanyName?: string
@@ -218,60 +224,85 @@ export function OutstandingTemplate({
           </View>
 
           {transactions.map((tx, i) => (
-            <View
-              key={i}
-              style={
-                i % 2 === 0
-                  ? styles.tableRow
-                  : styles.tableRowAlt
-              }
-            >
-              <Text
-                style={{ width: '15%', fontSize: 9 }}
+            <View key={i} style={{ marginBottom: 6 }}>
+              {/* Main invoice / payment row */}
+              <View
+                style={
+                  i % 2 === 0
+                    ? styles.tableRow
+                    : styles.tableRowAlt
+                }
               >
-                {formatDate(tx.date)}
-              </Text>
-              <Text
-                style={{ width: '40%', fontSize: 9 }}
-              >
-                {String(tx.description || '')}
-              </Text>
-              <Text
-                style={{
-                  width: '15%',
-                  fontSize: 9,
-                  textAlign: 'right',
-                  color: tx.debit ? '#dc2626' : '#9ca3af',
-                }}
-              >
-                {tx.debit ? formatINR(tx.debit) : '—'}
-              </Text>
-              <Text
-                style={{
-                  width: '15%',
-                  fontSize: 9,
-                  textAlign: 'right',
-                  color: tx.credit ? '#16a34a' : '#9ca3af',
-                }}
-              >
-                {tx.credit ? formatINR(tx.credit) : '—'}
-              </Text>
-              <Text
-                style={{
-                  width: '15%',
-                  fontSize: 9,
-                  textAlign: 'right',
-                  fontFamily: 'Roboto',
-                  fontWeight: 'bold',
-                  color:
-                    tx.balance < 0
-                      ? '#16a34a'
-                      : '#111827',
-                }}
-              >
-                {formatINR(Math.abs(tx.balance))}
-                {tx.balance < 0 ? ' CR' : ''}
-              </Text>
+                <Text style={{ width: '15%', fontSize: 9 }}>
+                  {formatDate(tx.date)}
+                </Text>
+                <Text style={{ width: '40%', fontSize: 9, fontFamily: 'Helvetica-Bold' }}>
+                  {String(tx.description || '')}
+                </Text>
+                <Text
+                  style={{
+                    width: '15%',
+                    fontSize: 9,
+                    textAlign: 'right',
+                    color: tx.debit ? '#dc2626' : '#9ca3af',
+                  }}
+                >
+                  {tx.debit ? formatINR(tx.debit) : '—'}
+                </Text>
+                <Text
+                  style={{
+                    width: '15%',
+                    fontSize: 9,
+                    textAlign: 'right',
+                    color: tx.credit ? '#16a34a' : '#9ca3af',
+                  }}
+                >
+                  {tx.credit ? formatINR(tx.credit) : '—'}
+                </Text>
+                <Text
+                  style={{
+                    width: '15%',
+                    fontSize: 9,
+                    textAlign: 'right',
+                    fontFamily: 'Helvetica-Bold',
+                    color:
+                      tx.balance < 0
+                        ? '#16a34a'
+                        : '#111827',
+                  }}
+                >
+                  {formatINR(Math.abs(tx.balance))}
+                  {tx.balance < 0 ? ' CR' : ''}
+                </Text>
+              </View>
+
+              {/* Product sub-rows (only for invoice entries) */}
+              {tx.items && tx.items.length > 0 && tx.items.map((item, j) => (
+                <View
+                  key={j}
+                  style={{
+                    flexDirection: 'row',
+                    paddingVertical: 3,
+                    paddingHorizontal: 8,
+                    paddingLeft: 20,
+                    backgroundColor: '#f9fafb',
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#f3f4f6',
+                  }}
+                >
+                  <Text style={{ width: '15%', fontSize: 8, color: '#9ca3af' }}>{''}</Text>
+                  <Text style={{ width: '40%', fontSize: 8, color: '#374151' }}>
+                    {item.productName}
+                  </Text>
+                  <Text style={{ width: '15%', fontSize: 8, color: '#374151', textAlign: 'right' }}>
+                    {item.pcsSold > 0 ? `${item.pcsSold} PCS` : '-'}
+                  </Text>
+                  <Text style={{ width: '15%', fontSize: 8, color: '#374151', textAlign: 'right' }}>
+                    {'@ '}{formatINR(item.ratePerPcs)}
+                  </Text>
+                  <Text style={{ width: '15%', fontSize: 8, color: '#9ca3af', textAlign: 'right' }}>{''}</Text>
+                </View>
+              ))}
             </View>
           ))}
         </View>

@@ -54,6 +54,8 @@ export default function ReportsPage() {
       totalStockCost?: number
       totalIndiaProducts?: number
       totalIndiaAvailableCtn?: number
+      totalIndiaAvailablePcs?: number
+      totalIndiaStockCost?: number
     }
     rows: {
       productName: string
@@ -67,7 +69,14 @@ export default function ReportsPage() {
       costPerPiece?: number
       totalCost?: number
     }[]
-    indiaRows?: { productName: string; totalCtnBought: number; availableCtn: number }[]
+    indiaRows?: {
+      productName: string
+      totalCtnBought: number
+      availableCtn: number
+      availablePcs?: number
+      costPerPiece?: number
+      totalCost?: number
+    }[]
   } | null>(null)
   const [selling, setSelling] = useState<{
     summary: { totalBills: number; totalRevenue: number; totalProfit: number; avgBillValue: number }
@@ -437,8 +446,8 @@ export default function ReportsPage() {
                                 {r.costPerPiece && r.costPerPiece > 0
                                   ? `₹${r.costPerPiece.toFixed(5)}`
                                   : (r.availablePcs ?? 0) === 0
-                                  ? <span className="text-gray-300">—</span>
-                                  : <span className="text-orange-500">No cost</span>}
+                                    ? <span className="text-gray-300">—</span>
+                                    : <span className="text-orange-500">No cost</span>}
                               </td>
                               <td className="p-3 text-right text-blue-600 font-medium">
                                 {r.totalCost && r.totalCost > 0
@@ -483,7 +492,39 @@ export default function ReportsPage() {
                     </div>
                   </div>
                   {stock.indiaRows && stock.indiaRows.length > 0 && (
-                    <div>
+                    <div className="space-y-3">
+                      {/* India summary cards */}
+                      <div className="grid gap-3 sm:grid-cols-4">
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">India Total Products</p>
+                            <p className="text-xl font-semibold">{stock.summary.totalIndiaProducts ?? 0}</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">Total Available CTN</p>
+                            <p className="text-xl font-semibold">{stock.summary.totalIndiaAvailableCtn ?? 0}</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">Total Available PCS</p>
+                            <p className="text-xl font-semibold">
+                              {(stock.summary.totalIndiaAvailablePcs ?? 0).toLocaleString('en-IN')}
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">Total India Stock Cost</p>
+                            <p className="text-xl font-semibold text-blue-600">
+                              ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+
                       <h4 className="mb-2 font-medium">India Products</h4>
                       <div className="rounded-md border overflow-x-auto">
                         <table className="w-full text-sm">
@@ -492,6 +533,9 @@ export default function ReportsPage() {
                               <th className="p-3 text-left font-medium">Product</th>
                               <th className="p-3 text-right font-medium">Total CTN Bought</th>
                               <th className="p-3 text-right font-medium">Available CTN</th>
+                              <th className="p-3 text-right font-medium">Total PCS</th>
+                              <th className="p-3 text-right font-medium">Cost/Piece (₹)</th>
+                              <th className="p-3 text-right font-medium">Total Cost (₹)</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -500,8 +544,41 @@ export default function ReportsPage() {
                                 <td className="p-3">{r.productName}</td>
                                 <td className="p-3 text-right">{r.totalCtnBought}</td>
                                 <td className="p-3 text-right">{r.availableCtn}</td>
+                                <td className="p-3 text-right">
+                                  {r.availablePcs?.toLocaleString('en-IN') ?? '—'}
+                                </td>
+                                <td className="p-3 text-right text-emerald-600">
+                                  {r.costPerPiece && r.costPerPiece > 0
+                                    ? `₹${r.costPerPiece.toFixed(2)}`
+                                    : (r.availablePcs ?? 0) === 0
+                                      ? <span className="text-gray-300">—</span>
+                                      : <span className="text-orange-500">No cost</span>}
+                                </td>
+                                <td className="p-3 text-right text-blue-600 font-medium">
+                                  {r.totalCost && r.totalCost > 0
+                                    ? `₹${Number(r.totalCost).toLocaleString('en-IN')}`
+                                    : <span className="text-gray-300">—</span>}
+                                </td>
                               </tr>
                             ))}
+                            {stock.indiaRows.length > 0 && (
+                              <tr className="border-t-2 bg-muted/40 font-semibold">
+                                <td className="p-3">Total</td>
+                                <td className="p-3 text-right">
+                                  {stock.indiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}
+                                </td>
+                                <td className="p-3 text-right">
+                                  {stock.indiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}
+                                </td>
+                                <td className="p-3 text-right">
+                                  {stock.summary.totalIndiaAvailablePcs?.toLocaleString('en-IN')}
+                                </td>
+                                <td className="p-3 text-right">—</td>
+                                <td className="p-3 text-right text-blue-700">
+                                  ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -612,7 +689,7 @@ export default function ReportsPage() {
           </Card>
 
           {/* Buying Section */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Buying Report</CardTitle>
             </CardHeader>
@@ -731,7 +808,7 @@ export default function ReportsPage() {
                 </>
               )}
             </CardContent>
-          </Card>
+          </Card> */}
         </>
       )}
     </div>
