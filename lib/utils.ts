@@ -41,13 +41,13 @@ export function calcGrandTotal(
 }
 
 export function generateOutstandingFileName(companyNameInput: string): string {
-  const base = (companyNameInput || 'outstanding').trim()
+  const base = (companyNameInput || 'OUTSTANDING').trim().toUpperCase()
   const companyName =
     base
       .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_]/g, '') || 'outstanding'
+      .replace(/[^A-Z0-9_]/g, '') || 'OUTSTANDING'
 
   const date = format(new Date(), 'dd-MM-yyyy')
 
-  return `${companyName}_outstanding_${date}.pdf`
+  return `${companyName}_OUTSTANDING_${date}.pdf`
 }
