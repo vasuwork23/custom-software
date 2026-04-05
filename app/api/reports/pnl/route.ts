@@ -296,16 +296,21 @@ export async function GET(req: NextRequest) {
       ])
     )
     const companyBreakdown = byCompany.map(
-      (r: { _id: mongoose.Types.ObjectId; companyName?: string; revenue: number; profit: number }) => ({
-        companyId: r._id,
-        companyName: r.companyName ?? '—',
-        revenue: r.revenue,
-        profit: r.profit,
-        outstanding:
-          (billedMap[String(r._id)] ?? 0) -
-          (receivedMap[String(r._id)] ?? 0) +
-          (openingBalanceMap[String(r._id)] ?? 0),
-      })
+      (r: { _id: mongoose.Types.ObjectId; companyName?: string; revenue: number; profit: number }) => {
+        const isCashbook = r._id == null
+        return {
+          companyId: r._id,
+          companyName: isCashbook ? '💵 Cashbook' : (r.companyName ?? '—'),
+          revenue: r.revenue,
+          profit: r.profit,
+          // Cashbook bills are paid at point of sale — no outstanding
+          outstanding: isCashbook
+            ? 0
+            : (billedMap[String(r._id)] ?? 0) -
+              (receivedMap[String(r._id)] ?? 0) +
+              (openingBalanceMap[String(r._id)] ?? 0),
+        }
+      }
     )
 
     const expenseByPeriodMap = Object.fromEntries(
