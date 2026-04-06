@@ -24,8 +24,10 @@ interface ProductCardProps {
   hasNotReceived?: boolean
   totalCbm?: number
   totalWeight?: number
-  /** Sum of remainingAmount (¥ RMB) across unpaid/partially paid entries */
+    /** Sum of remainingAmount (¥ RMB) across unpaid/partially paid entries */
   remainingAmount?: number
+  /** Sum of availableValue (₹ INR) across entries for India products */
+  availableValue?: number
 }
 
 export function ProductCard({
@@ -47,6 +49,7 @@ export function ProductCard({
   totalCbm,
   totalWeight,
   remainingAmount,
+  availableValue,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -91,6 +94,14 @@ export function ProductCard({
                 {availableCtn} CTN
               </span>
             </div>
+            {availableValue != null && availableValue > 0 && (
+              <div className="flex items-center justify-between col-span-2 py-1 border-y border-emerald-100 bg-emerald-50/30 -mx-1 px-1 dark:bg-emerald-950/10 dark:border-emerald-900/20">
+                <span className="text-emerald-600 font-medium">Available Value</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                  ₹{availableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             {chinaWarehouseCtn != null && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">China WH</span>

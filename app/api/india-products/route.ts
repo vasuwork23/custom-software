@@ -20,48 +20,114 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
     const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '150', 10)))
     const search = searchParams.get('search')?.trim() ?? ''
+    const filterParam = searchParams.get('filter') ?? 'all'
 
     await connectDB()
 
-    const filter: Record<string, unknown> = {}
+    const baseFilter: Record<string, unknown> = {}
     if (search) {
-      filter.$or = [
+      baseFilter.$or = [
         { productName: new RegExp(search, 'i') },
         { productDescription: new RegExp(search, 'i') },
       ]
     }
 
-    const skip = (page - 1) * limit
-    const [products, total] = await Promise.all([
-      IndiaProduct.find(filter).sort({ productName: 1 }).skip(skip).limit(limit).lean(),
-      IndiaProduct.countDocuments(filter),
+    // Fetch all products (for counts) with their entry stats
+    const allProducts = await IndiaProduct.find(baseFilter).sort({ productName: 1 }).lean()
+    const allProductIds = allProducts.map((p) => p._id)
+
+    const [entryCounts, allEntries] = await Promise.all([
+      IndiaBuyingEntry.aggregate([
+        { $match: { product: { $in: allProductIds } } },
+        {
+          $group: {
+            _id: '$product',
+            totalCtn: { $sum: '$totalCtn' },
+            availableCtn: { $sum: '$availableCtn' },
+            count: { $sum: 1 },
+            hasUnpaid: {
+              $sum: {
+                $cond: [{ $in: ['$currentStatus', ['unpaid', 'partiallypaid']] }, 1, 0],
+              },
+            },
+          },
+        },
+      ]),
+      IndiaBuyingEntry.find({ product: { $in: allProductIds } }).lean(),
     ])
 
-    const productIds = products.map((p) => p._id)
-    const entryCounts = await IndiaBuyingEntry.aggregate([
-      { $match: { product: { $in: productIds } } },
-      { $group: { _id: '$product', totalCtn: { $sum: '$totalCtn' }, availableCtn: { $sum: '$availableCtn' }, count: { $sum: 1 } } },
-    ])
+    const entriesByProd = allEntries.reduce((acc, e) => {
+      const pid = String(e.product)
+      if (!acc[pid]) acc[pid] = []
+      acc[pid].push(e)
+      return acc
+    }, {} as Record<string, any[]>)
+
     const byProduct = Object.fromEntries(entryCounts.map((e) => [String(e._id), e]))
 
-    const list = products.map((p) => {
-      const stats = byProduct[String(p._id)] ?? { totalCtn: 0, availableCtn: 0, count: 0 }
+    const allMapped = allProducts.map((p) => {
+      const stats = byProduct[String(p._id)] ?? { totalCtn: 0, availableCtn: 0, count: 0, hasUnpaid: 0 }
+      const pEntries = entriesByProd[String(p._id)] ?? []
+
+      // Calculate available value using the same logic as the stock report
+      // to avoid rounding discrepancies (pcs = round(avail * qty), then val = sum(pcs * rate))
+      let productAvailableValue = 0
+      for (const e of pEntries) {
+        const pcs = Math.round((e.availableCtn || 0) * (e.qty || 0))
+        const cost = e.finalCost ?? e.rate ?? 0
+        if (cost > 0) {
+          productAvailableValue += pcs * cost
+        }
+      }
+
       return {
         _id: p._id,
         productName: p.productName,
         productDescription: p.productDescription,
         productImage: p.productImage,
-        buyingEntriesCount: stats.count,
-        totalCtn: stats.totalCtn,
-        availableCtn: stats.availableCtn,
+        buyingEntriesCount: stats.count as number,
+        totalCtn: stats.totalCtn as number,
+        availableCtn: stats.availableCtn as number,
+        availableValue: Number(productAvailableValue.toFixed(2)),
+        hasUnpaidEntries: (stats.hasUnpaid as number) > 0,
       }
     })
+
+    // Compute counts per filter
+    const counts = {
+      all: allMapped.length,
+      available: allMapped.filter((p) => p.availableCtn > 0).length,
+      fullySold: allMapped.filter((p) => p.totalCtn > 0 && p.availableCtn === 0).length,
+      unpaid: allMapped.filter((p) => p.hasUnpaidEntries).length,
+      noStock: allMapped.filter((p) => p.totalCtn === 0).length,
+    }
+
+    // Apply quick filter
+    let filtered = allMapped
+    if (filterParam === 'available') filtered = allMapped.filter((p) => p.availableCtn > 0)
+    else if (filterParam === 'fullySold') filtered = allMapped.filter((p) => p.totalCtn > 0 && p.availableCtn === 0)
+    else if (filterParam === 'unpaid') filtered = allMapped.filter((p) => p.hasUnpaidEntries)
+    else if (filterParam === 'noStock') filtered = allMapped.filter((p) => p.totalCtn === 0)
+
+    // Totals across FILTERED products (reflects current tab)
+    const totals = {
+      totalCtn: filtered.reduce((s, p) => s + (p.totalCtn || 0), 0),
+      availableCtn: filtered.reduce((s, p) => s + (p.availableCtn || 0), 0),
+      availableValue: Number(filtered.reduce((s, p) => s + (p.availableValue || 0), 0).toFixed(2)),
+    }
+
+    // Paginate filtered results
+    const total = filtered.length
+    const skip = (page - 1) * limit
+    const list = filtered.slice(skip, skip + limit)
 
     return NextResponse.json({
       success: true,
       data: {
         products: list,
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        counts,
+        totals,
+        pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
       },
     })
   } catch (error) {
