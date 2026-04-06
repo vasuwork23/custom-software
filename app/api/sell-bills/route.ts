@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
             },
           },
         },
-        { $project: { _id: 1, billNumber: 1, billDate: 1, company: 1, isCashbook: 1, companyName: 1, totalAmount: 1, grandTotal: 1, extraCharges: 1, discount: 1, whatsappSent: 1, whatsappSentAt: 1, itemCount: 1, itemList: 1 } },
+        { $project: { _id: 1, billNumber: 1, billDate: 1, company: 1, isCashbook: 1, companyName: 1, contact1Mobile: '$companyDoc.contact1Mobile', contact2Mobile: '$companyDoc.contact2Mobile', totalAmount: 1, grandTotal: 1, extraCharges: 1, discount: 1, whatsappSent: 1, whatsappSentAt: 1, itemCount: 1, itemList: 1 } },
       ]),
       SellBill.countDocuments(filter),
     ])
@@ -98,14 +98,13 @@ export async function GET(req: NextRequest) {
       itemsByBill.get(bid)!.push({ productName, ctnSold: item.ctnSold, pcsSold: item.pcsSold })
     }
 
-    function formatCtnPcs(ctn: number, pcs: number): string {
+    const formatCtnPcs = (ctn: number, pcs: number): string => {
       const isWhole = Number.isInteger(ctn)
       return isWhole ? `${ctn} CTN (${pcs} pcs)` : `${ctn.toFixed(2)} CTN (${pcs} pcs)`
     }
 
     const list = billsRaw.map((b) => {
       const items = itemsByBill.get(String(b._id)) ?? []
-      const productsSummary = items.map((i) => `${i.productName}: ${formatCtnPcs(i.ctnSold, i.pcsSold)}`).join('; ')
       return {
         _id: b._id,
         billNumber: b.billNumber,
@@ -113,12 +112,14 @@ export async function GET(req: NextRequest) {
         company: b.company,
         isCashbook: !!b.isCashbook,
         companyName: b.companyName ?? '—',
+        contact1Mobile: b.contact1Mobile,
+        contact2Mobile: b.contact2Mobile,
         totalAmount: b.totalAmount,
         grandTotal: b.grandTotal ?? b.totalAmount,
         whatsappSent: b.whatsappSent ?? false,
         whatsappSentAt: b.whatsappSentAt,
         itemCount: b.itemCount ?? 0,
-        productsSummary: productsSummary || (b.itemCount != null ? `${b.itemCount} product${b.itemCount !== 1 ? 's' : ''}` : '—'),
+        productsSummary: items.map((i) => `${i.productName}: ${formatCtnPcs(i.ctnSold, i.pcsSold)}`).join('\n') || (b.itemCount != null ? `${b.itemCount} product${b.itemCount !== 1 ? 's' : ''}` : '—'),
       }
     })
 
