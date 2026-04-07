@@ -59,11 +59,11 @@ export function AutoCalculatedFields({
   const totalQty = roundQty(totalQtyRaw)
   const totalCbm = round(totalCbmRaw)
   const totalWeight = round(totalWeightRaw)
-  const totalAmount = round(totalAmountRaw)
+  const totalAmount = Math.round(totalAmountRaw) // RMB - Round to integer like India
   const rmbInrPurchase = round(rmbInrPurchaseRaw)
   const totalCarrying = round(totalCarryingRaw)
   const totalExpenseINR = round(totalExpenseRaw)
-  const remainingAmount = round(totalAmountRaw - givenAmountDisplay)
+  const remainingAmount = Number((totalAmount - givenAmountDisplay).toFixed(2))
 
   const shippingCostPerPiece =
     totalQty > 0 ? round(totalCarryingRaw / totalQty) : 0

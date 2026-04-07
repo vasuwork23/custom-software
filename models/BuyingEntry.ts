@@ -126,13 +126,14 @@ BuyingEntrySchema.pre('save', function (next) {
   doc.totalQty = roundQty(totalQtyRaw)
   doc.totalCbm = round(totalCbmRaw)
   doc.totalWeight = round(totalWeightRaw)
-  doc.totalAmount = round(totalAmountRaw) // RMB
+  doc.totalAmount = Math.round(totalAmountRaw) // RMB - Round to integer like India
   doc.rmbInrPurchase = round(rmbInrPurchaseRaw) // INR
   doc.totalCarrying = round(totalCarryingRaw) // INR
   doc.totalExpenseINR = round(totalExpenseRaw)
 
-  const remainingAmountRaw = totalAmountRaw - givenAmount
-  doc.remainingAmount = round(remainingAmountRaw)
+  const roundedTotalAmount = doc.totalAmount
+  const roundedGivenAmount = doc.givenAmount ?? 0
+  doc.remainingAmount = Number((roundedTotalAmount - roundedGivenAmount).toFixed(2))
 
   // Final per-piece costs use RAW totals, then rounded once
   doc.finalCost =
