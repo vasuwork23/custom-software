@@ -191,7 +191,7 @@ export function IndiaBuyingEntryTable({
                     <td className="p-4 text-right">{entry.totalCtn}</td>
                     <td className="p-4 text-center">{stockBadge(entry)}</td>
                     <td className="p-4 text-right">{entry.totalQty}</td>
-                    <td className="p-4 text-right">₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(entry.rate)}</td>
+                    <td className="p-4 text-right">₹{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(entry.rate)}</td>
                     <td className="p-4 text-right">₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(entry.totalAmount)}</td>
                     <td className="p-4 text-right">₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(entry.givenAmount)}</td>
                     <td className="p-4 text-right">₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(entry.remainingAmount)}</td>
@@ -246,7 +246,7 @@ export function IndiaBuyingEntryTable({
                                     <tr key={p._id} className="border-b last:border-0">
                                       <td className="py-2">{format(new Date(p.paymentDate), 'dd MMM yyyy')}</td>
                                       <td className="py-2">{p.bankAccountName ?? '—'}</td>
-                                      <td className="py-2 text-right">₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(p.amount)}</td>
+                                      <td className="py-2 text-right">₹{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(p.amount)}</td>
                                       <td className="py-2 text-muted-foreground max-w-[200px] truncate">{p.notes ?? '—'}</td>
                                       <td className="py-2">
                                         <ConfirmDialog

@@ -332,7 +332,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                     <td className="p-2 text-right tabular-nums">{entry.totalWeight ?? 0}</td>
                     <td className="p-2 text-right whitespace-nowrap">
                       ¥{new Intl.NumberFormat('en-IN', {
-                        maximumFractionDigits: 0,
+                        maximumFractionDigits: 2,
                       }).format(entry.rate)}
                     </td>
                     <td className="p-2 text-right whitespace-nowrap">
@@ -476,7 +476,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Rate per piece</span>
-                                  <span className="font-semibold">¥{entry.rate}</span>
+                                  <span className="font-semibold">¥{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(entry.rate)}</span>
                                 </div>
 
                                 <div className="flex flex-col">

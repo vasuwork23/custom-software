@@ -138,7 +138,7 @@ export function MakeIndiaPaymentDialog({
                 {entries.map((e) => (
                   <SelectItem key={e._id} value={e._id}>
                     {format(new Date(e.entryDate), 'dd MMM yyyy')} — {e.totalCtn} CTN — ₹
-                    {new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(e.remainingAmount ?? 0)} remaining
+                    {new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(e.remainingAmount ?? 0)} remaining
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -154,7 +154,7 @@ export function MakeIndiaPaymentDialog({
               <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a._id} value={a._id}>
-                    {a.accountName} — ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(a.currentBalance)}
+                    {a.accountName} — ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(a.currentBalance)}
                   </SelectItem>
                 ))}
               </SelectContent>

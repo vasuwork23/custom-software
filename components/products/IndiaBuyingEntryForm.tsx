@@ -346,25 +346,25 @@ export function IndiaBuyingEntryForm({
                   <div className="flex flex-col">
                     <span className="text-xs text-muted-foreground">Total Amount</span>
                     <span className="font-semibold text-sm">
-                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(totalAmount)}
+                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(totalAmount)}
                     </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs text-muted-foreground">Final Cost per piece</span>
                     <span className="font-semibold text-sm">
-                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(watched.rate ?? 0)}
+                      ₹{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(watched.rate ?? 0)}
                     </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs text-muted-foreground">Given Amount</span>
                     <span className="font-semibold text-sm">
-                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(givenDisplay)}
+                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(givenDisplay)}
                     </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs text-muted-foreground">Remaining Amount</span>
                     <span className="font-semibold text-sm">
-                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(remainingAmount)}
+                      ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(remainingAmount)}
                     </span>
                   </div>
                 </div>
