@@ -66,7 +66,7 @@ export default function CompaniesPage() {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(page))
-    params.set('limit', '20')
+    params.set('limit', '200')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     params.set('outstandingFilter', debouncedOutstandingFilter)
     if (debouncedMinOutstanding.trim() !== '') params.set('minOutstanding', debouncedMinOutstanding)
@@ -321,8 +321,8 @@ export default function CompaniesPage() {
                       c.outstandingBalance > 0
                         ? 'text-red-600'
                         : c.outstandingBalance === 0
-                        ? 'text-green-600'
-                        : 'text-blue-600'
+                          ? 'text-green-600'
+                          : 'text-blue-600'
                     }
                   >
                     {c.outstandingBalance > 0 && (
@@ -348,101 +348,101 @@ export default function CompaniesPage() {
       ) : (
         <div className="w-full overflow-hidden rounded-md border">
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="h-10 px-4 text-left font-medium">Company Name</th>
-                <th className="h-10 px-4 text-left font-medium">Owner Name</th>
-                <th className="h-10 px-4 text-left font-medium">Mobile</th>
-                <th className="h-10 px-4 text-left font-medium">City</th>
-                <th className="h-10 px-4 text-right font-medium">Outstanding</th>
-                <th className="h-10 px-4 text-right font-medium">Total Profit</th>
-                <th className="h-10 w-24 px-4" />
-              </tr>
-            </thead>
-            <tbody>
-              {data?.companies.map((c) => (
-                <tr
-                  key={c._id}
-                  className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-                  onClick={() => router.push(`/companies/${c._id}`)}
-                >
-                  <td className="p-4 font-medium">{c.companyName}</td>
-                  <td className="p-4 text-muted-foreground">{c.ownerName ?? '—'}</td>
-                  <td className="p-4 text-muted-foreground">
-                    {[c.contact1Mobile, c.contact2Mobile].filter(Boolean).join(', ') || '—'}
-                  </td>
-                  <td className="p-4 text-muted-foreground">{c.city ?? '—'}</td>
-                  <td className="p-4 text-right">
-                    <span
-                      className={
-                        c.outstandingBalance > 0
-                          ? 'text-red-600'
-                          : c.outstandingBalance === 0
-                          ? 'text-green-600'
-                          : 'text-blue-600'
-                      }
-                    >
-                      {c.outstandingBalance > 0 && (
-                        <AmountDisplay amount={c.outstandingBalance} />
-                      )}
-                      {c.outstandingBalance === 0 && 'Clear'}
-                      {c.outstandingBalance < 0 && (
-                        <>
-                          Credit{' '}
-                          <AmountDisplay
-                            amount={Math.abs(c.outstandingBalance)}
-                          />
-                        </>
-                      )}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <AmountDisplay amount={c.totalProfit} />
-                  </td>
-                  <td className="p-4">
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openEdit(c)
-                        }}
-                        aria-label="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <ConfirmDialog
-                        title="Delete company"
-                        description="This cannot be undone. The company must have zero outstanding balance, and no linked sale bills or payment receipts."
-                        confirmLabel="Delete"
-                        variant="destructive"
-                        onConfirm={() => handleDelete(c)}
-                        trigger={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            aria-label="Delete"
-                            disabled={c.outstandingBalance !== 0}
-                            title={
-                              c.outstandingBalance !== 0
-                                ? 'Cannot delete: company has a pending outstanding balance'
-                                : 'Delete company'
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        }
-                      />
-                    </div>
-                  </td>
+            <table className="w-full min-w-[800px] text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="h-10 px-4 text-left font-medium">Company Name</th>
+                  {/* <th className="h-10 px-4 text-left font-medium">Owner Name</th> */}
+                  {/* <th className="h-10 px-4 text-left font-medium">Mobile</th>
+                <th className="h-10 px-4 text-left font-medium">City</th> */}
+                  <th className="h-10 px-4 text-right font-medium">Outstanding</th>
+                  <th className="h-10 px-4 text-right font-medium">Total Profit</th>
+                  <th className="h-10 w-24 px-4" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data?.companies.map((c) => (
+                  <tr
+                    key={c._id}
+                    className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
+                    onClick={() => router.push(`/companies/${c._id}`)}
+                  >
+                    <td className="p-4 font-medium">{c.companyName}</td>
+                    {/* <td className="p-4 text-muted-foreground">{c.ownerName ?? '—'}</td> */}
+                    {/* <td className="p-4 text-muted-foreground">
+                      {[c.contact1Mobile, c.contact2Mobile].filter(Boolean).join(', ') || '—'}
+                    </td> */}
+                    {/* <td className="p-4 text-muted-foreground">{c.city ?? '—'}</td> */}
+                    <td className="p-4 text-right">
+                      <span
+                        className={
+                          c.outstandingBalance > 0
+                            ? 'text-red-600'
+                            : c.outstandingBalance === 0
+                              ? 'text-green-600'
+                              : 'text-blue-600'
+                        }
+                      >
+                        {c.outstandingBalance > 0 && (
+                          <AmountDisplay amount={c.outstandingBalance} />
+                        )}
+                        {c.outstandingBalance === 0 && 'Clear'}
+                        {c.outstandingBalance < 0 && (
+                          <>
+                            Credit{' '}
+                            <AmountDisplay
+                              amount={Math.abs(c.outstandingBalance)}
+                            />
+                          </>
+                        )}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <AmountDisplay amount={c.totalProfit} />
+                    </td>
+                    <td className="p-4">
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEdit(c)
+                          }}
+                          aria-label="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <ConfirmDialog
+                          title="Delete company"
+                          description="This cannot be undone. The company must have zero outstanding balance, and no linked sale bills or payment receipts."
+                          confirmLabel="Delete"
+                          variant="destructive"
+                          onConfirm={() => handleDelete(c)}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              aria-label="Delete"
+                              disabled={c.outstandingBalance !== 0}
+                              title={
+                                c.outstandingBalance !== 0
+                                  ? 'Cannot delete: company has a pending outstanding balance'
+                                  : 'Delete company'
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
