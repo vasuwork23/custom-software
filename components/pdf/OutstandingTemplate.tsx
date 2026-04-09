@@ -133,7 +133,7 @@ export function OutstandingTemplate({
   const currentOutstanding =
     transactions.length > 0
       ? transactions[transactions.length - 1].balance
-      : 0
+      : (company.openingBalance || 0)
 
   return (
     <Document>
@@ -336,11 +336,11 @@ export function OutstandingTemplate({
             }}
           >
             <Text style={{ fontSize: 10, color: '#000000' }}>
-              {currentOutstanding > 0 ? 'Current Outstanding' : 'Balance Clear ✓'}
+              {currentOutstanding > 0 ? 'Current Outstanding' : currentOutstanding < 0 ? 'Advance Balance' : 'Balance Clear ✓'}
             </Text>
             <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#000000' }}>
               {formatINR(Math.abs(currentOutstanding))}
-              {currentOutstanding <= 0 ? ' (Advance)' : ''}
+              {currentOutstanding < 0 ? ' (ADVANCE)' : ''}
             </Text>
           </View>
           <Text style={{ fontSize: 8, color: '#6b7280', textAlign: 'right' }}>
