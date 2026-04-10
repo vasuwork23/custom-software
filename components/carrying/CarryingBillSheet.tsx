@@ -29,8 +29,8 @@ export interface CarryingBillSheetProps {
 
 function formatNum(n: number): string {
   return new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
   }).format(n)
 }
 
@@ -87,9 +87,9 @@ export function CarryingBillSheet({
       const defaults =
         last != null
           ? {
-              priceBuyCBM: last.priceBuyCBM,
-              priceSellCBM: last.priceSellCBM,
-            }
+            priceBuyCBM: last.priceBuyCBM,
+            priceSellCBM: last.priceSellCBM,
+          }
           : undefined
       return [...prev, createProduct(defaults)]
     })
@@ -118,17 +118,17 @@ export function CarryingBillSheet({
     const filtered = products.filter((p) => p.productName.trim() !== '')
     const billToSave: CarryingBill = bill
       ? {
-          ...bill,
-          containerName: containerName.trim(),
-          companyName: companyName.trim(),
-          products: filtered.length > 0 ? filtered : [createProduct()],
-          updatedAt: new Date().toISOString(),
-        }
+        ...bill,
+        containerName: containerName.trim(),
+        companyName: companyName.trim(),
+        products: filtered.length > 0 ? filtered : [createProduct()],
+        updatedAt: new Date().toISOString(),
+      }
       : createBill({
-          containerName: containerName.trim(),
-          companyName: companyName.trim(),
-          products: filtered.length > 0 ? filtered : [createProduct()],
-        })
+        containerName: containerName.trim(),
+        companyName: companyName.trim(),
+        products: filtered.length > 0 ? filtered : [createProduct()],
+      })
     onSave(billToSave)
   }
 
@@ -279,9 +279,8 @@ export function CarryingBillSheet({
                         ₹{formatNum(p.totalAmount)}
                       </td>
                       <td
-                        className={`p-2 text-right tabular-nums align-middle ${
-                          p.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}
+                        className={`p-2 text-right tabular-nums align-middle ${p.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}
                       >
                         ₹{formatNum(p.totalProfit)}
                       </td>
@@ -308,9 +307,8 @@ export function CarryingBillSheet({
                     <td colSpan={2} className="p-2" />
                     <td className="p-2 text-right tabular-nums">₹{formatNum(sumAmount)}</td>
                     <td
-                      className={`p-2 text-right tabular-nums ${
-                        sumProfit >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
+                      className={`p-2 text-right tabular-nums ${sumProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
                     >
                       ₹{formatNum(sumProfit)}
                     </td>

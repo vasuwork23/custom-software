@@ -29,8 +29,8 @@ interface CarryingListResponse {
 
 function formatMoney(n: number): string {
   return new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
   }).format(n)
 }
 
@@ -172,9 +172,8 @@ export default function CarryingPage() {
         <span className="rounded-full border bg-card px-3 py-1">
           <span className="text-muted-foreground">Total Profit: </span>
           <span
-            className={`font-medium ${
-              totals.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
-            }`}
+            className={`font-medium ${totals.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}
           >
             ₹{formatMoney(totals.totalProfit)}
           </span>
