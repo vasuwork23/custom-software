@@ -533,7 +533,7 @@ export default function CompanyDetailPage() {
         }}
       />
 
-      <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
+      {/* <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>PDF Downloaded</DialogTitle>
@@ -563,7 +563,7 @@ export default function CompanyDetailPage() {
             <Button onClick={() => setDownloadModalOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
     </div>
   )
 }
