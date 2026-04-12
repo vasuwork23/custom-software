@@ -397,17 +397,30 @@ export async function sendOutstandingOnWhatsApp(
       debit: (b as { grandTotal?: number }).grandTotal ?? b.totalAmount,
       credit: null as number | null,
     })),
-    ...payments.map((p) => ({
-      date: (p as any).paymentDate || (p as any).date,
-      createdAt: p.createdAt,
-      description: `Payment received${
-        (p as { notes?: string }).notes
-          ? ` — ${(p as { notes?: string }).notes}`
+    ...payments.map((p) => {
+      const pAny = p as { paymentDate?: Date; date?: Date; companyNote?: string; remark?: string; paymentMode?: string }
+      const isSetOff = pAny.paymentMode === 'set_off'
+      let description: string
+      if (isSetOff) {
+        const cleanRemark = pAny.remark
+          ? pAny.remark
+              .replace(/^Payment for India Product:\s*/i, '')
+              .replace(/\s*-\s*\d{2}\s+\w+\s+\d{4}$/, '')
+              .replace(/₹/g, '')
           : ''
-      }`,
-      debit: null as number | null,
-      credit: p.amount,
-    })),
+        description = `Payment received for purchase${cleanRemark ? ` ${cleanRemark}` : ''}`
+        if (pAny.companyNote) description += ` (${pAny.companyNote})`
+      } else {
+        description = `Payment received${pAny.companyNote ? ` — ${pAny.companyNote}` : ''}`
+      }
+      return {
+        date: (pAny.paymentDate || pAny.date) as Date,
+        createdAt: p.createdAt,
+        description,
+        debit: null as number | null,
+        credit: p.amount,
+      }
+    }),
   ].sort((a, b) => {
     const ad = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
     const bd = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()

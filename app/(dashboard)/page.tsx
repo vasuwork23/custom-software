@@ -55,6 +55,8 @@ interface DashboardStats {
   chinaBankBalance: number
   cashBalance: number
   totalOutstanding: number
+  totalPositiveOutstanding: number
+  totalNegativeOutstanding: number
   pendingPaymentsCount: number
 }
 
@@ -558,30 +560,23 @@ export default function DashboardPage() {
             </Link>
 
             <Link href="/companies">
-              <Card
-                className={cn(
-                  'transition hover:shadow-sm',
-                  stats.totalOutstanding > 0
-                    ? 'border-red-500/60 bg-red-50/40'
-                    : stats.totalOutstanding < 0
-                    ? 'border-blue-500/60 bg-blue-50/40'
-                    : 'border-green-500/60 bg-green-50/40'
-                )}
-              >
-                <CardContent className="pt-4">
+              <Card className="transition hover:shadow-sm">
+                <CardContent className="pt-4 space-y-2">
                   <p className="text-xs text-muted-foreground">Total Outstanding</p>
-                  <p
-                    className={cn(
-                      'text-xl font-semibold',
-                      stats.totalOutstanding > 0
-                        ? 'text-red-600'
-                        : stats.totalOutstanding < 0
-                        ? 'text-blue-600'
-                        : 'text-green-600'
-                    )}
-                  >
-                    <AmountDisplay amount={stats.totalOutstanding} />
-                  </p>
+                  <div className="flex gap-4">
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">To Receive</p>
+                      <p className="text-base font-semibold text-red-600">
+                        <AmountDisplay amount={stats.totalPositiveOutstanding ?? 0} />
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Advance/Credit</p>
+                      <p className="text-base font-semibold text-blue-600">
+                        <AmountDisplay amount={stats.totalNegativeOutstanding ?? 0} />
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </Link>

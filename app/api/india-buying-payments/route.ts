@@ -3,6 +3,8 @@ import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
 import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
+import PaymentReceipt from '@/models/PaymentReceipt'
+import Company from '@/models/Company'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import mongoose from 'mongoose'
@@ -32,8 +34,9 @@ export async function GET(req: NextRequest) {
     await connectDB()
     const payments = await IndiaBuyingPayment.find({ buyingEntry: buyingEntryId })
       .sort({ paymentDate: -1, createdAt: -1 })
-      .lean()
       .populate('bankAccount', 'accountName')
+      .populate('company', 'companyName')
+      .lean()
 
     const list = payments.map((p) => ({
       _id: p._id,
@@ -41,6 +44,9 @@ export async function GET(req: NextRequest) {
       product: p.product,
       bankAccount: p.bankAccount,
       bankAccountName: (p.bankAccount as { accountName?: string })?.accountName,
+      company: p.company,
+      companyName: (p.company as unknown as { companyName?: string })?.companyName,
+      paymentSource: p.paymentSource ?? 'bank',
       amount: p.amount,
       paymentDate: p.paymentDate,
       notes: p.notes,
@@ -72,6 +78,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const buyingEntryId = body.buyingEntryId ?? body.buyingEntry
     const bankAccountId = body.bankAccountId ?? body.bankAccount
+    const companyId = body.companyId ?? body.company
+    const paymentSource: 'bank' | 'company' = companyId ? 'company' : 'bank'
     const amount = Number(body.amount)
     const paymentDateRaw = body.paymentDate
     const notes =
@@ -83,11 +91,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    if (!bankAccountId || !mongoose.Types.ObjectId.isValid(bankAccountId)) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'bankAccountId is required' },
-        { status: 400 }
-      )
+    if (paymentSource === 'bank') {
+      if (!bankAccountId || !mongoose.Types.ObjectId.isValid(bankAccountId)) {
+        return NextResponse.json(
+          { success: false, error: 'Validation failed', message: 'bankAccountId is required' },
+          { status: 400 }
+        )
+      }
+    } else {
+      if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+        return NextResponse.json(
+          { success: false, error: 'Validation failed', message: 'companyId is required' },
+          { status: 400 }
+        )
+      }
     }
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json(
@@ -112,57 +129,85 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       )
     }
-    const bank = await BankAccount.findById(bankAccountId)
-    if (!bank) {
-      return NextResponse.json(
-        { success: false, error: 'Not found', message: 'Bank account not found' },
-        { status: 404 }
-      )
-    }
 
     const productName = (entry.product as { productName?: string })?.productName ?? 'India Product'
     const entryDateStr = format(new Date(entry.entryDate), 'dd MMM yyyy')
     const sourceLabel = `Payment for India Product: ${productName} - ${entryDateStr}`
+    const setOffRemark = `${productName} @ ${entry.rate}`
 
-    const bankAcct = await BankAccount.findById(bankAccountId).select('type').lean()
-    if (bankAcct?.type === 'cash') {
-      const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
-      await createCashTransaction({
-        type: 'debit',
-        amount,
-        description: sourceLabel + (notes ? ` - ${notes}` : ''),
-        date: paymentDate,
-        category: 'other',
-        referenceId: entry._id as mongoose.Types.ObjectId,
-        referenceType: 'india_buying_payment',
-      })
-    } else {
-      const lastTx = await BankTransaction.findOne({ bankAccount: bankAccountId })
-        .sort({ transactionDate: -1, createdAt: -1 })
-        .select('balanceAfter')
-        .lean()
-      const lastBalance = lastTx?.balanceAfter ?? 0
-      const newBalance = lastBalance - amount
+    let linkedPaymentReceiptId: mongoose.Types.ObjectId | undefined
 
-      await BankTransaction.create({
-        bankAccount: bankAccountId,
-        type: 'debit',
+    if (paymentSource === 'company') {
+      // Company set-off path: create a PaymentReceipt with paymentMode 'set_off'
+      const company = await Company.findById(companyId).select('_id').lean()
+      if (!company) {
+        return NextResponse.json(
+          { success: false, error: 'Not found', message: 'Company not found' },
+          { status: 404 }
+        )
+      }
+      const receipt = await PaymentReceipt.create({
+        company: companyId,
         amount,
-        balanceAfter: newBalance,
-        source: 'india_buying_payment',
-        sourceRef: entry._id,
-        sourceLabel,
-        transactionDate: paymentDate,
-        notes,
+        paymentMode: 'set_off',
+        paymentDate,
+        remark: setOffRemark,
+        companyNote: notes,
         createdBy,
+        updatedBy: createdBy,
       })
-      await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: newBalance })
+      linkedPaymentReceiptId = receipt._id as mongoose.Types.ObjectId
+    } else {
+      // Bank path
+      const bank = await BankAccount.findById(bankAccountId)
+      if (!bank) {
+        return NextResponse.json(
+          { success: false, error: 'Not found', message: 'Bank account not found' },
+          { status: 404 }
+        )
+      }
+      const bankAcct = await BankAccount.findById(bankAccountId).select('type').lean()
+      if (bankAcct?.type === 'cash') {
+        const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+        await createCashTransaction({
+          type: 'debit',
+          amount,
+          description: sourceLabel + (notes ? ` - ${notes}` : ''),
+          date: paymentDate,
+          category: 'other',
+          referenceId: entry._id as mongoose.Types.ObjectId,
+          referenceType: 'india_buying_payment',
+        })
+      } else {
+        const lastTx = await BankTransaction.findOne({ bankAccount: bankAccountId })
+          .sort({ transactionDate: -1, createdAt: -1 })
+          .select('balanceAfter')
+          .lean()
+        const lastBalance = lastTx?.balanceAfter ?? 0
+        const newBalance = lastBalance - amount
+
+        await BankTransaction.create({
+          bankAccount: bankAccountId,
+          type: 'debit',
+          amount,
+          balanceAfter: newBalance,
+          source: 'india_buying_payment',
+          sourceRef: entry._id,
+          sourceLabel,
+          transactionDate: paymentDate,
+          notes,
+          createdBy,
+        })
+        await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: newBalance })
+      }
     }
 
     await IndiaBuyingPayment.create({
       buyingEntry: buyingEntryId,
       product: entry.product,
-      bankAccount: bankAccountId,
+      ...(paymentSource === 'bank' ? { bankAccount: bankAccountId } : { company: companyId }),
+      paymentSource,
+      linkedPaymentReceiptId,
       amount,
       paymentDate,
       notes,
@@ -173,8 +218,9 @@ export async function POST(req: NextRequest) {
 
     const payments = await IndiaBuyingPayment.find({ buyingEntry: buyingEntryId })
       .sort({ paymentDate: -1 })
-      .lean()
       .populate('bankAccount', 'accountName')
+      .populate('company', 'companyName')
+      .lean()
     return NextResponse.json({ success: true, data: { payments } })
   } catch (error) {
     console.error('India buying payment create API Error:', error)

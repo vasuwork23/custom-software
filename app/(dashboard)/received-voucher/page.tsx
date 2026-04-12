@@ -26,12 +26,13 @@ interface PaymentRow {
   _id: string
   paymentDate: string
   amount: number
-  paymentMode: 'cash' | 'online'
+  paymentMode: 'cash' | 'online' | 'set_off'
   companyId: string
   companyName: string
   bankAccountId?: string
   bankAccountName?: string
   remark?: string
+  companyNote?: string
 }
 
 interface PaymentsData {
@@ -44,7 +45,7 @@ export default function ReceivedVoucherPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<PaymentsData | null>(null)
   const [companyFilter, setCompanyFilter] = useState('')
-  const [modeFilter, setModeFilter] = useState<'all' | 'cash' | 'online'>('all')
+  const [modeFilter, setModeFilter] = useState<'all' | 'cash' | 'online' | 'set_off'>('all')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -152,12 +153,13 @@ export default function ReceivedVoucherPage() {
           />
           <select
             value={modeFilter}
-            onChange={(e) => setModeFilter(e.target.value as 'all' | 'cash' | 'online')}
+            onChange={(e) => setModeFilter(e.target.value as 'all' | 'cash' | 'online' | 'set_off')}
             className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
           >
             <option value="all">All modes</option>
             <option value="cash">Cash</option>
             <option value="online">Online</option>
+            <option value="set_off">Set-off</option>
           </select>
           <DateRangePicker value={dateRange} onChange={setDateRange} placeholder="Date range" />
         </div>
@@ -189,6 +191,7 @@ export default function ReceivedVoucherPage() {
                 <th className="h-10 px-4 text-center font-medium">Mode</th>
                 <th className="h-10 px-4 text-left font-medium">Bank Account</th>
                 <th className="h-10 px-4 text-left font-medium">Remark</th>
+                <th className="h-10 px-4 text-left font-medium">Company Note</th>
                 <th className="h-10 w-28 px-4" />
               </tr>
             </thead>
@@ -210,10 +213,12 @@ export default function ReceivedVoucherPage() {
                         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                         p.paymentMode === 'cash'
                           ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          : p.paymentMode === 'set_off'
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                       )}
                     >
-                      {p.paymentMode === 'cash' ? 'Cash' : 'Online'}
+                      {p.paymentMode === 'cash' ? 'Cash' : p.paymentMode === 'set_off' ? 'Set-off' : 'Online'}
                     </span>
                   </td>
                   <td className="p-4 text-muted-foreground">
@@ -221,14 +226,19 @@ export default function ReceivedVoucherPage() {
                       ? p.bankAccountName
                       : p.paymentMode === 'cash'
                         ? 'Cash'
-                        : '—'}
+                        : p.paymentMode === 'set_off'
+                          ? 'India Buying Set-off'
+                          : '—'}
                   </td>
                   <td className="p-4 text-muted-foreground max-w-[180px] truncate">{p.remark ?? '—'}</td>
+                  <td className="p-4 text-muted-foreground max-w-[180px] truncate">{p.companyNote ?? '—'}</td>
                   <td className="p-4">
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)} aria-label="Edit">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {p.paymentMode !== 'set_off' && (
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(p)} aria-label="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <ConfirmDialog
                         title="Delete voucher"
                         description="This will reverse the bank transaction. This cannot be undone."

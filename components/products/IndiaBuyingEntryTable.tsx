@@ -51,7 +51,7 @@ export function IndiaBuyingEntryTable({
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
   const [paymentsByEntry, setPaymentsByEntry] = useState<
-    Record<string, { _id: string; amount: number; paymentDate: string; bankAccountName?: string; notes?: string }[]>
+    Record<string, { _id: string; amount: number; paymentDate: string; paymentSource?: string; bankAccountName?: string; companyName?: string; notes?: string }[]>
   >({})
   const [paymentsLoading, setPaymentsLoading] = useState<string | null>(null)
 
@@ -96,7 +96,7 @@ export function IndiaBuyingEntryTable({
   async function fetchPaymentsForEntry(entryId: string) {
     setPaymentsLoading(entryId)
     const result = await apiGet<{
-      payments: { _id: string; amount: number; paymentDate: string; bankAccountName?: string; notes?: string }[]
+      payments: { _id: string; amount: number; paymentDate: string; paymentSource?: string; bankAccountName?: string; companyName?: string; notes?: string }[]
     }>(`/api/india-buying-payments?buyingEntryId=${entryId}`)
     setPaymentsLoading(null)
     if (result.success) setPaymentsByEntry((prev) => ({ ...prev, [entryId]: result.data.payments }))
@@ -235,7 +235,7 @@ export function IndiaBuyingEntryTable({
                                 <thead>
                                   <tr className="border-b">
                                     <th className="text-left py-2 font-medium">Date</th>
-                                    <th className="text-left py-2 font-medium">Bank Account</th>
+                                    <th className="text-left py-2 font-medium">Source</th>
                                     <th className="text-right py-2 font-medium">Amount (₹)</th>
                                     <th className="text-left py-2 font-medium">Notes</th>
                                     <th className="w-16" />
@@ -245,7 +245,18 @@ export function IndiaBuyingEntryTable({
                                   {(paymentsByEntry[entry._id] ?? []).map((p) => (
                                     <tr key={p._id} className="border-b last:border-0">
                                       <td className="py-2">{format(new Date(p.paymentDate), 'dd MMM yyyy')}</td>
-                                      <td className="py-2">{p.bankAccountName ?? '—'}</td>
+                                      <td className="py-2">
+                                        {p.paymentSource === 'company' ? (
+                                          <span className="inline-flex items-center gap-1">
+                                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                                              Set-off
+                                            </span>
+                                            <span className="text-muted-foreground">{p.companyName ?? '—'}</span>
+                                          </span>
+                                        ) : (
+                                          p.bankAccountName ?? '—'
+                                        )}
+                                      </td>
                                       <td className="py-2 text-right">₹{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(p.amount)}</td>
                                       <td className="py-2 text-muted-foreground max-w-[200px] truncate">{p.notes ?? '—'}</td>
                                       <td className="py-2">

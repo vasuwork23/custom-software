@@ -4,7 +4,6 @@ import { connectDB } from '@/lib/mongodb'
 import SellBillItem from '@/models/SellBillItem'
 import SellBill from '@/models/SellBill'
 import Expense from '@/models/Expense'
-import PaymentReceipt from '@/models/PaymentReceipt'
 import Company from '@/models/Company'
 import mongoose from 'mongoose'
 
@@ -174,12 +173,24 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
           },
         },
         {
           $group: {
             _id: null,
-            revenue: { $sum: '$totalAmount' },
+            revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
             grossProfit: { $sum: '$totalProfit' },
           },
@@ -208,6 +219,18 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
             period: {
               $dateToString: { format: chartFormat, date: '$bill.billDate' },
             },
@@ -216,7 +239,7 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: '$period',
-            revenue: { $sum: '$totalAmount' },
+            revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
             grossProfit: { $sum: '$totalProfit' },
           },
@@ -262,10 +285,26 @@ export async function GET(req: NextRequest) {
         },
         { $unwind: { path: '$companyDoc', preserveNullAndEmptyArrays: true } },
         {
+          $addFields: {
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
+          },
+        },
+        {
           $group: {
             _id: '$bill.company',
             name: { $first: '$companyDoc.companyName' },
-            revenue: { $sum: '$totalAmount' },
+            revenue: { $sum: '$adjustedRevenue' },
             profit: { $sum: '$totalProfit' },
           },
         },
@@ -303,12 +342,24 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
           },
         },
         {
           $group: {
             _id: null,
-            revenue: { $sum: '$totalAmount' },
+            revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
             grossProfit: { $sum: '$totalProfit' },
           },

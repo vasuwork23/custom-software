@@ -4,10 +4,11 @@ export interface IPaymentReceipt {
   _id?: mongoose.Types.ObjectId
   company: mongoose.Types.ObjectId
   amount: number
-  paymentMode: 'cash' | 'online'
+  paymentMode: 'cash' | 'online' | 'set_off'
   bankAccount?: mongoose.Types.ObjectId
   paymentDate: Date
   remark?: string
+  companyNote?: string
   createdBy: mongoose.Types.ObjectId
   updatedBy: mongoose.Types.ObjectId
   createdAt: Date
@@ -18,10 +19,11 @@ const PaymentReceiptSchema = new Schema<IPaymentReceipt>(
   {
     company: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
     amount: { type: Number, required: true },
-    paymentMode: { type: String, required: true, enum: ['cash', 'online'] },
+    paymentMode: { type: String, required: true, enum: ['cash', 'online', 'set_off'] },
     bankAccount: { type: Schema.Types.ObjectId, ref: 'BankAccount' },
     paymentDate: { type: Date, required: true },
     remark: { type: String },
+    companyNote: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },

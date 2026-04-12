@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
+import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
+import PaymentReceipt from '@/models/PaymentReceipt'
 import IndiaProduct from '@/models/IndiaProduct'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
@@ -409,6 +411,49 @@ export async function DELETE(
         await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
       }
     }
+
+    // Clean up all IndiaBuyingPayments for this entry
+    const linkedPayments = await IndiaBuyingPayment.find({ buyingEntry: new mongoose.Types.ObjectId(id) }).lean()
+    for (const p of linkedPayments) {
+      if (p.paymentSource === 'company' && p.linkedPaymentReceiptId) {
+        // Delete the set-off PaymentReceipt (restores company outstanding)
+        await PaymentReceipt.findByIdAndDelete(p.linkedPaymentReceiptId)
+      } else if (p.bankAccount) {
+        // Reverse the bank transaction
+        const bankId = p.bankAccount as mongoose.Types.ObjectId
+        const bankAcct = await BankAccount.findById(bankId).select('type').lean()
+        if (bankAcct?.type === 'cash') {
+          const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+          await createCashTransaction({
+            type: 'credit',
+            amount: p.amount,
+            description: `Reversal: payment for India buying entry (deleted)`,
+            date: new Date(),
+            category: 'other',
+            referenceId: p._id as mongoose.Types.ObjectId,
+            referenceType: 'india_buying_payment',
+          })
+        } else {
+          const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
+            .sort({ transactionDate: -1, createdAt: -1 })
+            .select('balanceAfter')
+            .lean()
+          const newBalance = (lastTx?.balanceAfter ?? 0) + p.amount
+          await BankTransaction.create({
+            bankAccount: bankId,
+            type: 'credit',
+            amount: p.amount,
+            balanceAfter: newBalance,
+            source: 'manual',
+            sourceLabel: `Reversal: payment for India buying entry (deleted)`,
+            transactionDate: new Date(),
+            createdBy: p.createdBy,
+          })
+          await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+        }
+      }
+    }
+    await IndiaBuyingPayment.deleteMany({ buyingEntry: new mongoose.Types.ObjectId(id) })
 
     await IndiaBuyingEntry.findByIdAndDelete(id)
     return NextResponse.json({ success: true, data: { deleted: id } })

@@ -105,6 +105,7 @@ export async function GET(
           paymentMode: p.paymentMode,
           bankAccount: (p as { bankAccount?: { accountName: string } })?.bankAccount,
           remark: p.remark,
+          companyNote: p.companyNote,
         })),
       },
     })

@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
         { $group: { _id: null, totalBilled: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
       ]),
       PaymentReceipt.aggregate([
-        { $group: { _id: null, totalReceived: { $sum: '$amount' } } },
+        { $group: { _id: '$company', totalReceived: { $sum: '$amount' } } },
       ]),
       BuyingEntry.countDocuments({
         currentStatus: { $in: ['unpaid', 'partiallypaid'] },
@@ -138,6 +138,7 @@ export async function GET(req: NextRequest) {
         currentStatus: { $in: ['unpaid', 'partiallypaid'] },
       }),
       // China inventory in India warehouse (available for selling)
+      // Round PCS to integer first (matches stock report's roundQty = Math.round)
       BuyingEntry.aggregate([
         {
           $match: {
@@ -149,8 +150,7 @@ export async function GET(req: NextRequest) {
           $project: {
             value: {
               $multiply: [
-                '$availableCtn',
-                '$qty',
+                { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
                 { $ifNull: ['$finalCost', 0] },
               ],
             },
@@ -158,7 +158,8 @@ export async function GET(req: NextRequest) {
         },
         { $group: { _id: null, total: { $sum: '$value' } } },
       ]),
-      // India inventory
+      // India inventory (finalCost === rate for India entries)
+      // Round PCS to integer first (matches stock report's roundQty = Math.round)
       IndiaBuyingEntry.aggregate([
         {
           $match: {
@@ -168,7 +169,10 @@ export async function GET(req: NextRequest) {
         {
           $project: {
             value: {
-              $multiply: ['$availableCtn', '$qty', '$rate'],
+              $multiply: [
+                { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
+                '$finalCost',
+              ],
             },
           },
         },
@@ -460,9 +464,12 @@ export async function GET(req: NextRequest) {
 
     const chinaBankBalance = chinaBankLastTx?.balanceAfter ?? 0
     const cashBalance = cashAccount?.currentBalance ?? 0
+    // receivedAgg is now per-company; sum up for global total
+    const totalReceived = (receivedAgg as { _id: unknown; totalReceived: number }[]).reduce(
+      (sum, r) => sum + (r.totalReceived ?? 0),
+      0
+    )
     const totalBilled = billedAgg[0]?.totalBilled ?? 0
-    const totalReceived = receivedAgg[0]?.totalReceived ?? 0
-    const totalOutstanding = totalBilled - totalReceived
     const pendingPaymentsCount = Number(pendingChina) + Number(pendingIndia)
 
     const chinaInventory = chinaInventoryAgg[0]?.total ?? 0
@@ -588,16 +595,41 @@ export async function GET(req: NextRequest) {
       daysPending: number
     }[] = []
 
-    const companies = await Company.find({}).select('companyName').lean()
+    // Fetch companies with openingBalance to compute accurate outstanding split
+    const companies = await Company.find({}).select('companyName openingBalance').lean()
 
     const companyNameMap = new Map<string, string>()
-    for (const c of companies as { _id: mongoose.Types.ObjectId; companyName?: string }[]) {
+    const openingBalanceMap = new Map<string, number>()
+    for (const c of companies as { _id: mongoose.Types.ObjectId; companyName?: string; openingBalance?: number }[]) {
       companyNameMap.set(String(c._id), c.companyName ?? '—')
+      openingBalanceMap.set(String(c._id), c.openingBalance ?? 0)
     }
 
-    billedMap.forEach((billed, companyId) => {
+    // Compute positive/negative outstanding per company (matches companies page logic)
+    const epsilon = 0.00001
+    let totalPositiveOutstanding = 0
+    let totalNegativeOutstanding = 0
+
+    // Collect all company IDs from both billed and opening balance maps
+    // Skip 'null' key — cashbook bills (company = null) have no receivable outstanding
+    const allCompanyIds = new Set([...billedMap.keys(), ...openingBalanceMap.keys()])
+    allCompanyIds.forEach((companyId) => {
+      if (!companyId || companyId === 'null') return
+      const billed = billedMap.get(companyId) ?? 0
       const received = receivedMap.get(companyId) ?? 0
-      const outstanding = billed - received
+      const openingBalance = openingBalanceMap.get(companyId) ?? 0
+      const outstanding = billed - received + openingBalance
+      if (outstanding > epsilon) totalPositiveOutstanding += outstanding
+      else if (outstanding < -epsilon) totalNegativeOutstanding += Math.abs(outstanding)
+    })
+
+    const totalOutstanding = totalPositiveOutstanding - totalNegativeOutstanding
+
+    billedMap.forEach((billed, companyId) => {
+      if (!companyId || companyId === 'null') return  // skip cashbook bills
+      const received = receivedMap.get(companyId) ?? 0
+      const openingBalance = openingBalanceMap.get(companyId) ?? 0
+      const outstanding = billed - received + openingBalance
       if (outstanding <= 0) return
       const oldestBillDate = oldestBillMap.get(companyId)
       if (!oldestBillDate) return
@@ -638,6 +670,8 @@ export async function GET(req: NextRequest) {
         chinaBankBalance,
         cashBalance,
         totalOutstanding,
+        totalPositiveOutstanding,
+        totalNegativeOutstanding,
         pendingPaymentsCount,
         inventoryValue,
         chinaBankHealth,

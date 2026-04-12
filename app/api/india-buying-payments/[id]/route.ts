@@ -3,6 +3,7 @@ import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
 import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
+import PaymentReceipt from '@/models/PaymentReceipt'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import mongoose from 'mongoose'
@@ -48,38 +49,47 @@ export async function DELETE(
     const sourceLabel = `Reversal: Payment for India Product: ${productName} - ${entryDateStr}`
 
     const createdBy = await resolveCreatedBy(user.id)
-    const bankId = payment.bankAccount as mongoose.Types.ObjectId
-    const bankAcct = await BankAccount.findById(bankId).select('type').lean()
-    if (bankAcct?.type === 'cash') {
-      const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
-      await createCashTransaction({
-        type: 'credit',
-        amount: payment.amount,
-        description: sourceLabel,
-        date: new Date(),
-        category: 'other',
-        referenceId: payment._id as mongoose.Types.ObjectId,
-        referenceType: 'india_buying_payment',
-      })
-    } else {
-      const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
-        .sort({ transactionDate: -1, createdAt: -1 })
-        .select('balanceAfter')
-        .lean()
-      const lastBalance = lastTx?.balanceAfter ?? 0
-      const newBalance = lastBalance + payment.amount
 
-      await BankTransaction.create({
-        bankAccount: bankId,
-        type: 'credit',
-        amount: payment.amount,
-        balanceAfter: newBalance,
-        source: 'manual',
-        sourceLabel,
-        transactionDate: new Date(),
-        createdBy,
-      })
-      await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+    if (payment.paymentSource === 'company') {
+      // Reverse the linked PaymentReceipt (set-off)
+      if (payment.linkedPaymentReceiptId) {
+        await PaymentReceipt.findByIdAndDelete(payment.linkedPaymentReceiptId)
+      }
+    } else {
+      // Bank path reversal
+      const bankId = payment.bankAccount as mongoose.Types.ObjectId
+      const bankAcct = await BankAccount.findById(bankId).select('type').lean()
+      if (bankAcct?.type === 'cash') {
+        const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
+        await createCashTransaction({
+          type: 'credit',
+          amount: payment.amount,
+          description: sourceLabel,
+          date: new Date(),
+          category: 'other',
+          referenceId: payment._id as mongoose.Types.ObjectId,
+          referenceType: 'india_buying_payment',
+        })
+      } else {
+        const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
+          .sort({ transactionDate: -1, createdAt: -1 })
+          .select('balanceAfter')
+          .lean()
+        const lastBalance = lastTx?.balanceAfter ?? 0
+        const newBalance = lastBalance + payment.amount
+
+        await BankTransaction.create({
+          bankAccount: bankId,
+          type: 'credit',
+          amount: payment.amount,
+          balanceAfter: newBalance,
+          source: 'manual',
+          sourceLabel,
+          transactionDate: new Date(),
+          createdBy,
+        })
+        await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+      }
     }
 
     const buyingEntryId = payment.buyingEntry as mongoose.Types.ObjectId

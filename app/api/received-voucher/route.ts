@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       filter.company = new mongoose.Types.ObjectId(companyId)
       baseFilter.company = filter.company
     }
-    if (paymentMode === 'cash' || paymentMode === 'online') {
+    if (paymentMode === 'cash' || paymentMode === 'online' || paymentMode === 'set_off') {
       filter.paymentMode = paymentMode
       baseFilter.paymentMode = paymentMode
     }
@@ -114,6 +114,7 @@ export async function GET(req: NextRequest) {
       bankAccountId: (p.bankAccount as { _id?: mongoose.Types.ObjectId } | undefined)?._id,
       bankAccountName: (p.bankAccount as { accountName?: string } | undefined)?.accountName,
       remark: p.remark,
+      companyNote: p.companyNote,
     }))
 
     return NextResponse.json({
@@ -156,6 +157,7 @@ export async function POST(req: NextRequest) {
     const bankAccountId = body.bankAccountId?.trim()
     const paymentDateRaw = body.paymentDate
     const remark = body.remark != null && String(body.remark).trim() ? String(body.remark).trim() : undefined
+    const companyNote = body.companyNote != null && String(body.companyNote).trim() ? String(body.companyNote).trim() : undefined
 
     if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
       return NextResponse.json(
@@ -238,6 +240,7 @@ export async function POST(req: NextRequest) {
       bankAccount: paymentMode === 'online' ? bankAccount._id : undefined,
       paymentDate,
       remark,
+      companyNote,
       createdBy,
       updatedBy: createdBy,
     })

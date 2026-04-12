@@ -30,6 +30,7 @@ export interface PaymentFormValues {
   bankAccountName?: string
   paymentDate: string
   remark?: string
+  companyNote?: string
 }
 
 interface PaymentFormDialogProps {
@@ -57,6 +58,7 @@ export function PaymentFormDialog({
   const [bankAccountId, setBankAccountId] = useState('')
   const [paymentDate, setPaymentDate] = useState<Date>(new Date())
   const [remark, setRemark] = useState('')
+  const [companyNote, setCompanyNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [outstanding, setOutstanding] = useState<number | null>(null)
   const [outstandingLoading, setOutstandingLoading] = useState(false)
@@ -116,6 +118,7 @@ export function PaymentFormDialog({
       setBankAccountId(editPayment.bankAccountId ?? '')
       setPaymentDate(editPayment.paymentDate ? new Date(editPayment.paymentDate) : new Date())
       setRemark(editPayment.remark ?? '')
+      setCompanyNote(editPayment.companyNote ?? '')
     } else {
       setCompanyId(preselectedCompanyId ?? '')
       setAmount(undefined)
@@ -123,6 +126,7 @@ export function PaymentFormDialog({
       setBankAccountId('')
       setPaymentDate(new Date())
       setRemark('')
+      setCompanyNote('')
     }
   }, [open, editPayment, preselectedCompanyId])
 
@@ -158,6 +162,7 @@ export function PaymentFormDialog({
       bankAccountId: paymentMode === 'online' ? bankAccountId : undefined,
       paymentDate: format(paymentDate, 'yyyy-MM-dd'),
       remark: remark.trim() || undefined,
+      companyNote: companyNote.trim() || undefined,
     }
     if (editPayment) {
       const result = await apiPut(`/api/received-voucher/${editPayment._id}`, payload)
@@ -371,6 +376,15 @@ export function PaymentFormDialog({
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
               placeholder="Cheque no, UTR, note..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="companyNote">Company Note (optional)</Label>
+            <Input
+              id="companyNote"
+              value={companyNote}
+              onChange={(e) => setCompanyNote(e.target.value)}
+              placeholder="Note visible on company side and PDF..."
             />
           </div>
           <div className="flex gap-2 pt-2">

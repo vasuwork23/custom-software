@@ -34,9 +34,10 @@ interface PaymentRow {
   _id: string
   paymentDate: string
   amount: number
-  paymentMode: 'cash' | 'online'
+  paymentMode: 'cash' | 'online' | 'set_off'
   bankAccount?: { accountName: string }
   remark?: string
+  companyNote?: string
 }
 
 interface CompanyDetailData {
@@ -373,6 +374,7 @@ export default function CompanyDetailPage() {
                     <th className="h-10 px-4 text-center font-medium">Mode</th>
                     <th className="h-10 px-4 text-left font-medium">Bank Account</th>
                     <th className="h-10 px-4 text-left font-medium">Remark</th>
+                    <th className="h-10 px-4 text-left font-medium">Company Note</th>
                     <th className="h-10 w-24 px-4" />
                   </tr>
                 </thead>
@@ -389,10 +391,12 @@ export default function CompanyDetailPage() {
                             'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                             p.paymentMode === 'cash'
                               ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                              : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : p.paymentMode === 'set_off'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                                : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                           )}
                         >
-                          {p.paymentMode === 'cash' ? 'Cash' : 'Online'}
+                          {p.paymentMode === 'cash' ? 'Cash' : p.paymentMode === 'set_off' ? 'Set-off' : 'Online'}
                         </span>
                       </td>
                       <td className="p-4 text-muted-foreground">
@@ -400,9 +404,12 @@ export default function CompanyDetailPage() {
                           ? p.bankAccount.accountName
                           : p.paymentMode === 'cash'
                             ? 'Cash'
-                            : '—'}
+                            : p.paymentMode === 'set_off'
+                              ? 'India Buying Set-off'
+                              : '—'}
                       </td>
                       <td className="p-4 text-muted-foreground">{p.remark ?? '—'}</td>
+                      <td className="p-4 text-muted-foreground max-w-[180px] truncate">{p.companyNote ?? '—'}</td>
                       <td className="p-4">
                         <div className="flex gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openEditPayment(p._id)} aria-label="Edit">

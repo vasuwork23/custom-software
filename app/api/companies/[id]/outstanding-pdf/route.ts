@@ -10,7 +10,7 @@ import SellBillItem from '@/models/SellBillItem'
 import Product from '@/models/Product'
 import IndiaProduct from '@/models/IndiaProduct'
 import PaymentReceipt from '@/models/PaymentReceipt'
-import { OutstandingTemplate } from '@/components/pdf/OutstandingTemplate'
+import { OutstandingTemplate, type OutstandingTemplateProps } from '@/components/pdf/OutstandingTemplate'
 import { generateOutstandingFileName } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -106,21 +106,34 @@ export async function GET(
           items,
         }
       }),
-      ...payments.map((p) => ({
-        items: [] as { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[],
-        date: (p as any).paymentDate || (p as any).date,
-        createdAt: p.createdAt,
-        description: `Payment received${
-          (p as { notes?: string }).notes
-            ? ` — ${(p as { notes?: string }).notes}`
+      ...payments.map((p) => {
+        const pAny = p as { paymentDate?: Date; date?: Date; companyNote?: string; remark?: string; paymentMode?: string }
+        const isSetOff = pAny.paymentMode === 'set_off'
+        let description: string
+        if (isSetOff) {
+          const cleanRemark = pAny.remark
+            ? pAny.remark
+                .replace(/^Payment for India Product:\s*/i, '')
+                .replace(/\s*-\s*\d{2}\s+\w+\s+\d{4}$/, '')
+                .replace(/₹/g, '')
             : ''
-        }`,
-        debit: null as number | null,
-        credit: p.amount,
-      })),
+          description = `Payment received for purchase${cleanRemark ? ` ${cleanRemark}` : ''}`
+          if (pAny.companyNote) description += ` (${pAny.companyNote})`
+        } else {
+          description = `Payment received${pAny.companyNote ? ` — ${pAny.companyNote}` : ''}`
+        }
+        return {
+          items: [] as { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[],
+          date: (pAny.paymentDate || pAny.date || new Date()) as Date,
+          createdAt: p.createdAt,
+          description,
+          debit: null as number | null,
+          credit: p.amount,
+        }
+      }),
     ].sort((a, b) => {
-      const aDate = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime()
-      const bDate = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime()
+      const aDate = a.date instanceof Date ? a.date.getTime() : new Date(a.date as string).getTime()
+      const bDate = b.date instanceof Date ? b.date.getTime() : new Date(b.date as string).getTime()
       if (aDate !== bDate) return aDate - bDate
       
       const ad = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
@@ -173,7 +186,7 @@ export async function GET(
         openingBalance: modifiedOpeningBalance,
         openingBalanceNotes: modifiedOpeningBalanceNotes,
       },
-      transactions,
+      transactions: transactions as OutstandingTemplateProps['transactions'],
       generatedDate,
       yourCompanyName: process.env.COMPANY_NAME ?? '',
       yourAddress: process.env.COMPANY_ADDRESS ?? '',

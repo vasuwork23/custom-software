@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/SearchableSelect'
 import { cn } from '@/lib/utils'
 import { apiGet, apiPost } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -33,12 +34,22 @@ const amountSchema = z.preprocess(
   (v) => (v === '' || v == null ? undefined : Number(v)),
   z.number({ required_error: 'Amount required' }).min(0.01, 'Amount must be greater than 0')
 )
+
 const schema = z.object({
+  paymentSource: z.enum(['bank', 'company']),
   buyingEntryId: z.string().min(1, 'Select an entry'),
-  bankAccountId: z.string().min(1, 'Select bank account'),
+  bankAccountId: z.string().optional(),
+  companyId: z.string().optional(),
   amount: amountSchema,
   paymentDate: z.date(),
   notes: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.paymentSource === 'bank' && !data.bankAccountId) {
+    ctx.addIssue({ code: 'custom', path: ['bankAccountId'], message: 'Select bank account' })
+  }
+  if (data.paymentSource === 'company' && !data.companyId) {
+    ctx.addIssue({ code: 'custom', path: ['companyId'], message: 'Select company' })
+  }
 })
 
 type FormValues = z.infer<typeof schema>
@@ -51,6 +62,12 @@ interface MakeIndiaPaymentDialogProps {
   onSuccess: () => void
 }
 
+interface CompanyOption {
+  _id: string
+  companyName: string
+  outstandingBalance: number
+}
+
 export function MakeIndiaPaymentDialog({
   open,
   onOpenChange,
@@ -60,6 +77,8 @@ export function MakeIndiaPaymentDialog({
 }: MakeIndiaPaymentDialogProps) {
   const [entries, setEntries] = useState<{ _id: string; entryDate: string; totalCtn: number; remainingAmount: number }[]>([])
   const [accounts, setAccounts] = useState<{ _id: string; accountName: string; currentBalance: number }[]>([])
+  const [companies, setCompanies] = useState<CompanyOption[]>([])
+  const [paymentSource, setPaymentSource] = useState<'bank' | 'company'>('bank')
 
   const {
     control,
@@ -72,15 +91,19 @@ export function MakeIndiaPaymentDialog({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      paymentSource: 'bank',
       buyingEntryId: '',
       bankAccountId: '',
-      amount: undefined,
+      companyId: '',
+      amount: undefined as unknown as number,
       paymentDate: new Date(),
       notes: '',
     },
   })
 
   const watched = watch()
+
+  const selectedCompanyOutstanding = companies.find((c) => c._id === watched.companyId)?.outstandingBalance ?? null
 
   useEffect(() => {
     if (open && productId) {
@@ -94,24 +117,44 @@ export function MakeIndiaPaymentDialog({
         if (r.success) setAccounts(r.data.accounts ?? [])
         else setAccounts([])
       })
+      apiGet<{ companies: { _id: string; companyName: string; outstandingBalance: number }[] }>('/api/companies?limit=500').then((r) => {
+        if (r.success) setCompanies(r.data.companies ?? [])
+        else setCompanies([])
+      })
+      setPaymentSource('bank')
       reset({
+        paymentSource: 'bank',
         buyingEntryId: '',
         bankAccountId: '',
-        amount: undefined,
+        companyId: '',
+        amount: undefined as unknown as number,
         paymentDate: new Date(),
         notes: '',
       })
     }
   }, [open, productId, reset])
 
+  function handleSourceToggle(source: 'bank' | 'company') {
+    setPaymentSource(source)
+    setValue('paymentSource', source)
+    setValue('bankAccountId', '')
+    setValue('companyId', '')
+  }
+
   async function onSubmit(values: FormValues) {
-    const result = await apiPost('/api/india-buying-payments', {
+    const payload: Record<string, unknown> = {
       buyingEntryId: values.buyingEntryId,
-      bankAccountId: values.bankAccountId,
       amount: values.amount ?? 0,
       paymentDate: format(values.paymentDate, 'yyyy-MM-dd'),
       notes: values.notes || undefined,
-    })
+    }
+    if (values.paymentSource === 'company') {
+      payload.companyId = values.companyId
+    } else {
+      payload.bankAccountId = values.bankAccountId
+    }
+
+    const result = await apiPost('/api/india-buying-payments', payload)
     if (!result.success) {
       toast.error(result.message)
       return
@@ -121,6 +164,11 @@ export function MakeIndiaPaymentDialog({
     onSuccess()
   }
 
+  const companyOptions: SearchableSelectOption<string>[] = companies.map((c) => ({
+    value: c._id,
+    label: c.companyName,
+  }))
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -128,6 +176,38 @@ export function MakeIndiaPaymentDialog({
           <DialogTitle>Make Payment — {productName}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Payment Source Toggle */}
+          <div className="space-y-2">
+            <Label>Payment Source</Label>
+            <div className="flex rounded-md border overflow-hidden">
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-2 text-sm font-medium transition-colors',
+                  paymentSource === 'bank'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-foreground hover:bg-muted'
+                )}
+                onClick={() => handleSourceToggle('bank')}
+              >
+                Bank / Cash
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-2 text-sm font-medium transition-colors border-l',
+                  paymentSource === 'company'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-foreground hover:bg-muted'
+                )}
+                onClick={() => handleSourceToggle('company')}
+              >
+                Company Set-off
+              </button>
+            </div>
+          </div>
+
+          {/* Buying Entry */}
           <div className="space-y-2">
             <Label>Buying Entry</Label>
             <Select value={watched.buyingEntryId} onValueChange={(v) => setValue('buyingEntryId', v)}>
@@ -145,22 +225,55 @@ export function MakeIndiaPaymentDialog({
             </Select>
             {errors.buyingEntryId && <p className="text-sm text-destructive">{errors.buyingEntryId.message}</p>}
           </div>
-          <div className="space-y-2">
-            <Label>Bank Account</Label>
-            <Select value={watched.bankAccountId} onValueChange={(v) => setValue('bankAccountId', v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select (Cash or Online)" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a._id} value={a._id}>
-                    {a.accountName} — ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(a.currentBalance)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.bankAccountId && <p className="text-sm text-destructive">{errors.bankAccountId.message}</p>}
-          </div>
+
+          {/* Bank Account (bank path) */}
+          {paymentSource === 'bank' && (
+            <div className="space-y-2">
+              <Label>Bank Account</Label>
+              <Select value={watched.bankAccountId ?? ''} onValueChange={(v) => setValue('bankAccountId', v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select (Cash or Online)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a._id} value={a._id}>
+                      {a.accountName} — ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(a.currentBalance)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.bankAccountId && (
+                <p className="text-sm text-destructive">{errors.bankAccountId.message}</p>
+              )}
+            </div>
+          )}
+
+          {/* Company (set-off path) */}
+          {paymentSource === 'company' && (
+            <div className="space-y-2">
+              <Label>Company</Label>
+              <SearchableSelect
+                options={companyOptions}
+                value={watched.companyId ?? ''}
+                onValueChange={(v) => setValue('companyId', v)}
+                placeholder="Search company…"
+              />
+              {selectedCompanyOutstanding !== null && (
+                <p className={cn(
+                  'text-xs font-medium',
+                  selectedCompanyOutstanding > 0 ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
+                )}>
+                  Outstanding: ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(Math.abs(selectedCompanyOutstanding))}
+                  {selectedCompanyOutstanding <= 0 ? ' (advance/credit)' : ''}
+                </p>
+              )}
+              {errors.companyId && (
+                <p className="text-sm text-destructive">{errors.companyId.message}</p>
+              )}
+            </div>
+          )}
+
+          {/* Amount */}
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (₹)</Label>
             <Controller
@@ -180,6 +293,8 @@ export function MakeIndiaPaymentDialog({
             />
             {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
           </div>
+
+          {/* Payment Date */}
           <div className="space-y-2">
             <Label>Payment Date</Label>
             <Popover>
@@ -197,10 +312,13 @@ export function MakeIndiaPaymentDialog({
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
             <Input id="notes" {...register('notes')} placeholder="Optional" />
           </div>
+
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

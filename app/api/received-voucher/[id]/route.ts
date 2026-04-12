@@ -5,7 +5,9 @@ import Company from '@/models/Company'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import PaymentReceipt from '@/models/PaymentReceipt'
+import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import { recalcIndiaBuyingEntryGivenAndStatus } from '@/lib/india-buying-entry-payments'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
@@ -51,6 +53,7 @@ export async function GET(
         bankAccountName: bankAccount?.accountName,
         paymentDate: payment.paymentDate,
         remark: payment.remark,
+        companyNote: payment.companyNote,
       },
     })
   } catch (error) {
@@ -103,6 +106,7 @@ export async function PUT(
     const bankAccountId = body.bankAccountId?.trim()
     const paymentDateRaw = body.paymentDate
     const remark = body.remark != null && String(body.remark).trim() ? String(body.remark).trim() : undefined
+    const companyNote = body.companyNote != null && String(body.companyNote).trim() ? String(body.companyNote).trim() : undefined
 
     if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
       return NextResponse.json(
@@ -228,6 +232,7 @@ export async function PUT(
     payment.bankAccount = paymentMode === 'online' ? bankAccount._id : undefined
     payment.paymentDate = paymentDate
     payment.remark = remark
+    payment.companyNote = companyNote
     payment.updatedBy = updatedBy
     await payment.save()
 
@@ -306,8 +311,17 @@ export async function DELETE(
       )
     }
 
-    const wasCash = (payment as { paymentMode?: string }).paymentMode === 'cash'
-    if (wasCash) {
+    const paymentMode = (payment as { paymentMode?: string }).paymentMode
+
+    if (paymentMode === 'set_off') {
+      // Find the linked IndiaBuyingPayment and delete it, then recalculate the entry
+      const linkedPayment = await IndiaBuyingPayment.findOne({ linkedPaymentReceiptId: payment._id }).lean()
+      if (linkedPayment) {
+        const buyingEntryId = linkedPayment.buyingEntry as mongoose.Types.ObjectId
+        await IndiaBuyingPayment.findByIdAndDelete(linkedPayment._id)
+        await recalcIndiaBuyingEntryGivenAndStatus(buyingEntryId)
+      }
+    } else if (paymentMode === 'cash') {
       await createCashTransaction({
         type: 'debit',
         amount: (payment as { amount: number }).amount,
