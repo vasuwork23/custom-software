@@ -113,8 +113,9 @@ export async function GET(
         count: 0,
       }
     const totalCtn = stats.totalCtn ?? 0
-    const availableCtn = stats.availableCtnIndia ?? 0
-    const totalSoldCtn = stats.soldCtn ?? 0
+    // Round to 2dp to eliminate floating-point residuals from FIFO division
+    const availableCtn = Math.round((stats.availableCtnIndia ?? 0) * 100) / 100
+    const totalSoldCtn = Math.round((stats.soldCtn ?? 0) * 100) / 100
     const inTransitCtn = stats.inTransitCtn ?? 0
     const chinaFactoryCtn = stats.chinaFactoryCtn ?? 0
     const chinaWhCtn = stats.chinaWhCtn ?? 0

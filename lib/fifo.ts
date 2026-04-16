@@ -49,8 +49,13 @@ export async function processFIFO(
     if (remainingPcsToSell <= 0) break
 
     const availablePcsThisEntry = entry.availableCtn * entry.qty
-    const pcsFromThisEntry = Math.min(remainingPcsToSell, availablePcsThisEntry)
-    const ctnFromThisEntry = pcsFromThisEntry / entry.qty // can be decimal
+    // Pcs are always whole units; rounding eliminates float residuals from availableCtn × qty
+    const pcsFromThisEntry = Math.round(Math.min(remainingPcsToSell, availablePcsThisEntry))
+    // When consuming all remaining pcs from this entry, snap to avoid float division residuals
+    const isFullyConsuming = pcsFromThisEntry >= availablePcsThisEntry
+    const ctnFromThisEntry = isFullyConsuming
+      ? entry.availableCtn // exact stored value, no division
+      : pcsFromThisEntry / entry.qty
     const finalCost = entry.finalCost ?? 0
     const profitFromThisEntry = (ratePerPcs - finalCost) * pcsFromThisEntry
 
@@ -74,7 +79,8 @@ export async function processFIFO(
 
     const doc = await BuyingEntry.findById(entry._id)
     if (doc) {
-      doc.availableCtn = roundCtn((doc.availableCtn ?? 0) - ctnConsumed)
+      // When fully consuming an entry, snap availableCtn to exactly 0 (prevents tiny float residuals)
+      doc.availableCtn = isFullyConsuming ? 0 : roundCtn((doc.availableCtn ?? 0) - ctnConsumed)
       doc.soldCtn = roundCtn((doc.soldCtn ?? 0) + ctnConsumed)
       await doc.save()
     }

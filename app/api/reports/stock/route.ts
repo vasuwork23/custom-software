@@ -127,16 +127,20 @@ export async function GET(req: NextRequest) {
       chinaWarehouse: number
       inTransit: number
       lockedEntries: number
-    }[]).map((r) => ({
-      productId: r._id,
-      productName: (r.productName ?? '—') + ' 🇨🇳 China',
-      totalCtnBought: r.totalCtnBought,
-      availableCtn: r.availableCtn,
-      chinaWarehouse: r.chinaWarehouse,
-      inTransit: r.inTransit,
-      indiaWarehouse: r.availableCtn,
-      lockedEntries: r.lockedEntries,
-    }))
+    }[]).map((r) => {
+      // Round to 2dp to eliminate floating-point residuals from FIFO division
+      const availableCtn = Math.round(r.availableCtn * 100) / 100
+      return {
+        productId: r._id,
+        productName: (r.productName ?? '—') + ' 🇨🇳 China',
+        totalCtnBought: r.totalCtnBought,
+        availableCtn,
+        chinaWarehouse: r.chinaWarehouse,
+        inTransit: r.inTransit,
+        indiaWarehouse: availableCtn,
+        lockedEntries: r.lockedEntries,
+      }
+    })
 
     const enrichedRows = await Promise.all(
       rows.map(async (row) => {
@@ -193,7 +197,8 @@ export async function GET(req: NextRequest) {
       productId: r._id,
       productName: (r.productName ?? '—') + ' 🇮🇳 India',
       totalCtnBought: r.totalCtnBought,
-      availableCtn: r.availableCtn,
+      // Round to 2dp to eliminate floating-point residuals from FIFO division
+      availableCtn: Math.round(r.availableCtn * 100) / 100,
     }))
 
     // Enrich India rows with PCS, cost/piece, and total cost (same logic as China)
