@@ -48,9 +48,10 @@ export async function GET(req: NextRequest) {
 
     const total = await CashTransaction.countDocuments(query)
 
-    // Single query — sort oldest first for running balance calculation using date then createdAt
+    // Single query — sort oldest first for running balance calculation
+    // sortOrder ensures reversals (sortOrder:1) appear right after their originals within same createdAt
     const allInRange = await CashTransaction.find(query)
-      .sort({ date: 1, createdAt: 1 })
+      .sort({ date: 1, createdAt: 1, sortOrder: 1 })
       .lean()
 
     let runningBalance = 0
