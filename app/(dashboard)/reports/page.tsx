@@ -28,7 +28,7 @@ import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { cn } from '@/lib/utils'
 import type { DateRange } from 'react-day-picker'
 
-type Period = 'week' | 'month' | 'year' | 'custom'
+type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
 
 const PIE_COLORS = ['#22c55e', '#ef4444', '#eab308']
 
@@ -168,7 +168,7 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
           <div className="flex gap-2">
-            {(['week', 'month', 'year'] as const).map((p) => (
+            {(['today', 'week', 'month', 'year'] as const).map((p) => (
               <Button
                 key={p}
                 variant={period === p ? 'default' : 'outline'}
@@ -229,7 +229,7 @@ export default function ReportsPage() {
             <CardContent className="space-y-6">
               {pnl && (
                 <>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                  <div className={cn('grid gap-4 sm:grid-cols-2', withExpenses ? 'lg:grid-cols-6' : 'lg:grid-cols-4')}>
                     <Card>
                       <CardContent className="pt-4">
                         <p className="text-xs text-muted-foreground">Total Revenue</p>
@@ -242,28 +242,32 @@ export default function ReportsPage() {
                         <p className="text-xl font-semibold"><AmountDisplay amount={pnl.summary.cost} /></p>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className={cn(!withExpenses && 'border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/10')}>
                       <CardContent className="pt-4">
                         <p className="text-xs text-muted-foreground">Gross Profit</p>
-                        <p className={cn('text-xl font-semibold', pnl.summary.grossProfit < 0 && 'text-destructive')}>
+                        <p className={cn('text-xl font-semibold', pnl.summary.grossProfit < 0 ? 'text-destructive' : !withExpenses && 'text-emerald-600')}>
                           <AmountDisplay amount={pnl.summary.grossProfit} />
                         </p>
                       </CardContent>
                     </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Total Expenses</p>
-                        <p className="text-xl font-semibold"><AmountDisplay amount={pnl.summary.totalExpenses} /></p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Net Profit</p>
-                        <p className={cn('text-xl font-semibold', pnl.summary.netProfit < 0 && 'text-destructive')}>
-                          <AmountDisplay amount={pnl.summary.netProfit} />
-                        </p>
-                      </CardContent>
-                    </Card>
+                    {withExpenses && (
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Total Expenses</p>
+                          <p className="text-xl font-semibold text-orange-500"><AmountDisplay amount={pnl.summary.totalExpenses} /></p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {withExpenses && (
+                      <Card className="border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/10">
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Net Profit</p>
+                          <p className={cn('text-xl font-semibold', pnl.summary.netProfit < 0 ? 'text-destructive' : 'text-emerald-600')}>
+                            <AmountDisplay amount={pnl.summary.netProfit} />
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
                     <Card>
                       <CardContent className="pt-4">
                         <p className="text-xs text-muted-foreground">Profit Margin</p>
@@ -288,7 +292,7 @@ export default function ReportsPage() {
                           <Line type="monotone" dataKey="revenue" stroke="#22c55e" name="Revenue" />
                           <Line type="monotone" dataKey="cost" stroke="#ef4444" name="Cost" />
                           <Line type="monotone" dataKey="grossProfit" stroke="#3b82f6" name="Gross Profit" />
-                          <Line type="monotone" dataKey="netProfit" stroke="#8b5cf6" name="Net Profit" />
+                          {withExpenses && <Line type="monotone" dataKey="netProfit" stroke="#8b5cf6" name="Net Profit" />}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>

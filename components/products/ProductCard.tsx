@@ -28,6 +28,8 @@ interface ProductCardProps {
   remainingAmount?: number
   /** Sum of availableValue (₹ INR) across entries for India products */
   availableValue?: number
+  /** Total available pcs across entries (India products) */
+  availablePcs?: number
 }
 
 export function ProductCard({
@@ -50,6 +52,7 @@ export function ProductCard({
   totalWeight,
   remainingAmount,
   availableValue,
+  availablePcs,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -94,6 +97,18 @@ export function ProductCard({
                 {availableCtn} CTN
               </span>
             </div>
+            {availablePcs != null && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Available PCS</span>
+                <span
+                  className={`font-semibold ${
+                    availablePcs > 0 ? 'text-emerald-600' : 'text-muted-foreground'
+                  }`}
+                >
+                  {availablePcs.toLocaleString('en-IN')} PCS
+                </span>
+              </div>
+            )}
             {availableValue != null && availableValue > 0 && (
               <div className="flex items-center justify-between col-span-2 py-1 border-y border-emerald-100 bg-emerald-50/30 -mx-1 px-1 dark:bg-emerald-950/10 dark:border-emerald-900/20">
                 <span className="text-emerald-600 font-medium">Available Value</span>

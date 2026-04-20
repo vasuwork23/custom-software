@@ -26,6 +26,7 @@ interface ProductItem {
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
+  availablePcs: number
   chinaWarehouseCtn: number
   chinaFactoryCtn: number
   inTransitCtn: number
@@ -47,6 +48,7 @@ interface IndiaProductItem {
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
+  availablePcs: number
   availableValue: number
   hasUnpaidEntries: boolean
 }
@@ -479,6 +481,7 @@ export default function ProductsPage() {
                     buyingEntriesCount={p.buyingEntriesCount}
                     totalCtn={p.totalCtn}
                     availableCtn={p.availableCtn}
+                    availablePcs={p.availablePcs}
                     chinaFactoryCtn={p.chinaFactoryCtn}
                     chinaWarehouseCtn={p.chinaWarehouseCtn}
                     inTransitCtn={p.inTransitCtn}
@@ -703,6 +706,7 @@ export default function ProductsPage() {
                       buyingEntriesCount={p.buyingEntriesCount}
                       totalCtn={p.totalCtn}
                       availableCtn={p.availableCtn}
+                      availablePcs={p.availablePcs}
                       availableValue={p.availableValue}
                       hasUnpaidEntries={p.hasUnpaidEntries}
                       detailHref={`/products/india/${p._id}`}

@@ -47,10 +47,12 @@ export default function EditSellBillPage() {
   const [existingBillIsCashbook, setExistingBillIsCashbook] = useState(false)
   const [billDate, setBillDate] = useState<Date>(new Date())
   const [notes, setNotes] = useState('')
-  const [extraCharges, setExtraCharges] = useState(0)
+  const [extraChargesStr, setExtraChargesStr] = useState('')
   const [extraChargesNote, setExtraChargesNote] = useState('')
-  const [discount, setDiscount] = useState(0)
+  const [discountStr, setDiscountStr] = useState('')
   const [discountNote, setDiscountNote] = useState('')
+  const extraCharges = parseFloat(extraChargesStr) || 0
+  const discount = parseFloat(discountStr) || 0
   const [lines, setLines] = useState<LineRow[]>([])
   const [saving, setSaving] = useState(false)
   /** Fresh availableCtn + qtyPerCtn per productId (from product APIs). Used so getAvailablePcsForEdit is correct when line.availableCtn is 0. */
@@ -81,9 +83,9 @@ export default function EditSellBillPage() {
     setExistingBillIsCashbook(isCashbook)
     setBillDate(new Date(d.billDate))
     setNotes(d.notes ?? '')
-    setExtraCharges(Number(d.extraCharges) || 0)
+    setExtraChargesStr(d.extraCharges ? String(d.extraCharges) : '')
     setExtraChargesNote(d.extraChargesNote ?? '')
-    setDiscount(Number(d.discount) || 0)
+    setDiscountStr(d.discount ? String(d.discount) : '')
     setDiscountNote(d.discountNote ?? '')
     const lineRows: LineRow[] = d.items.map((item, i) => {
       const source: 'china' | 'india' =
@@ -558,8 +560,8 @@ export default function EditSellBillPage() {
               <Input
                 type="text"
                 inputMode="decimal"
-                value={extraCharges === 0 ? '' : extraCharges}
-                onChange={(e) => setExtraCharges(Number(e.target.value) || 0)}
+                value={extraChargesStr}
+                onChange={(e) => { if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) setExtraChargesStr(e.target.value) }}
                 placeholder="0"
               />
             </div>
@@ -578,8 +580,8 @@ export default function EditSellBillPage() {
               <Input
                 type="text"
                 inputMode="decimal"
-                value={discount === 0 ? '' : discount}
-                onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                value={discountStr}
+                onChange={(e) => { if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) setDiscountStr(e.target.value) }}
                 placeholder="0"
               />
             </div>

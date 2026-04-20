@@ -59,7 +59,8 @@ export async function GET(req: NextRequest) {
 
     const productIds = products.map((p) => p._id)
 
-    const entryStats = await BuyingEntry.aggregate([
+    const [entryStats, availablePcsStats] = await Promise.all([
+    BuyingEntry.aggregate([
       { $match: { product: { $in: productIds } } },
       {
         $group: {
@@ -94,7 +95,19 @@ export async function GET(req: NextRequest) {
           count: { $sum: 1 },
         },
       },
-    ])
+    ]),
+    BuyingEntry.aggregate([
+      { $match: { product: { $in: productIds }, chinaWarehouseReceived: 'yes' } },
+      {
+        $group: {
+          _id: '$product',
+          availablePcs: {
+            $sum: { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
+          },
+        },
+      },
+    ]),
+  ])
 
     const statusStats = await BuyingEntry.aggregate([
       { $match: { product: { $in: productIds } } },
@@ -122,6 +135,7 @@ export async function GET(req: NextRequest) {
 
     const statsByProduct = Object.fromEntries(entryStats.map((e) => [String(e._id), e]))
     const statusByProduct = Object.fromEntries(statusStats.map((e) => [String(e._id), e]))
+    const availablePcsByProduct = Object.fromEntries(availablePcsStats.map((e) => [String(e._id), e.availablePcs as number]))
 
     const enrichedProducts = products.map((p) => {
       const stats = statsByProduct[String(p._id)] ?? {
@@ -176,6 +190,7 @@ export async function GET(req: NextRequest) {
         chinaWarehouseCtn,
         inTransitCtn,
         availableCtn,
+        availablePcs: availablePcsByProduct[String(p._id)] ?? 0,
         soldCtn,
         chinaFactoryCtn,
         totalCbm,

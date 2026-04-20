@@ -20,6 +20,9 @@ export function getReportDateRange(
   let start: Date
   let end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
   switch (period) {
+    case 'today':
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+      break
     case 'week': {
       const day = now.getDay()
       const diff = now.getDate() - day + (day === 0 ? -6 : 1)
@@ -41,6 +44,8 @@ export function getReportDateRange(
 /** MongoDB $dateToString format for grouping by period */
 export function getPeriodFormat(period: string): string {
   switch (period) {
+    case 'today':
+      return '%Y-%m-%d'
     case 'week':
       return '%Y-W%V'
     case 'month':

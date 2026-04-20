@@ -72,8 +72,10 @@ export async function GET(req: NextRequest) {
       // Calculate available value using the same logic as the stock report
       // to avoid rounding discrepancies (pcs = round(avail * qty), then val = sum(pcs * rate))
       let productAvailableValue = 0
+      let productAvailablePcs = 0
       for (const e of pEntries) {
         const pcs = Math.round((e.availableCtn || 0) * (e.qty || 0))
+        productAvailablePcs += pcs
         const cost = e.finalCost ?? e.rate ?? 0
         if (cost > 0) {
           productAvailableValue += pcs * cost
@@ -88,6 +90,7 @@ export async function GET(req: NextRequest) {
         buyingEntriesCount: stats.count as number,
         totalCtn: stats.totalCtn as number,
         availableCtn: stats.availableCtn as number,
+        availablePcs: productAvailablePcs,
         availableValue: Number(productAvailableValue.toFixed(2)),
         hasUnpaidEntries: (stats.hasUnpaid as number) > 0,
       }
