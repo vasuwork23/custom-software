@@ -128,10 +128,14 @@ export function TransactionHistory({
                       <AmountDisplay amount={tx.balanceAfter} />
                     </td>
                     <td className="p-4">
-                      {tx.type === 'credit' && !tx.buyingEntry ? (
+                      {(tx.type === 'credit' || tx.type === 'debit') && !tx.buyingEntry ? (
                         <ConfirmDialog
                           title="Delete transaction"
-                          description="This will remove this credit entry and recalculate subsequent balances. This cannot be undone."
+                          description={
+                            tx.type === 'debit'
+                              ? 'This will remove this transfer-out entry, reverse the destination account balance, and recalculate subsequent China Bank balances. This cannot be undone.'
+                              : 'This will remove this payment entry, restore the source account balance, and recalculate subsequent China Bank balances. This cannot be undone.'
+                          }
                           confirmLabel="Delete"
                           variant="destructive"
                           onConfirm={() => handleDelete(tx._id)}

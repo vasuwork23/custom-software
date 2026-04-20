@@ -7,6 +7,7 @@ export type CashTransactionCategory =
   | 'expense'
   | 'bank_transfer'
   | 'china_bank_payment'
+  | 'china_bank_withdrawal'
   | 'cash_in'
   | 'reversal'
   | 'other'

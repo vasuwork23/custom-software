@@ -10,6 +10,7 @@ interface ChinaBankCardProps {
   balance: number
   isNegative: boolean
   onAddPayment: () => void
+  onTransferOut: () => void
   loading?: boolean
 }
 
@@ -17,6 +18,7 @@ export function ChinaBankCard({
   balance,
   isNegative,
   onAddPayment,
+  onTransferOut,
   loading,
 }: ChinaBankCardProps) {
   return (
@@ -36,9 +38,14 @@ export function ChinaBankCard({
             <Badge variant="destructive">Negative balance</Badge>
           )}
         </div>
-        <Button onClick={onAddPayment} className="mt-4" size="sm">
-          Add Payment
-        </Button>
+        <div className="mt-4 flex gap-2">
+          <Button onClick={onAddPayment} size="sm">
+            Add Payment
+          </Button>
+          <Button onClick={onTransferOut} size="sm" variant="outline">
+            Transfer Out
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

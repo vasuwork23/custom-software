@@ -41,13 +41,13 @@ export async function DELETE(
       )
     }
 
-    // Only allow deleting payment-like credits without linked buying entry
-    if (tx.type !== 'credit') {
+    // Only allow deleting credit (payments) or debit (withdrawals) without linked buying entry
+    if (tx.type !== 'credit' && tx.type !== 'debit') {
       return NextResponse.json(
         {
           success: false,
           error: 'Forbidden',
-          message: 'Only credit entries can be deleted',
+          message: 'Only payment or transfer-out entries can be deleted',
         },
         { status: 403 }
       )
@@ -66,8 +66,11 @@ export async function DELETE(
 
     const deletedAmount = tx.amount
 
-    // Step 0: if no payFrom info, fall back to just reversing China Bank ledger
-    if (!tx.payFrom) {
+    const isWithdrawal = tx.type === 'debit'
+
+    // Step 0: if no payFrom/payTo info, fall back to just reversing China Bank ledger
+    const hasSourceInfo = isWithdrawal ? !!tx.payTo : !!tx.payFrom
+    if (!hasSourceInfo) {
       const subsequent = await ChinaBankTransaction.find({
         createdAt: { $gt: tx.createdAt },
       })
@@ -77,24 +80,27 @@ export async function DELETE(
       await ChinaBankTransaction.findByIdAndDelete(id)
 
       for (const s of subsequent) {
-        const newBalanceAfter = s.balanceAfter - deletedAmount
+        // credit deletion → subtract from subsequent; debit deletion → add back to subsequent
+        const newBalanceAfter = isWithdrawal
+          ? s.balanceAfter + deletedAmount
+          : s.balanceAfter - deletedAmount
         await ChinaBankTransaction.updateOne(
           { _id: s._id },
           { $set: { balanceAfter: newBalanceAfter } }
         )
       }
 
-      console.warn('ChinaBankTransaction has no payFrom; reversed China Bank only')
+      console.warn('ChinaBankTransaction has no payFrom/payTo; reversed China Bank only')
 
       return NextResponse.json({
         success: true,
         data: { deleted: id },
         warning:
-          'China Bank ledger reversed but source cash/bank could not be determined. Please adjust manually.',
+          'China Bank ledger reversed but destination cash/bank could not be determined. Please adjust manually.',
       })
     }
 
-    // Step 1 — reverse China Bank running balances (same as before)
+    // Step 1 — reverse China Bank running balances
     const subsequent = await ChinaBankTransaction.find({
       createdAt: { $gt: tx.createdAt },
     })
@@ -104,73 +110,123 @@ export async function DELETE(
     await ChinaBankTransaction.findByIdAndDelete(id)
 
     for (const s of subsequent) {
-      const newBalanceAfter = s.balanceAfter - deletedAmount
+      const newBalanceAfter = isWithdrawal
+        ? s.balanceAfter + deletedAmount
+        : s.balanceAfter - deletedAmount
       await ChinaBankTransaction.updateOne(
         { _id: s._id },
         { $set: { balanceAfter: newBalanceAfter } }
       )
     }
 
-    // Step 2 — reverse the SOURCE that was debited
+    // Step 2 — reverse the account that was affected
     const createdBy = await resolveCreatedBy(user.id)
     const txDate = tx.transactionDate
 
-    if (tx.payFrom === 'cash') {
-      // Restore cash balance
-      const updatedCash = await Cash.findOneAndUpdate(
-        {},
-        { $inc: { balance: deletedAmount } },
-        { new: true }
-      ).lean()
+    if (isWithdrawal) {
+      // Withdrawal reversal: debit the destination account (undo the credit it received)
+      if (tx.payTo === 'cash') {
+        const updatedCash = await Cash.findOneAndUpdate(
+          {},
+          { $inc: { balance: -deletedAmount } },
+          { new: true }
+        ).lean()
 
-      // Also sync default cash BankAccount currentBalance if exists
-      const cashAccount = await BankAccount.findOne({ type: 'cash', isDefault: true })
-      if (cashAccount && updatedCash) {
-        cashAccount.currentBalance = updatedCash.balance
-        cashAccount.updatedBy = createdBy
-        await cashAccount.save()
+        const cashAccount = await BankAccount.findOne({ type: 'cash', isDefault: true })
+        if (cashAccount && updatedCash) {
+          cashAccount.currentBalance = updatedCash.balance
+          cashAccount.updatedBy = createdBy
+          await cashAccount.save()
+        }
+
+        await CashTransaction.create({
+          type: 'debit',
+          amount: deletedAmount,
+          description: 'Reversal — China Bank transfer out deleted',
+          date: new Date(),
+          category: 'reversal',
+          isReversal: true,
+          reversalOf: undefined,
+          sortOrder: 1,
+        })
+      } else if (tx.payTo === 'bank' && tx.destBankAccountId) {
+        const bankAccount = await BankAccount.findById(tx.destBankAccountId)
+
+        if (bankAccount) {
+          const newBalance = (bankAccount.currentBalance ?? 0) - deletedAmount
+          bankAccount.currentBalance = newBalance
+          bankAccount.updatedBy = createdBy
+          await bankAccount.save()
+
+          await BankTransaction.create({
+            bankAccount: bankAccount._id,
+            type: 'debit',
+            amount: deletedAmount,
+            balanceAfter: newBalance,
+            source: 'china_bank_withdrawal',
+            sourceRef: undefined,
+            sourceLabel: 'Reversal — China Bank transfer out deleted',
+            transactionDate: txDate,
+            notes: undefined,
+            createdBy,
+          })
+        }
       }
+    } else {
+      // Payment reversal: credit the source account (undo the debit it had)
+      if (tx.payFrom === 'cash') {
+        const updatedCash = await Cash.findOneAndUpdate(
+          {},
+          { $inc: { balance: deletedAmount } },
+          { new: true }
+        ).lean()
 
-      // Create reversal cash transaction so history is correct
-      await CashTransaction.create({
-        type: 'credit',
-        amount: deletedAmount,
-        description: 'Reversal — China Bank payment deleted',
-        date: new Date(),
-        category: 'reversal',
-        isReversal: true,
-        reversalOf: undefined,
-        sortOrder: 1,
-      })
-    } else if (tx.payFrom === 'bank' && tx.sourceBankAccountId) {
-      const bankAccountId = tx.sourceBankAccountId
-      const bankAccount = await BankAccount.findById(bankAccountId)
+        const cashAccount = await BankAccount.findOne({ type: 'cash', isDefault: true })
+        if (cashAccount && updatedCash) {
+          cashAccount.currentBalance = updatedCash.balance
+          cashAccount.updatedBy = createdBy
+          await cashAccount.save()
+        }
 
-      if (bankAccount) {
-        const newBalance = (bankAccount.currentBalance ?? 0) + deletedAmount
-        bankAccount.currentBalance = newBalance
-        bankAccount.updatedBy = createdBy
-        await bankAccount.save()
-
-        await BankTransaction.create({
-          bankAccount: bankAccount._id,
+        await CashTransaction.create({
           type: 'credit',
           amount: deletedAmount,
-          balanceAfter: newBalance,
-          source: 'china_bank_payment',
-          sourceRef: undefined,
-          sourceLabel: 'Reversal — China Bank payment deleted',
-          transactionDate: txDate,
-          notes: undefined,
-          createdBy,
+          description: 'Reversal — China Bank payment deleted',
+          date: new Date(),
+          category: 'reversal',
+          isReversal: true,
+          reversalOf: undefined,
+          sortOrder: 1,
         })
+      } else if (tx.payFrom === 'bank' && tx.sourceBankAccountId) {
+        const bankAccount = await BankAccount.findById(tx.sourceBankAccountId)
+
+        if (bankAccount) {
+          const newBalance = (bankAccount.currentBalance ?? 0) + deletedAmount
+          bankAccount.currentBalance = newBalance
+          bankAccount.updatedBy = createdBy
+          await bankAccount.save()
+
+          await BankTransaction.create({
+            bankAccount: bankAccount._id,
+            type: 'credit',
+            amount: deletedAmount,
+            balanceAfter: newBalance,
+            source: 'china_bank_payment',
+            sourceRef: undefined,
+            sourceLabel: 'Reversal — China Bank payment deleted',
+            transactionDate: txDate,
+            notes: undefined,
+            createdBy,
+          })
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
       data: { deleted: id },
-      message: 'Transaction deleted and source balance restored',
+      message: 'Transaction deleted and balance restored',
     })
   } catch (error) {
     console.error('China Bank delete transaction API Error:', error)

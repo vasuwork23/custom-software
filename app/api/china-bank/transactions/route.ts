@@ -25,12 +25,12 @@ export async function GET(req: NextRequest) {
 
     const filter: Record<string, unknown> = {}
     if (startDate || endDate) {
-      filter.createdAt = {}
-      if (startDate) (filter.createdAt as Record<string, Date>).$gte = new Date(startDate)
+      filter.transactionDate = {}
+      if (startDate) (filter.transactionDate as Record<string, Date>).$gte = new Date(startDate)
       if (endDate) {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
-        ;(filter.createdAt as Record<string, Date>).$lte = end
+        ;(filter.transactionDate as Record<string, Date>).$lte = end
       }
     }
 

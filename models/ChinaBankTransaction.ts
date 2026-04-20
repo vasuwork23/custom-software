@@ -13,6 +13,8 @@ export interface IChinaBankTransaction {
   sortOrder?: number
   payFrom?: 'cash' | 'bank' | null
   sourceBankAccountId?: mongoose.Types.ObjectId | null
+  payTo?: 'cash' | 'bank' | null
+  destBankAccountId?: mongoose.Types.ObjectId | null
   createdBy: mongoose.Types.ObjectId
   createdAt: Date
   updatedAt: Date
@@ -30,6 +32,8 @@ const ChinaBankTransactionSchema = new Schema<IChinaBankTransaction>(
     sortOrder: { type: Number, default: 0 },
     payFrom: { type: String, enum: ['cash', 'bank'], default: null },
     sourceBankAccountId: { type: Schema.Types.ObjectId, default: null },
+    payTo: { type: String, enum: ['cash', 'bank'], default: null },
+    destBankAccountId: { type: Schema.Types.ObjectId, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }

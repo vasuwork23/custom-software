@@ -58,8 +58,8 @@ const schema = z
     totalCtn: numRequired,
     qty: numRequired,
     rate: numRequired,
-    cbm: numRequired,
-    weight: numRequired,
+    cbm: numOptional,
+    weight: numOptional,
     hasAdvancePayment: z.boolean(),
     advanceAmount: numOptional,
     advanceChinaPerson: z.string().optional(),
@@ -72,6 +72,15 @@ const schema = z
     inTransitCtn: numOptional,
   })
   .superRefine((val, ctx) => {
+    if (val.avgRmbRate != null && val.avgRmbRate > 0) {
+      if (val.cbm == null || val.cbm <= 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cbm'], message: 'Required when Avg RMB Rate is set' })
+      }
+      if (val.weight == null || val.weight <= 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['weight'], message: 'Required when Avg RMB Rate is set' })
+      }
+    }
+
     const totalQty = (val.totalCtn as number) * (val.qty as number)
     // Round to 2 decimals to avoid floating point issues
     const rawTotalAmount = totalQty * (val.rate as number)
@@ -288,16 +297,13 @@ export function BuyingEntryForm({
     const prefillFromLast = async () => {
       try {
         const res = await apiGet<{
-          entry: { qty?: number; rate?: number; cbm?: number; weight?: number; carryingRate?: number; avgRmbRate?: number } | null
+          entry: { qty?: number; rate?: number; carryingRate?: number } | null
         }>(`/api/buying-entries/last?productId=${productId}`)
         if (res.success && res.data?.entry) {
           const last = res.data.entry
           if (last.qty != null) setValue('qty', last.qty)
           if (last.rate != null) setValue('rate', last.rate)
-          if (last.cbm != null) setValue('cbm', last.cbm)
-          if (last.weight != null) setValue('weight', last.weight)
           if (last.carryingRate != null) setValue('carryingRate', last.carryingRate)
-          if (last.avgRmbRate != null) setValue('avgRmbRate', last.avgRmbRate)
           setPrefillMessage('Fields pre-filled from last entry.')
         }
       } catch {
@@ -600,7 +606,7 @@ export function BuyingEntryForm({
 
             {/* Row 3: CBM | Weight | Carrying | Avg RMB */}
             <div className="space-y-2">
-              <Label htmlFor="cbm">CBM per CTN *</Label>
+              <Label htmlFor="cbm">CBM per CTN</Label>
               <Controller
                 name="cbm"
                 control={control}
@@ -617,7 +623,7 @@ export function BuyingEntryForm({
               {errors.cbm && <p className="text-sm text-destructive">{errors.cbm.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weight">Weight per CTN *</Label>
+              <Label htmlFor="weight">Weight per CTN</Label>
               <Controller
                 name="weight"
                 control={control}

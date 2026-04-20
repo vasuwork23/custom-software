@@ -5,10 +5,12 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { ChinaBankCard } from '@/components/china-bank/ChinaBankCard'
 import { TransactionHistory } from '@/components/china-bank/TransactionHistory'
 import { AddPaymentDialog } from '@/components/china-bank/AddPaymentDialog'
+import { WithdrawDialog } from '@/components/china-bank/WithdrawDialog'
 import { apiGet } from '@/lib/api-client'
 
 export default function ChinaBankPage() {
   const [paymentOpen, setPaymentOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [balance, setBalance] = useState<number | null>(null)
   const [isNegative, setIsNegative] = useState(false)
   const [balanceLoading, setBalanceLoading] = useState(true)
@@ -44,12 +46,19 @@ export default function ChinaBankPage() {
         balance={balance ?? 0}
         isNegative={isNegative}
         onAddPayment={() => setPaymentOpen(true)}
+        onTransferOut={() => setWithdrawOpen(true)}
         loading={balanceLoading}
       />
 
       <AddPaymentDialog
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
+        onSuccess={handlePaymentSuccess}
+      />
+
+      <WithdrawDialog
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
         onSuccess={handlePaymentSuccess}
       />
 
