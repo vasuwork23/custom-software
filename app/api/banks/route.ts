@@ -38,11 +38,31 @@ export async function GET(req: NextRequest) {
 
     const accounts = await BankAccount.find({}).sort({ isDefault: -1, accountName: 1 }).lean()
     const accountIds = accounts.map((a) => a._id)
-    const counts = await BankTransaction.aggregate([
-      { $match: { bankAccount: { $in: accountIds } } },
-      { $group: { _id: '$bankAccount', count: { $sum: 1 } } },
+
+    const [counts, balances] = await Promise.all([
+      BankTransaction.aggregate([
+        { $match: { bankAccount: { $in: accountIds } } },
+        { $group: { _id: '$bankAccount', count: { $sum: 1 } } },
+      ]),
+      BankTransaction.aggregate([
+        { $match: { bankAccount: { $in: accountIds } } },
+        {
+          $group: {
+            _id: '$bankAccount',
+            balance: {
+              $sum: {
+                $cond: [{ $eq: ['$type', 'credit'] }, '$amount', { $multiply: ['$amount', -1] }],
+              },
+            },
+          },
+        },
+      ]),
     ])
+
     const countByAccount = Object.fromEntries(counts.map((c) => [String(c._id), c.count]))
+    const balanceByAccount = Object.fromEntries(
+      balances.map((b) => [String(b._id), parseFloat((b.balance as number).toFixed(2))])
+    )
 
     // Cash account uses CashTransaction ledger, not BankTransaction
     const cashTransactionCount = await CashTransaction.countDocuments()
@@ -56,7 +76,7 @@ export async function GET(req: NextRequest) {
         accountName: a.accountName,
         type: a.type,
         isDefault: a.isDefault,
-        currentBalance: isCash ? trueCashBalance : (a.currentBalance ?? 0),
+        currentBalance: isCash ? trueCashBalance : (balanceByAccount[String(a._id)] ?? 0),
         transactionCount: isCash ? cashTransactionCount : (countByAccount[String(a._id)] ?? 0),
       }
     })

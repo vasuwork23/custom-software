@@ -89,10 +89,40 @@ export async function GET(
       )
     }
 
-    const totalProfit = (bill.items as { totalProfit?: number }[]).reduce((s, i) => s + (i.totalProfit ?? 0), 0)
+    // If bill.items is empty but SellBillItems exist (orphaned due to interrupted save),
+    // recover them and fix the bill document.
+    let items = bill.items as unknown[]
+    if (!items || items.length === 0) {
+      const orphaned = await SellBillItem.find({ sellBill: bill._id })
+        .populate('product', 'productName')
+        .populate('indiaProduct', 'productName')
+        .populate('fifoBreakdown.buyingEntry', 'entryDate')
+        .lean()
+
+      if (orphaned.length > 0) {
+        items = orphaned
+        // Repair the bill document so future loads are also correct
+        const subtotal = orphaned.reduce((s, i) => s + ((i as { totalAmount?: number }).totalAmount ?? 0), 0)
+        const { calcGrandTotal } = await import('@/lib/utils')
+        const grandTotal = calcGrandTotal(
+          Math.round(subtotal * 100) / 100,
+          (bill as { extraCharges?: number }).extraCharges,
+          (bill as { discount?: number }).discount
+        )
+        await SellBill.findByIdAndUpdate(bill._id, {
+          items: orphaned.map((i) => (i as { _id: unknown })._id),
+          totalAmount: Math.round(subtotal * 100) / 100,
+          grandTotal,
+        })
+        ;(bill as Record<string, unknown>).totalAmount = Math.round(subtotal * 100) / 100
+        ;(bill as Record<string, unknown>).grandTotal = grandTotal
+      }
+    }
+
+    const totalProfit = (items as { totalProfit?: number }[]).reduce((s, i) => s + (i.totalProfit ?? 0), 0)
     return NextResponse.json({
       success: true,
-      data: { ...bill, totalProfit },
+      data: { ...bill, items, totalProfit },
     })
   } catch (error) {
     console.error('Sell bill get API Error:', error)

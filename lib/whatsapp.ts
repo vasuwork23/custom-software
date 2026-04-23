@@ -15,7 +15,7 @@ import { generateBillFileName, generateOutstandingFileName } from '@/lib/utils'
 
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID
-const BASE_URL = 'https://graph.facebook.com/v21.0'
+const BASE_URL = 'https://graph.facebook.com/v25.0'
 const WHATSAPP_SENDER_NAME = process.env.WHATSAPP_SENDER_NAME ?? process.env.COMPANY_NAME ?? ''
 const WHATSAPP_SENDER_PHONE = process.env.WHATSAPP_SENDER_PHONE ?? process.env.COMPANY_PHONE ?? ''
 
@@ -34,6 +34,7 @@ export interface BillDataForWhatsApp {
   company: {
     companyName?: string
     ownerName?: string
+    primaryMobile?: string
     contact1Mobile?: string
     contact2Mobile?: string
     address?: string
@@ -60,7 +61,9 @@ export async function sendBillOnWhatsApp(
   }
 
   const mobile =
-    billData.company.contact1Mobile || billData.company.contact2Mobile
+    billData.company.primaryMobile ||
+    billData.company.contact1Mobile ||
+    billData.company.contact2Mobile
   if (!mobile || !mobile.trim()) {
     return {
       success: false,
@@ -95,6 +98,7 @@ export async function sendBillOnWhatsApp(
     })
 
     const formData = new FormData()
+    formData.append('messaging_product', 'whatsapp')
     formData.append('file', new Blob([pdfBuffer as any], { type: 'application/pdf' }), filename)
 
     const uploadRes = await fetch(`${BASE_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`, {
@@ -124,11 +128,6 @@ export async function sendBillOnWhatsApp(
         document: {
           id: uploadJson.id,
           filename,
-          caption: `Dear ${
-            billData.company.companyName ?? 'Customer'
-          }, please find your bill #${
-            billData.billNumber
-          } attached. Total: ₹${billData.totalAmount.toLocaleString('en-IN')}`,
         },
       }),
     })
@@ -352,28 +351,6 @@ export async function sendOutstandingOnWhatsApp(
     return { success: false, message: 'Invalid WhatsApp mobile number.' }
   }
 
-  const [billedRes, receivedRes] = await Promise.all([
-    SellBill.aggregate([
-      { $match: { company: id } },
-      { $group: { _id: null, total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
-    ]),
-    PaymentReceipt.aggregate([
-      { $match: { company: id } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]),
-  ])
-
-  const totalBilled = billedRes[0]?.total ?? 0
-  const totalReceived = receivedRes[0]?.total ?? 0
-  const totalOutstanding = totalBilled - totalReceived + ((company as any).openingBalance || 0)
-
-  if (totalOutstanding <= 0) {
-    return {
-      success: false,
-      message: 'No outstanding amount for this company.',
-    }
-  }
-
   const generatedDate = new Date()
   // Build full statement transactions as in outstanding-pdf
   const [allBills, payments] = await Promise.all([
@@ -477,6 +454,7 @@ export async function sendOutstandingOnWhatsApp(
     const filename = generateOutstandingFileName(company.companyName)
 
     const formData = new FormData()
+    formData.append('messaging_product', 'whatsapp')
     formData.append(
       'file',
       new Blob([pdfBuffer as any], { type: 'application/pdf' }),
@@ -504,12 +482,6 @@ export async function sendOutstandingOnWhatsApp(
       }
     }
 
-    const caption = `Dear ${
-      company.companyName
-    },\n\nYour current outstanding amount is ₹${totalOutstanding.toLocaleString(
-      'en-IN'
-    )}.\n\nKindly clear the payment at the earliest.\n\nThank you!\n${WHATSAPP_SENDER_NAME}`
-
     const messageRes = await fetch(
       `${BASE_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -525,7 +497,6 @@ export async function sendOutstandingOnWhatsApp(
           document: {
             id: uploadJson.id,
             filename,
-            caption,
           },
         }),
       }
@@ -545,7 +516,6 @@ export async function sendOutstandingOnWhatsApp(
 
     await Company.findByIdAndUpdate(id, {
       lastWhatsappSentAt: new Date(),
-      lastWhatsappMessage: caption,
     })
 
     return {

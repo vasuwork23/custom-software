@@ -39,7 +39,6 @@ export async function POST(
         : primaryMobileInput
 
     await connectDB()
-    // Ensure model registered
     void Company
 
     if (primaryMobileInput) {
@@ -67,4 +66,3 @@ export async function POST(
     )
   }
 }
-

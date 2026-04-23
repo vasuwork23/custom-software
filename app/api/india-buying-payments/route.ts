@@ -179,12 +179,21 @@ export async function POST(req: NextRequest) {
           referenceType: 'india_buying_payment',
         })
       } else {
-        const lastTx = await BankTransaction.findOne({ bankAccount: bankAccountId })
-          .sort({ transactionDate: -1, createdAt: -1 })
-          .select('balanceAfter')
-          .lean()
-        const lastBalance = lastTx?.balanceAfter ?? 0
-        const newBalance = lastBalance - amount
+        const balAgg = await BankTransaction.aggregate([
+          { $match: { bankAccount: new mongoose.Types.ObjectId(bankAccountId) } },
+          {
+            $group: {
+              _id: null,
+              balance: {
+                $sum: {
+                  $cond: [{ $eq: ['$type', 'credit'] }, '$amount', { $multiply: ['$amount', -1] }],
+                },
+              },
+            },
+          },
+        ])
+        const currentLedgerBalance = balAgg[0]?.balance ?? 0
+        const newBalance = parseFloat((currentLedgerBalance - amount).toFixed(2))
 
         await BankTransaction.create({
           bankAccount: bankAccountId,
