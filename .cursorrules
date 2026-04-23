@@ -1,0 +1,151 @@
+# Cursor AI Rules — Import Export Management System
+
+## What This Project Is
+A full-stack Next.js 14 business management system for a China-to-India import/export business.
+Built with TypeScript, MongoDB/Mongoose, Tailwind CSS, shadcn/ui.
+
+## Before Writing Any Code
+1. Read MAIN_RULES.md for overall project rules
+2. Read DATABASE_SCHEMA.md for all MongoDB models
+3. Read API_ROUTES.md for all API endpoints
+4. Read UI_PAGES.md for all pages and components
+5. Read BUSINESS_LOGIC.md for critical algorithms (FIFO, Lock/Unlock, etc.)
+6. Follow DEVELOPMENT_ROADMAP.md for build order
+
+## Non-Negotiable Rules
+
+### TypeScript
+- Strict TypeScript everywhere, no implicit `any`
+- All API request/response bodies must be typed
+- All mongoose models must have proper interfaces
+
+### Error Handling
+- Every API route must have try/catch
+- Every async operation must handle errors
+- All errors return: `{ success: false, error: string, message: string }`
+
+### Security
+- Never expose passwords in API responses (use `.select('-password')`)
+- Always verify JWT on protected routes
+- Validate all inputs with Zod before processing
+- Hash passwords with bcrypt (salt rounds: 12)
+
+### Database
+- Never use raw MongoDB driver, always use Mongoose
+- Always recalculate auto-computed fields on backend (never trust frontend values)
+- Use transactions for operations that affect multiple collections
+- Add proper indexes for frequently queried fields
+
+### UI
+- Every form uses React Hook Form + Zod resolver
+- Every table uses TanStack Table with pagination
+- Every delete action has ConfirmDialog
+- Every async action has loading state
+- Use `sonner` for toast notifications
+- Use shadcn/ui components as base, extend with Tailwind
+
+### Money Display
+- INR values: prefix with ₹, format with Indian number system
+- RMB values: prefix with ¥
+- Negative values: always shown in red color
+- Use `Intl.NumberFormat` for formatting
+
+### FIFO — Critical
+- FIFO logic is in `/lib/fifo.ts` — use this everywhere, never duplicate
+- Only sale from `warehouseStatus = 'india_warehouse'` entries
+- Always process oldest entries first (sort by createdAt ASC)
+- Always store fifoBreakdown in SellBillItem for full traceability
+
+### Running Balance — Critical  
+- Always calculate `balanceAfter` at transaction creation time
+- Get last transaction's balanceAfter as starting point
+- If deleting a middle transaction: recalculate ALL subsequent transactions
+- Keep BankAccount.currentBalance in sync
+
+## File Naming Conventions
+- Components: PascalCase (`BuyingEntryForm.tsx`)
+- Pages: lowercase with hyphens via folder names (`/buying-entries/`)
+- API routes: `route.ts` in folder
+- Models: PascalCase (`BuyingEntry.ts`)
+- Utilities: camelCase (`fifo.ts`, `auth.ts`)
+- Types: `index.ts` in `/types/` folder
+
+## Import Order Convention
+```typescript
+// 1. React/Next.js
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+// 2. Third party
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+
+// 3. Internal - Models/DB
+import Product from '@/models/Product'
+
+// 4. Internal - Components
+import { Button } from '@/components/ui/button'
+
+// 5. Internal - Utilities/Lib
+import { connectDB } from '@/lib/mongodb'
+
+// 6. Types
+import type { IProduct } from '@/types'
+```
+
+## API Route Template
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { connectDB } from '@/lib/mongodb'
+import { verifyToken } from '@/lib/auth'
+import { z } from 'zod'
+
+const schema = z.object({
+  // define schema
+})
+
+export async function POST(req: NextRequest) {
+  try {
+    const user = await verifyToken(req)
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    await connectDB()
+    
+    const body = await req.json()
+    const validated = schema.safeParse(body)
+    
+    if (!validated.success) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Validation failed',
+        message: validated.error.errors[0].message 
+      }, { status: 400 })
+    }
+
+    // ... business logic
+
+    return NextResponse.json({ success: true, data: result })
+  } catch (error) {
+    console.error('API Error:', error)
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+```
+
+## Common Mistakes to Avoid
+1. DO NOT create a "register" page — users are created by admin only
+2. DO NOT allow selling when warehouseStatus is not 'india_warehouse'
+3. DO NOT allow deleting a BuyingEntry that has sales against it
+4. DO NOT allow deleting Owner role user
+5. DO NOT allow deleting default Cash entity or JACK
+6. DO NOT store RMB values in any model except ChinaPerson and ChinaPersonTransaction
+7. DO NOT trust frontend calculations — always recalculate on backend
+8. DO NOT skip FIFO reversal on edit/delete of sale bills
+9. DO NOT forget to update availableCtn on BuyingEntry when sale is created/edited/deleted
+10. DO NOT forget to reverse BankTransaction when PaymentReceipt or Expense is deleted
