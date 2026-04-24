@@ -252,14 +252,15 @@ export async function POST(req: NextRequest) {
 
     const subtotal = Math.round(totalAmount * 100) / 100
     const grandTotal = calcGrandTotal(subtotal, extraCharges, discount)
-    bill.items = createdItems
-    bill.totalAmount = subtotal
-    bill.extraCharges = extraCharges
-    bill.extraChargesNote = extraChargesNote || undefined
-    bill.discount = discount
-    bill.discountNote = discountNote || undefined
-    bill.grandTotal = grandTotal
-    await bill.save()
+    await SellBill.findByIdAndUpdate(bill._id, {
+      items: createdItems,
+      totalAmount: subtotal,
+      extraCharges,
+      extraChargesNote: extraChargesNote || undefined,
+      discount,
+      discountNote: discountNote || undefined,
+      grandTotal,
+    })
 
     if (isCashbook) {
       await createCashTransaction({

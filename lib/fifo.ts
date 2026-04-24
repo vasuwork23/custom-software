@@ -32,7 +32,7 @@ export async function processFIFO(
 
   const totalAvailablePcs = entries.reduce((s, e) => s + e.availableCtn * e.qty, 0)
   const effectiveAvailable = totalAvailablePcs + pcsAlreadyOnThisBill
-  if (pcsToSell > effectiveAvailable) {
+  if (Math.round(pcsToSell) > Math.round(effectiveAvailable)) {
     const totalAvailableCtn = entries.reduce((s, e) => s + e.availableCtn, 0)
     throw new Error(
       `Insufficient stock. Only ${Math.round(effectiveAvailable)} pcs available (${Math.round(totalAvailablePcs)} in stock + ${pcsAlreadyOnThisBill} on this bill) in India Warehouse for this product.`

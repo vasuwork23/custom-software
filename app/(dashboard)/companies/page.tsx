@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Building2, LayoutGrid, List, Plus, Pencil, Trash2, Wallet } from 'lucide-react'
+import { Building2, LayoutGrid, List, Plus, Pencil, Trash2, Wallet, MessageCircle } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CompanyFormSheet } from '@/components/companies/CompanyFormSheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
-import { apiGet, apiDelete } from '@/lib/api-client'
+import { apiGet, apiDelete, apiPost } from '@/lib/api-client'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
@@ -34,6 +35,7 @@ interface CompanyItem {
   gstNumber?: string
   address?: string
   city?: string
+  primaryMobile?: string
   openingBalance?: number
   openingBalanceNotes?: string
   outstandingBalance: number
@@ -55,6 +57,9 @@ export default function CompaniesPage() {
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [outstandingFilter, setOutstandingFilter] = useState<OutstandingFilter>('all')
+  const [whatsappCompany, setWhatsappCompany] = useState<CompanyItem | null>(null)
+  const [whatsappPhone, setWhatsappPhone] = useState('')
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
   const [minOutstanding, setMinOutstanding] = useState('')
   const [maxOutstanding, setMaxOutstanding] = useState('')
   const debouncedSearch = useDebounce(search, 400)
@@ -107,6 +112,27 @@ export default function CompaniesPage() {
     }
     toast.success('Company deleted')
     fetchCompanies()
+  }
+
+  function openWhatsapp(e: React.MouseEvent, company: CompanyItem) {
+    e.stopPropagation()
+    setWhatsappCompany(company)
+    setWhatsappPhone(company.primaryMobile ?? company.contact1Mobile ?? company.contact2Mobile ?? '')
+    setSendingWhatsapp(false)
+  }
+
+  async function handleSendWhatsapp() {
+    if (!whatsappCompany) return
+    const phone = whatsappPhone.trim()
+    if (!phone) { toast.error('Enter a WhatsApp number'); return }
+    setSendingWhatsapp(true)
+    const result = await apiPost(`/api/companies/${whatsappCompany._id}/whatsapp-outstanding`, {
+      mobileNumber: phone,
+    })
+    setSendingWhatsapp(false)
+    if (!result.success) { toast.error(result.message ?? 'Failed to send'); return }
+    toast.success('Outstanding PDF sent on WhatsApp')
+    setWhatsappCompany(null)
   }
 
   return (
@@ -275,6 +301,18 @@ export default function CompaniesPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-1">
+                    {c.outstandingBalance > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-emerald-600 hover:text-emerald-700"
+                        onClick={(e) => openWhatsapp(e, c)}
+                        aria-label="Send outstanding on WhatsApp"
+                        title="Send outstanding PDF on WhatsApp"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -403,6 +441,16 @@ export default function CompaniesPage() {
                     <td className="p-4">
                       <div className="flex gap-1">
                         <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-emerald-600 hover:text-emerald-700"
+                            onClick={(e) => openWhatsapp(e, c)}
+                            aria-label="Send outstanding on WhatsApp"
+                            title="Send outstanding PDF on WhatsApp"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                        <Button
                           variant="ghost"
                           size="icon"
                           onClick={(e) => {
@@ -469,6 +517,56 @@ export default function CompaniesPage() {
         onSuccess={fetchCompanies}
         editPayment={null}
       />
+
+      <Dialog open={!!whatsappCompany} onOpenChange={(open) => { if (!open) setWhatsappCompany(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-emerald-600" />
+              Send Outstanding PDF
+            </DialogTitle>
+            <DialogDescription>
+              Send the outstanding statement PDF for{' '}
+              <span className="font-medium text-foreground">{whatsappCompany?.companyName}</span> via WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="mb-1.5 block text-sm font-medium">WhatsApp number</label>
+            <input
+              type="tel"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="e.g. 9800XXXXXX"
+              value={whatsappPhone}
+              onChange={(e) => setWhatsappPhone(e.target.value)}
+            />
+            {whatsappCompany && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Outstanding:{' '}
+                <span className={whatsappCompany.outstandingBalance > 0 ? 'text-red-600' : whatsappCompany.outstandingBalance < 0 ? 'text-blue-600' : 'text-green-600'}>
+                  {whatsappCompany.outstandingBalance === 0
+                    ? 'Clear'
+                    : whatsappCompany.outstandingBalance < 0
+                    ? <>Credit <AmountDisplay amount={Math.abs(whatsappCompany.outstandingBalance)} /></>
+                    : <AmountDisplay amount={whatsappCompany.outstandingBalance} />}
+                </span>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setWhatsappCompany(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleSendWhatsapp}
+              disabled={sendingWhatsapp}
+            >
+              {sendingWhatsapp ? 'Sending...' : 'Send PDF'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

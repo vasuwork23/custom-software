@@ -56,6 +56,7 @@ interface BillDetail {
     _id: string
     companyName?: string
     ownerName?: string
+    primaryMobile?: string
     contact1Mobile?: string
     contact2Mobile?: string
     address?: string
@@ -121,7 +122,7 @@ export default function SellBillDetailPage() {
   }
 
   async function handleSendWhatsApp() {
-    const mobile = bill?.company?.contact1Mobile || bill?.company?.contact2Mobile
+    const mobile = bill?.company?.primaryMobile || bill?.company?.contact1Mobile || bill?.company?.contact2Mobile
     if (!mobile?.trim()) {
       toast.error('Company has no mobile number. Add a contact mobile to send WhatsApp.')
       return

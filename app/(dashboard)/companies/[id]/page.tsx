@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Pencil, FileText, Wallet, Plus, Trash2, MessageCircle, Download, Phone, Copy, Check } from 'lucide-react'
+import { Building2, Pencil, FileText, Wallet, Plus, Trash2, MessageCircle, Download, Phone } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StatCard } from '@/components/ui/StatCard'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
@@ -74,13 +73,10 @@ export default function CompanyDetailPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<PaymentFormValues | null>(null)
-  const [whatsappOpen, setWhatsappOpen] = useState(false)
-  const [whatsappMode, setWhatsappMode] = useState<'outstanding' | 'custom'>('outstanding')
-  const [whatsappMessage, setWhatsappMessage] = useState('')
   const [downloadingOutstanding, setDownloadingOutstanding] = useState(false)
   const [sendingOutstanding, setSendingOutstanding] = useState(false)
-  const [downloadModalOpen, setDownloadModalOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [sendPdfOpen, setSendPdfOpen] = useState(false)
+  const [sendPdfPhone, setSendPdfPhone] = useState('')
 
   const fetchCompany = useCallback(async () => {
     if (!id) return
@@ -90,7 +86,6 @@ export default function CompanyDetailPage() {
     if (result.success) {
       setData(result.data)
     } else {
-      // If company is not found (e.g. deleted in another tab), silently redirect
       router.push('/companies')
     }
   }, [id, router])
@@ -108,49 +103,24 @@ export default function CompanyDetailPage() {
   }
 
   const { company, totalBilled, totalReceived, outstanding, totalProfit, sellingHistory, paymentHistory } = data
-  const mobiles = [company.primaryMobile, company.contact1Mobile, company.contact2Mobile].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ')
+  const mobiles = [company.primaryMobile, company.contact1Mobile, company.contact2Mobile]
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .join(', ')
 
-  function buildOutstandingMessage(): string {
-    const formatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })
-    const lines: string[] = []
-    lines.push(`Dear ${company.companyName},`)
-    lines.push('')
-    lines.push('This is a reminder for your outstanding payment.')
-    lines.push('')
-    lines.push(`Outstanding Amount: ₹${formatter.format(outstanding)}`)
-    if (sellingHistory.length) {
-      lines.push('')
-      lines.push('Bill wise breakdown:')
-      sellingHistory.slice(0, 10).forEach((row) => {
-        const date = format(new Date(row.billDate), 'dd MMM yyyy')
-        lines.push(`- INV-${row.billNumber} dated ${date}: ₹${formatter.format(row.totalAmount)}`)
-      })
-    }
-    lines.push('')
-    lines.push('Please clear the payment at your earliest convenience.')
-    lines.push('')
-    lines.push('Thank you,')
-    lines.push('Import Export')
-    return lines.join('\n')
-  }
+  const defaultPhone =
+    company.primaryMobile ?? company.contact1Mobile ?? company.contact2Mobile ?? ''
 
-  function handleOpenWhatsapp(mode: 'outstanding' | 'custom') {
-    setWhatsappMode(mode)
-    if (mode === 'outstanding') {
-      setWhatsappMessage(buildOutstandingMessage())
-    } else {
-      setWhatsappMessage('')
-    }
-    setWhatsappOpen(true)
+  function handleOpenSendPdf() {
+    setSendPdfPhone(defaultPhone)
+    setSendPdfOpen(true)
   }
 
   function handleDownloadOutstanding() {
     setDownloadingOutstanding(true)
     fetch(`/api/companies/${id}/outstanding-pdf`, { headers: authHeaders() })
       .then(async (res) => {
-        if (!res.ok) {
-          throw new Error('Failed to generate outstanding PDF')
-        }
+        if (!res.ok) throw new Error('Failed to generate outstanding PDF')
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -161,10 +131,6 @@ export default function CompanyDetailPage() {
         a.remove()
         URL.revokeObjectURL(url)
         toast.success('Outstanding statement downloaded')
-        if (mobiles) {
-          setDownloadModalOpen(true)
-          setCopied(false)
-        }
       })
       .catch((err) => {
         console.error(err)
@@ -173,22 +139,23 @@ export default function CompanyDetailPage() {
       .finally(() => setDownloadingOutstanding(false))
   }
 
-  async function handleSendWhatsapp() {
-    if (!whatsappMessage.trim()) {
-      toast.error('Message cannot be empty')
+  async function handleSendPdfOnWhatsApp() {
+    const phone = sendPdfPhone.trim()
+    if (!phone) {
+      toast.error('Enter a WhatsApp number')
       return
     }
     setSendingOutstanding(true)
     const result = await apiPost(`/api/companies/${id}/whatsapp-outstanding`, {
-      customMessage: whatsappMessage,
+      mobileNumber: phone,
     })
     setSendingOutstanding(false)
     if (!result.success) {
-      toast.error(result.message)
+      toast.error(result.message ?? 'Failed to send')
       return
     }
-    toast.success('Outstanding statement sent on WhatsApp')
-    setWhatsappOpen(false)
+    toast.success('Outstanding PDF sent on WhatsApp')
+    setSendPdfOpen(false)
     fetchCompany()
   }
 
@@ -239,27 +206,26 @@ export default function CompanyDetailPage() {
         }
         action={
           <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadOutstanding}
-                  disabled={downloadingOutstanding}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {downloadingOutstanding ? 'Downloading...' : 'Download Outstanding'}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => handleOpenWhatsapp('outstanding')}
-                  disabled={sendingOutstanding || !mobiles}
-                  title={!mobiles ? 'Add mobile number to company first' : undefined}
-                  className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  {sendingOutstanding ? 'Sending...' : 'Send Outstanding'}
-                </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadOutstanding}
+              disabled={downloadingOutstanding}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {downloadingOutstanding ? 'Downloading...' : 'Download Outstanding'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleOpenSendPdf}
+              disabled={sendingOutstanding}
+              className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Send Outstanding
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setSheetOpen(true)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit Company
@@ -315,7 +281,7 @@ export default function CompanyDetailPage() {
           <div className="rounded-md border overflow-x-auto">
             {sellingHistory.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
-                No sale bills yet. Selling history will appear here after Phase 6 (Sale Bills).
+                No sale bills yet.
               </div>
             ) : (
               <table className="w-full text-sm">
@@ -451,73 +417,48 @@ export default function CompanyDetailPage() {
         </TabsContent>
       </Tabs>
 
-      {/* WhatsApp Outstanding Dialog */}
-      {whatsappOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg rounded-lg bg-background p-6 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold flex items-center gap-2">
-                  <MessageCircle className="h-4 w-4 text-emerald-600" />
-                  WhatsApp outstanding reminder
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Outstanding: <AmountDisplay amount={outstanding} />
-                </p>
-              </div>
-              <button
-                type="button"
-                className="text-sm text-muted-foreground hover:text-foreground"
-                onClick={() => setWhatsappOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="mb-3 flex gap-2 text-xs">
-              <button
-                type="button"
-                className={`rounded border px-2 py-1 ${
-                  whatsappMode === 'outstanding'
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                    : 'border-border text-muted-foreground'
-                }`}
-                onClick={() => handleOpenWhatsapp('outstanding')}
-              >
-                Use outstanding template
-              </button>
-              <button
-                type="button"
-                className={`rounded border px-2 py-1 ${
-                  whatsappMode === 'custom'
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                    : 'border-border text-muted-foreground'
-                }`}
-                onClick={() => handleOpenWhatsapp('custom')}
-              >
-                Custom message
-              </button>
-            </div>
-            <textarea
-              className="mb-4 h-48 w-full rounded-md border bg-background p-2 text-sm"
-              value={whatsappMessage}
-              onChange={(e) => setWhatsappMessage(e.target.value)}
+      {/* Send Outstanding PDF via WhatsApp */}
+      <Dialog open={sendPdfOpen} onOpenChange={setSendPdfOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-emerald-600" />
+              Send Outstanding PDF
+            </DialogTitle>
+            <DialogDescription>
+              The outstanding statement PDF for{' '}
+              <span className="font-medium text-foreground">{company.companyName}</span> will be
+              sent to the number below via WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="mb-1.5 block text-sm font-medium">WhatsApp number</label>
+            <input
+              type="tel"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="e.g. 9800XXXXXX"
+              value={sendPdfPhone}
+              onChange={(e) => setSendPdfPhone(e.target.value)}
             />
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setWhatsappOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="button" size="sm" onClick={handleSendWhatsapp}>
-                Send on WhatsApp
-              </Button>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Outstanding: <AmountDisplay amount={outstanding} />
+            </p>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setSendPdfOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleSendPdfOnWhatsApp}
+              disabled={sendingOutstanding}
+            >
+              {sendingOutstanding ? 'Sending...' : 'Send PDF'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CompanyFormSheet
         open={sheetOpen}
@@ -539,38 +480,6 @@ export default function CompanyDetailPage() {
           openingBalanceNotes: company.openingBalanceNotes,
         }}
       />
-
-      {/* <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>PDF Downloaded</DialogTitle>
-            <DialogDescription>
-              The Outstanding Statement has been successfully downloaded. Use the WhatsApp button to share directly, or copy the customer&apos;s mobile number below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-x-2 my-2">
-            <div className="flex-1 bg-muted px-4 py-2 rounded-md font-medium text-base border">
-              {mobiles || 'No mobile number added'}
-            </div>
-            {mobiles && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  navigator.clipboard.writeText(mobiles)
-                  setCopied(true)
-                  setTimeout(() => setCopied(false), 2000)
-                }}
-              >
-                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setDownloadModalOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog> */}
     </div>
   )
 }

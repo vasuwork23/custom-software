@@ -64,7 +64,7 @@ IndiaBuyingEntrySchema.pre('save', function (next) {
   doc.totalAmount = Math.round(doc.totalQty * doc.rate)
   doc.finalCost = doc.rate
   doc.remainingAmount = round2(doc.totalAmount - (doc.givenAmount ?? 0))
-  if (doc.totalAmount === 0) doc.currentStatus = 'unpaid'
+  if (doc.totalAmount === 0) doc.currentStatus = 'paid'
   else if (doc.remainingAmount <= 0) doc.currentStatus = 'paid'
   else if ((doc.givenAmount ?? 0) === 0) doc.currentStatus = 'unpaid'
   else doc.currentStatus = 'partiallypaid'

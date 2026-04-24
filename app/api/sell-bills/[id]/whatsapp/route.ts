@@ -31,7 +31,7 @@ export async function POST(
 
     const bill = await SellBill.findById(id)
       .lean()
-      .populate('company', 'companyName ownerName contact1Mobile contact2Mobile address city')
+      .populate('company', 'companyName ownerName primaryMobile contact1Mobile contact2Mobile address city')
       .populate({ path: 'items', populate: [{ path: 'product', select: 'productName' }, { path: 'indiaProduct', select: 'productName' }] })
 
     if (!bill) {
@@ -50,6 +50,7 @@ export async function POST(
       company: bill.company as {
         companyName?: string
         ownerName?: string
+        primaryMobile?: string
         contact1Mobile?: string
         contact2Mobile?: string
         address?: string

@@ -90,6 +90,20 @@ export async function PUT(
       )
     }
 
+
+    if (body.qty != null && Number(body.qty) <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: 'QTY per CTN must be greater than 0' },
+        { status: 400 }
+      )
+    }
+    if (body.totalCtn != null && Number(body.totalCtn) <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: 'Total CTN must be greater than 0' },
+        { status: 400 }
+      )
+    }
+
     const soldCtn = (entry.totalCtn ?? 0) - (entry.availableCtn ?? 0)
     if (body.totalCtn != null) {
       const newTotalCtn = Number(body.totalCtn)
