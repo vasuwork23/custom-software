@@ -33,6 +33,10 @@ const numRequired = z.preprocess(
   (v) => (v === '' || v == null ? undefined : Number(v)),
   z.number({ required_error: 'Required' }).min(0.01, 'Must be greater than 0')
 )
+const numRequiredNonNegative = z.preprocess(
+  (v) => (v === '' || v == null ? undefined : Number(v)),
+  z.number({ required_error: 'Required' }).min(0, 'Must be 0 or greater')
+)
 const numOptional = z.preprocess(
   (v) => (v === '' || v == null ? undefined : Number(v)),
   z.number().min(0).optional()
@@ -41,7 +45,7 @@ const schema = z.object({
   entryDate: z.date(),
   totalCtn: numRequired,
   qty: numRequired,
-  rate: numRequired,
+  rate: numRequiredNonNegative,
   hasAdvancePayment: z.boolean(),
   advanceBankAccount: z.string().optional(),
   advanceAmount: numOptional,

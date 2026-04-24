@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
 
 const entrySchema = {
   product: (v: unknown) => v != null && mongoose.Types.ObjectId.isValid(String(v)),
-  totalCtn: (v: unknown) => typeof v === 'number' && v >= 0,
-  qty: (v: unknown) => typeof v === 'number' && v >= 0,
+  totalCtn: (v: unknown) => typeof v === 'number' && v > 0,
+  qty: (v: unknown) => typeof v === 'number' && v > 0,
   rate: (v: unknown) => typeof v === 'number' && v >= 0,
   entryDate: (v: unknown) => v != null,
 }

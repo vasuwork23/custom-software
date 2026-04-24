@@ -23,7 +23,7 @@ export async function recalcIndiaBuyingEntryGivenAndStatus(
   const advance = entry.hasAdvancePayment ? (entry.advanceAmount ?? 0) : 0
   entry.givenAmount = round2(advance + sumPayments)
   entry.remainingAmount = round2(entry.totalAmount - entry.givenAmount)
-  if (entry.totalAmount === 0) entry.currentStatus = 'unpaid'
+  if (entry.totalAmount === 0) entry.currentStatus = 'paid'
   else if (entry.remainingAmount <= 0) entry.currentStatus = 'paid'
   else if (entry.givenAmount === 0) entry.currentStatus = 'unpaid'
   else entry.currentStatus = 'partiallypaid'
