@@ -142,8 +142,8 @@ export async function DELETE(
       .sort({ transactionDate: 1, sortOrder: 1, createdAt: 1, _id: 1 })
       .exec()
 
-    // Anchor balanceAfter recomputation to the stored currentBalance so the top
-    // "Current Balance" stays consistent after delete.
+    // Anchor balanceAfter recomputation to currentBalance so the running totals
+    // stay consistent with the authoritative stored balance after delete.
     const anchorBalance = person.currentBalance ?? 0
     const sumDeltaAll = allTxs.reduce((acc, t) => {
       const delta = t.type === 'pay_in' ? t.amount : -t.amount
