@@ -106,7 +106,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date()
+    // If client sends a date-only string (YYYY-MM-DD), preserve that calendar date
+    // but attach the current time so same-day ordering stays chronological.
+    const now = new Date()
+    const paymentDate = (() => {
+      if (!paymentDateRaw) return now
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(paymentDateRaw))) {
+        const [y, m, d] = String(paymentDateRaw).split('-').map(Number)
+        return new Date(Date.UTC(y, m - 1, d, now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now.getUTCMilliseconds()))
+      }
+      return new Date(paymentDateRaw)
+    })()
     if (Number.isNaN(paymentDate.getTime())) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', message: 'Invalid payment date' },

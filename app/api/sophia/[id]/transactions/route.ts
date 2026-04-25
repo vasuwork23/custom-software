@@ -83,18 +83,13 @@ export async function GET(
 
     const totalFiltered = timelineAsc.length
 
-    // Build a deterministic balanceAfter chain using the earliest transaction's stored balanceAfter as anchor.
-    // That keeps the response consistent for the UI even if older records were created out-of-order.
-    let runningBalance = 0
-    if (timelineAsc.length > 0) {
-      const first = timelineAsc[0]
-      const firstDelta = first.type === 'pay_in' ? first.amount : -first.amount
-      const firstBalanceAfter = first.balanceAfter ?? 0
-      // balanceAfter = balanceBefore + firstDelta => balanceBefore = balanceAfter - delta
-      runningBalance = firstBalanceAfter - firstDelta
-    } else {
-      runningBalance = person.currentBalance ?? 0
-    }
+    // Use currentBalance as the authoritative anchor. Subtracting the net of all
+    // transactions in this view gives the balance just before the earliest shown tx,
+    // keeping every row's balanceAfter consistent with the stored currentBalance.
+    const sumDelta = timelineAsc.reduce((acc, t) => {
+      return acc + (t.type === 'pay_in' ? t.amount : -t.amount)
+    }, 0)
+    let runningBalance = (person.currentBalance ?? 0) - sumDelta
 
     const computedAsc = timelineAsc.map((t) => {
       const delta = t.type === 'pay_in' ? t.amount : -t.amount
