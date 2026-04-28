@@ -30,6 +30,10 @@ interface ProductCardProps {
   availableValue?: number
   /** Total available pcs across entries (India products) */
   availablePcs?: number
+  /** Sum of totalAmount (¥ RMB) across locked entries */
+  lockedAmountRMB?: number
+  /** Sum of lockedAmount (₹) — finalCost × qty × lockedCtn, stored at lock time */
+  lockedAmountINR?: number
 }
 
 export function ProductCard({
@@ -53,6 +57,8 @@ export function ProductCard({
   remainingAmount,
   availableValue,
   availablePcs,
+  lockedAmountRMB,
+  lockedAmountINR,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -178,6 +184,22 @@ export function ProductCard({
                 <span className="text-muted-foreground">⚖️ Total Weight</span>
                 <span className="font-semibold">
                   {(totalWeight ?? 0).toFixed(2)} kg
+                </span>
+              </div>
+            )}
+            {lockedAmountRMB != null && lockedAmountRMB > 0 && (
+              <div className="flex items-center justify-between col-span-2">
+                <span className="text-muted-foreground">🔒 Locked (¥)</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  ¥{lockedAmountRMB.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            )}
+            {lockedAmountINR != null && lockedAmountINR > 0 && (
+              <div className="flex items-center justify-between col-span-2">
+                <span className="text-muted-foreground">🔒 Locked (₹)</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  ₹{lockedAmountINR.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </span>
               </div>
             )}

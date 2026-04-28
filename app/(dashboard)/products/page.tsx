@@ -38,6 +38,8 @@ interface ProductItem {
   totalCbm: number
   totalWeight: number
   remainingAmount: number
+  lockedAmountRMB: number
+  lockedAmountINR: number
 }
 
 interface IndiaProductItem {
@@ -73,7 +75,7 @@ export default function ProductsPage() {
       unpaid: number
     }
     pagination: { page: number; limit: number; total: number; pages: number }
-    totals?: { cbm: number; weight: number; remainingToPay: number }
+    totals?: { cbm: number; weight: number; remainingToPay: number; lockedAmountRMB: number; lockedAmountINR: number }
   } | null>(null)
   const [indiaData, setIndiaData] = useState<{
     products: IndiaProductItem[]
@@ -139,7 +141,7 @@ export default function ProductsPage() {
         unpaid: number
       }
       pagination: { page: number; limit: number; total: number; pages: number }
-      totals?: { cbm: number; weight: number; remainingToPay: number }
+      totals?: { cbm: number; weight: number; remainingToPay: number; lockedAmountRMB: number; lockedAmountINR: number }
     }>(`/api/products?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
@@ -343,6 +345,30 @@ export default function ProductsPage() {
                     })}
                   </p>
                 </div>
+                {(data.totals?.lockedAmountRMB ?? 0) > 0 && (
+                  <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 px-3 py-2">
+                    <p className="text-[11px] text-blue-700 dark:text-blue-400 uppercase tracking-wide">
+                      🔒 Locked (¥)
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-blue-700 dark:text-blue-400">
+                      ¥{(data.totals?.lockedAmountRMB ?? 0).toLocaleString('en-IN', {
+                        maximumFractionDigits: 0,
+                      })}
+                    </p>
+                  </div>
+                )}
+                {(data.totals?.lockedAmountINR ?? 0) > 0 && (
+                  <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 px-3 py-2">
+                    <p className="text-[11px] text-blue-700 dark:text-blue-400 uppercase tracking-wide">
+                      🔒 Locked (₹)
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-blue-700 dark:text-blue-400">
+                      ₹{(data.totals?.lockedAmountINR ?? 0).toLocaleString('en-IN', {
+                        maximumFractionDigits: 0,
+                      })}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -493,6 +519,8 @@ export default function ProductsPage() {
                     totalCbm={p.totalCbm}
                     totalWeight={p.totalWeight}
                     remainingAmount={p.remainingAmount}
+                    lockedAmountRMB={p.lockedAmountRMB}
+                    lockedAmountINR={p.lockedAmountINR}
                   />
                 ))}
               </div>

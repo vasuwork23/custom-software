@@ -92,6 +92,20 @@ export async function GET(req: NextRequest) {
           totalCbm: { $sum: { $ifNull: ['$totalCbm', 0] } },
           totalWeight: { $sum: { $ifNull: ['$totalWeight', 0] } },
           remainingAmount: { $sum: { $ifNull: ['$remainingAmount', 0] } },
+          lockedAmountRMB: {
+            $sum: {
+              $cond: [
+                '$isLocked',
+                { $multiply: [{ $ifNull: ['$rate', 0] }, { $ifNull: ['$qty', 0] }, { $ifNull: ['$lockedCtn', 0] }] },
+                0,
+              ],
+            },
+          },
+          lockedAmountINR: {
+            $sum: {
+              $cond: ['$isLocked', { $ifNull: ['$lockedAmount', 0] }, 0],
+            },
+          },
           count: { $sum: 1 },
         },
       },
@@ -165,6 +179,8 @@ export async function GET(req: NextRequest) {
       const totalCbm = stats.totalCbm ?? 0
       const totalWeight = stats.totalWeight ?? 0
       const remainingAmount = stats.remainingAmount ?? 0
+      const lockedAmountRMB = stats.lockedAmountRMB ?? 0
+      const lockedAmountINR = stats.lockedAmountINR ?? 0
       const buyingEntries = stats.count ?? 0
 
       const chinaWarehouseReceived: 'yes' | 'no' =
@@ -196,6 +212,8 @@ export async function GET(req: NextRequest) {
         totalCbm,
         totalWeight,
         remainingAmount,
+        lockedAmountRMB,
+        lockedAmountINR,
         hasUnpaidEntries,
         chinaWarehouseReceived,
         hasWhReceived,
@@ -243,14 +261,16 @@ export async function GET(req: NextRequest) {
     const paginatedProducts = filteredProducts.slice(start, start + limit)
 
     // Totals across all filtered products (not just current page)
-    const { totalCbm: sumCbm, totalWeight: sumWeight, remainingAmount: sumRemaining } = filteredProducts.reduce(
+    const { totalCbm: sumCbm, totalWeight: sumWeight, remainingAmount: sumRemaining, lockedAmountRMB: sumLockedRMB, lockedAmountINR: sumLockedINR } = filteredProducts.reduce(
       (acc, p) => {
         acc.totalCbm += p.totalCbm ?? 0
         acc.totalWeight += p.totalWeight ?? 0
         acc.remainingAmount += p.remainingAmount ?? 0
+        acc.lockedAmountRMB += p.lockedAmountRMB ?? 0
+        acc.lockedAmountINR += p.lockedAmountINR ?? 0
         return acc
       },
-      { totalCbm: 0, totalWeight: 0, remainingAmount: 0 }
+      { totalCbm: 0, totalWeight: 0, remainingAmount: 0, lockedAmountRMB: 0, lockedAmountINR: 0 }
     )
 
     return NextResponse.json({
@@ -262,6 +282,8 @@ export async function GET(req: NextRequest) {
           cbm: sumCbm,
           weight: sumWeight,
           remainingToPay: sumRemaining,
+          lockedAmountRMB: sumLockedRMB,
+          lockedAmountINR: sumLockedINR,
         },
         pagination: { page, limit, total: totalFiltered, pages: totalPages },
       },
