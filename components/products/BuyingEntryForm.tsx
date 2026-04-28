@@ -337,7 +337,7 @@ export function BuyingEntryForm({
     } else {
       setCtnWarning(null)
     }
-  }, [open, watchTotalCtn, watchChinaWarehouseCtn, watchInTransitCtn])
+  }, [open, watchTotalCtn, watchChinaWarehouseCtn, watchInTransitCtn, watched.chinaWarehouseReceived])
 
   async function onSubmit(values: FormValues) {
     if (isEdit && (values.totalCtn ?? 0) < soldCtn) {

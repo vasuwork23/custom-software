@@ -129,10 +129,10 @@ function resolveCtnConsumed(item: IFifoBreakdownItem & Record<string, unknown>):
  * Reverse FIFO: restore availableCtn and soldCtn for all BuyingEntries referenced in fifoBreakdown.
  * Handles field name variations: buyingEntryId, entryId, entry; ctnConsumed, ctns, ctn, quantity.
  */
-export async function reverseFIFO(fifoBreakdown: (IFifoBreakdownItem & Record<string, unknown>)[]): Promise<void> {
+export async function reverseFIFO(fifoBreakdown: IFifoBreakdownItem[]): Promise<void> {
   for (const item of fifoBreakdown) {
-    const entryId = resolveChinaEntryId(item)
-    const ctnConsumed = resolveCtnConsumed(item)
+    const entryId = resolveChinaEntryId(item as IFifoBreakdownItem & Record<string, unknown>)
+    const ctnConsumed = resolveCtnConsumed(item as IFifoBreakdownItem & Record<string, unknown>)
     if (!entryId || ctnConsumed <= 0) continue
     const entry = await BuyingEntry.findById(entryId)
     if (entry) {
@@ -146,10 +146,10 @@ export async function reverseFIFO(fifoBreakdown: (IFifoBreakdownItem & Record<st
 /**
  * Re-apply FIFO consumption (inverse of reverseFIFO). Used when rolling back a failed edit.
  */
-export async function applyFIFO(fifoBreakdown: (IFifoBreakdownItem & Record<string, unknown>)[]): Promise<void> {
+export async function applyFIFO(fifoBreakdown: IFifoBreakdownItem[]): Promise<void> {
   for (const item of fifoBreakdown) {
-    const entryId = resolveChinaEntryId(item)
-    const ctnConsumed = resolveCtnConsumed(item)
+    const entryId = resolveChinaEntryId(item as IFifoBreakdownItem & Record<string, unknown>)
+    const ctnConsumed = resolveCtnConsumed(item as IFifoBreakdownItem & Record<string, unknown>)
     if (!entryId || ctnConsumed <= 0) continue
     const entry = await BuyingEntry.findById(entryId)
     if (entry) {

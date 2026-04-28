@@ -612,7 +612,7 @@ export async function GET(req: NextRequest) {
 
     // Collect all company IDs from both billed and opening balance maps
     // Skip 'null' key — cashbook bills (company = null) have no receivable outstanding
-    const allCompanyIds = new Set([...billedMap.keys(), ...openingBalanceMap.keys()])
+    const allCompanyIds = new Set([...Array.from(billedMap.keys()), ...Array.from(openingBalanceMap.keys())])
     allCompanyIds.forEach((companyId) => {
       if (!companyId || companyId === 'null') return
       const billed = billedMap.get(companyId) ?? 0

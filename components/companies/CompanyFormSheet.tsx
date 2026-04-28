@@ -279,7 +279,7 @@ export function CompanyFormSheet({
                   <Button
                     type="button"
                     variant="outline"
-                    size="xs"
+                    size="sm"
                     disabled={!contact1Mobile}
                     onClick={() => setContactForWhatsapp('contact1')}
                   >
@@ -288,7 +288,7 @@ export function CompanyFormSheet({
                   <Button
                     type="button"
                     variant="outline"
-                    size="xs"
+                    size="sm"
                     disabled={!contact2Mobile}
                     onClick={() => setContactForWhatsapp('contact2')}
                   >
