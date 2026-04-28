@@ -37,8 +37,6 @@ export function createProduct(overrides?: Partial<CarryingProduct>): CarryingPro
     totalCBM,
     priceBuyCBM,
     priceSellCBM,
-    totalAmount,
-    totalProfit,
     ...overrides,
     totalAmount: overrides?.totalAmount ?? totalAmount,
     totalProfit: overrides?.totalProfit ?? totalProfit,
@@ -55,7 +53,6 @@ export function createBill(overrides?: Partial<CarryingBill>): CarryingBill {
   const id = overrides?.id ?? `bill_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   const now = new Date().toISOString()
   return {
-    id,
     containerName: overrides?.containerName ?? '',
     companyName: overrides?.companyName ?? '',
     products: overrides?.products ?? [],

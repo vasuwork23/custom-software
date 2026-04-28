@@ -3,7 +3,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import SellBill from '@/models/SellBill'
 import PaymentReceipt from '@/models/PaymentReceipt'
-import { renderToBuffer } from '@react-pdf/renderer'
+import { renderToBuffer, DocumentProps } from '@react-pdf/renderer'
 import React from 'react'
 import { BillTemplate } from '@/components/pdf/BillTemplate'
 import mongoose from 'mongoose'
@@ -102,14 +102,15 @@ export async function GET(
           address?: string
           city?: string
         },
-        items: (bill.items as { product?: { productName?: string }; indiaProduct?: { productName?: string }; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number }[]) ?? [],
+        items: (bill.items as unknown as { product?: { productName?: string }; indiaProduct?: { productName?: string }; ctnSold: number; pcsSold: number; ratePerPcs: number; totalAmount: number }[]) ?? [],
       },
       yourCompanyName: process.env.COMPANY_NAME ?? '',
       yourAddress: process.env.COMPANY_ADDRESS ?? '',
       yourPhone: process.env.COMPANY_PHONE ?? '',
       companyOutstanding,
     })
-    const pdfBuffer = await renderToBuffer(doc)
+    const rawBuffer = await renderToBuffer(doc as React.ReactElement<DocumentProps>)
+    const pdfBuffer = new Uint8Array(rawBuffer)
 
     const filename = generateBillFileName({
       companyName: (bill.company as { companyName?: string })?.companyName,

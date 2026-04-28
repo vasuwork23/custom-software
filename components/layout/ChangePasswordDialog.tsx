@@ -51,7 +51,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
         newPassword,
       })
       if (res.success) {
-        toast.success(res.message ?? 'Password changed successfully.')
+        toast.success(res.data.message ?? 'Password changed successfully.')
         onOpenChange(false)
       } else {
         toast.error(res.message ?? res.error ?? 'Failed to change password.')

@@ -17,7 +17,7 @@ export async function recalculateBankAccountLedger(
   const txs = await txQuery.lean()
 
   let running = 0
-  const bulkOps: mongoose.mongo.AnyBulkWriteOperation[] = []
+  const bulkOps: any[] = [] // mongoose/mongodb driver type mismatch workaround
 
   for (const t of txs) {
     const effect = t.type === 'credit' ? (t.amount as number) : -(t.amount as number)

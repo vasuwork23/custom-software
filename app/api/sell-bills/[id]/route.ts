@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import SellBill from '@/models/SellBill'
-import SellBillItem from '@/models/SellBillItem'
+import SellBillItem, { IFifoBreakdownItem } from '@/models/SellBillItem'
 import Company from '@/models/Company'
 import BuyingEntry from '@/models/BuyingEntry'
 import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
@@ -309,7 +309,7 @@ export async function PUT(
 
     // Step 2 — Process new items with FIFO. On any failure, rollback: reverse new items and re-apply original.
     const createdItems: mongoose.Types.ObjectId[] = []
-    const createdBreakdowns: { fifoBreakdown: { buyingEntry?: mongoose.Types.ObjectId; indiaBuyingEntry?: mongoose.Types.ObjectId; ctnConsumed: number }[] }[] = []
+    const createdBreakdowns: { fifoBreakdown: IFifoBreakdownItem[] }[] = []
     let totalAmount = 0
 
     try {
@@ -321,7 +321,7 @@ export async function PUT(
         const productId = new mongoose.Types.ObjectId(row.productId)
         const isIndia = row.productSource === 'india'
         const pcsOnBill = pcsAlreadyOnThisBillByProduct.get(row.productId) ?? 0
-        let fifoBreakdown: { buyingEntry?: mongoose.Types.ObjectId; indiaBuyingEntry?: mongoose.Types.ObjectId; ctnConsumed: number; pcsConsumed?: number; finalCost?: number; profit?: number }[]
+        let fifoBreakdown: IFifoBreakdownItem[]
         let fifoNote: string | undefined
         let totalProfit: number
         let pcsSold: number

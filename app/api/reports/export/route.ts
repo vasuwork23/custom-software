@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 import React from 'react'
-import { renderToBuffer } from '@react-pdf/renderer'
+import { renderToBuffer, DocumentProps } from '@react-pdf/renderer'
 import { PnlPdfDocument, StockPdfDocument, SellingPdfDocument, BuyingPdfDocument } from '@/lib/report-pdf'
 import { format } from 'date-fns'
 
@@ -134,7 +134,8 @@ export async function GET(req: NextRequest) {
       }
 
       try {
-        const buffer = await renderToBuffer(doc)
+        const pdfBuffer = await renderToBuffer(doc as React.ReactElement<DocumentProps>)
+        const buffer = new Uint8Array(pdfBuffer)
         const filename = `report-${reportType}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
         return new NextResponse(buffer, {
           headers: {
