@@ -20,6 +20,7 @@ import {
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { apiGet, authHeaders } from '@/lib/api-client'
@@ -33,7 +34,7 @@ type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
 const PIE_COLORS = ['#22c55e', '#ef4444', '#eab308']
 
 export default function ReportsPage() {
-  const [period, setPeriod] = useState<Period>('month')
+  const [period, setPeriod] = useState<Period>('today')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [withExpenses, setWithExpenses] = useState(true)
   const [loading, setLoading] = useState(true)
@@ -362,68 +363,100 @@ export default function ReportsPage() {
 
           {/* Stock Section */}
           <Card>
-            <CardHeader>
-              <CardTitle>Stock Report</CardTitle>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle>Stock Report</CardTitle>
+                {stock && (
+                  <div className="flex flex-wrap gap-4 pt-1">
+                    <div>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">China Stock</p>
+                      <p className="text-lg font-bold text-blue-600">
+                        ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                    <div className="text-muted-foreground self-end pb-0.5 text-lg font-light">+</div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">India Stock</p>
+                      <p className="text-lg font-bold text-emerald-600">
+                        ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                    <div className="text-muted-foreground self-end pb-0.5 text-lg font-light">=</div>
+                    <div className="rounded-lg border bg-muted/40 px-3 py-1">
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total Stock Valuation</p>
+                      <p className="text-xl font-bold">
+                        ₹{(
+                          Number(stock.summary.totalStockCost ?? 0) +
+                          Number(stock.summary.totalIndiaStockCost ?? 0)
+                        ).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'pdf')}>Download PDF</Button>
+                <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'excel')}>Download Excel</Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {stock && (
-                <>
-                  <div className="grid gap-4 sm:grid-cols-7">
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Total Products</p>
-                        <p className="text-xl font-semibold">{stock.summary.totalProducts}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Available CTN (India)</p>
-                        <p className="text-xl font-semibold">{stock.summary.totalInIndia}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">In Transit</p>
-                        <p className="text-xl font-semibold">{stock.summary.totalInTransit}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">In China</p>
-                        <p className="text-xl font-semibold">{stock.summary.totalInChina}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Total Available CTN</p>
-                        <p className="text-xl font-semibold">{stock.summary.totalAvailableCtn}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Total Available PCS</p>
-                        <p className="text-xl font-semibold">
-                          {stock.summary.totalAvailablePcs?.toLocaleString('en-IN')}
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground">Total Stock Cost</p>
-                        <p className="text-xl font-semibold text-blue-600">
-                          ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  <div>
-                    <h4 className="mb-2 font-medium">China Products</h4>
+                <Tabs defaultValue="china">
+                  <TabsList>
+                    <TabsTrigger value="china">🏭 China Products</TabsTrigger>
+                    <TabsTrigger value="india">🇮🇳 India Products</TabsTrigger>
+                  </TabsList>
+
+                  {/* China Products Tab */}
+                  <TabsContent value="china" className="space-y-4 mt-4">
+                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Products</p>
+                          <p className="text-xl font-semibold">{stock.summary.totalProducts}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">In China</p>
+                          <p className="text-xl font-semibold">{stock.summary.totalInChina}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">In Transit</p>
+                          <p className="text-xl font-semibold">{stock.summary.totalInTransit}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Available (India)</p>
+                          <p className="text-xl font-semibold">{stock.summary.totalInIndia}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Available PCS</p>
+                          <p className="text-xl font-semibold">
+                            {stock.summary.totalAvailablePcs?.toLocaleString('en-IN')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-blue-200 bg-blue-50/40 dark:bg-blue-950/10">
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Stock Valuation</p>
+                          <p className="text-xl font-semibold text-blue-600">
+                            ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
                     <div className="rounded-md border overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b bg-muted/50">
                             <th className="p-3 text-left font-medium">Product</th>
-                            <th className="p-3 text-right font-medium">Total CTN Bought</th>
+                            <th className="p-3 text-right font-medium">Total CTN</th>
                             <th className="p-3 text-right font-medium">Available CTN</th>
                             <th className="p-3 text-right font-medium">China</th>
                             <th className="p-3 text-right font-medium">In Transit</th>
@@ -436,16 +469,14 @@ export default function ReportsPage() {
                         </thead>
                         <tbody>
                           {stock.rows.map((r, i) => (
-                            <tr key={i} className="border-b">
+                            <tr key={i} className="border-b hover:bg-muted/30">
                               <td className="p-3">{r.productName}</td>
                               <td className="p-3 text-right">{r.totalCtnBought}</td>
                               <td className="p-3 text-right">{r.availableCtn}</td>
                               <td className="p-3 text-right">{r.chinaWarehouse}</td>
                               <td className="p-3 text-right">{r.inTransit}</td>
                               <td className="p-3 text-right">{r.indiaWarehouse}</td>
-                              <td className="p-3 text-right">
-                                {r.availablePcs?.toLocaleString('en-IN')}
-                              </td>
+                              <td className="p-3 text-right">{r.availablePcs?.toLocaleString('en-IN')}</td>
                               <td className="p-3 text-right text-emerald-600">
                                 {r.costPerPiece && r.costPerPiece > 0
                                   ? `₹${r.costPerPiece.toFixed(5)}`
@@ -464,78 +495,63 @@ export default function ReportsPage() {
                           {stock.rows.length > 0 && (
                             <tr className="border-t-2 bg-muted/40 font-semibold">
                               <td className="p-3">Total</td>
-                              <td className="p-3 text-right">
-                                {stock.rows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}
-                              </td>
-                              <td className="p-3 text-right">
-                                {stock.rows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}
-                              </td>
-                              <td className="p-3 text-right">
-                                {stock.rows.reduce((s, r) => s + (r.chinaWarehouse ?? 0), 0)}
-                              </td>
-                              <td className="p-3 text-right">
-                                {stock.rows.reduce((s, r) => s + (r.inTransit ?? 0), 0)}
-                              </td>
-                              <td className="p-3 text-right">
-                                {stock.rows.reduce((s, r) => s + (r.indiaWarehouse ?? 0), 0)}
-                              </td>
-                              <td className="p-3 text-right">
-                                {stock.summary.totalAvailablePcs?.toLocaleString('en-IN')}
-                              </td>
+                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.chinaWarehouse ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.inTransit ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.indiaWarehouse ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{stock.summary.totalAvailablePcs?.toLocaleString('en-IN')}</td>
                               <td className="p-3 text-right">—</td>
                               <td className="p-3 text-right text-blue-700">
                                 ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
                               </td>
-                              <td className="p-3 text-right">
-                                {stock.rows.reduce((s, r) => s + (r.lockedEntries ?? 0), 0)}
-                              </td>
+                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.lockedEntries ?? 0), 0)}</td>
                             </tr>
                           )}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                  {stock.indiaRows && stock.indiaRows.length > 0 && (
-                    <div className="space-y-3">
-                      {/* India summary cards */}
-                      <div className="grid gap-3 sm:grid-cols-4">
-                        <Card>
-                          <CardContent className="pt-4">
-                            <p className="text-xs text-muted-foreground">India Total Products</p>
-                            <p className="text-xl font-semibold">{stock.summary.totalIndiaProducts ?? 0}</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-4">
-                            <p className="text-xs text-muted-foreground">Total Available CTN</p>
-                            <p className="text-xl font-semibold">{stock.summary.totalIndiaAvailableCtn ?? 0}</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-4">
-                            <p className="text-xs text-muted-foreground">Total Available PCS</p>
-                            <p className="text-xl font-semibold">
-                              {(stock.summary.totalIndiaAvailablePcs ?? 0).toLocaleString('en-IN')}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-4">
-                            <p className="text-xs text-muted-foreground">Total India Stock Cost</p>
-                            <p className="text-xl font-semibold text-blue-600">
-                              ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </div>
+                  </TabsContent>
 
-                      <h4 className="mb-2 font-medium">India Products</h4>
+                  {/* India Products Tab */}
+                  <TabsContent value="india" className="space-y-4 mt-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Products</p>
+                          <p className="text-xl font-semibold">{stock.summary.totalIndiaProducts ?? 0}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Available CTN</p>
+                          <p className="text-xl font-semibold">{stock.summary.totalIndiaAvailableCtn ?? 0}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Available PCS</p>
+                          <p className="text-xl font-semibold">
+                            {(stock.summary.totalIndiaAvailablePcs ?? 0).toLocaleString('en-IN')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/10">
+                        <CardContent className="pt-4">
+                          <p className="text-xs text-muted-foreground">Stock Valuation</p>
+                          <p className="text-xl font-semibold text-emerald-600">
+                            ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    {stock.indiaRows && stock.indiaRows.length > 0 ? (
                       <div className="rounded-md border overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b bg-muted/50">
                               <th className="p-3 text-left font-medium">Product</th>
-                              <th className="p-3 text-right font-medium">Total CTN Bought</th>
+                              <th className="p-3 text-right font-medium">Total CTN</th>
                               <th className="p-3 text-right font-medium">Available CTN</th>
                               <th className="p-3 text-right font-medium">Total PCS</th>
                               <th className="p-3 text-right font-medium">Cost/Piece (₹)</th>
@@ -544,7 +560,7 @@ export default function ReportsPage() {
                           </thead>
                           <tbody>
                             {stock.indiaRows.map((r, i) => (
-                              <tr key={i} className="border-b">
+                              <tr key={i} className="border-b hover:bg-muted/30">
                                 <td className="p-3">{r.productName}</td>
                                 <td className="p-3 text-right">{r.totalCtnBought}</td>
                                 <td className="p-3 text-right">{r.availableCtn}</td>
@@ -558,41 +574,33 @@ export default function ReportsPage() {
                                       ? <span className="text-gray-300">—</span>
                                       : <span className="text-orange-500">No cost</span>}
                                 </td>
-                                <td className="p-3 text-right text-blue-600 font-medium">
+                                <td className="p-3 text-right text-emerald-600 font-medium">
                                   {r.totalCost && r.totalCost > 0
                                     ? `₹${Number(r.totalCost).toLocaleString('en-IN')}`
                                     : <span className="text-gray-300">—</span>}
                                 </td>
                               </tr>
                             ))}
-                            {stock.indiaRows.length > 0 && (
-                              <tr className="border-t-2 bg-muted/40 font-semibold">
-                                <td className="p-3">Total</td>
-                                <td className="p-3 text-right">
-                                  {stock.indiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}
-                                </td>
-                                <td className="p-3 text-right">
-                                  {stock.indiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}
-                                </td>
-                                <td className="p-3 text-right">
-                                  {stock.summary.totalIndiaAvailablePcs?.toLocaleString('en-IN')}
-                                </td>
-                                <td className="p-3 text-right">—</td>
-                                <td className="p-3 text-right text-blue-700">
-                                  ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
-                                </td>
-                              </tr>
-                            )}
+                            <tr className="border-t-2 bg-muted/40 font-semibold">
+                              <td className="p-3">Total</td>
+                              <td className="p-3 text-right">{stock.indiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{stock.indiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
+                              <td className="p-3 text-right">
+                                {(stock.summary.totalIndiaAvailablePcs ?? 0).toLocaleString('en-IN')}
+                              </td>
+                              <td className="p-3 text-right">—</td>
+                              <td className="p-3 text-right text-emerald-700">
+                                ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'pdf')}>Download PDF</Button>
-                    <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'excel')}>Download Excel</Button>
-                  </div>
-                </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No India products with stock.</p>
+                    )}
+                  </TabsContent>
+                </Tabs>
               )}
             </CardContent>
           </Card>
