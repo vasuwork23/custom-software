@@ -141,22 +141,38 @@ export async function GET(req: NextRequest) {
     const pageCompanies = filtered.slice(skip, skip + limit)
 
     const pageCompanyIds = pageCompanies.map((c) => c._id)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    sevenDaysAgo.setHours(0, 0, 0, 0)
+
     let profitByCompany: Record<string, number> = {}
+    let last7DaysSalesByCompany: Record<string, number> = {}
     if (pageCompanyIds.length > 0) {
-      const profitAgg = await SellBillItem.aggregate([
-        { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
-        { $unwind: '$bill' },
-        { $match: { 'bill.company': { $in: pageCompanyIds } } },
-        { $group: { _id: '$bill.company', total: { $sum: '$totalProfit' } } },
+      const [profitAgg, salesAgg] = await Promise.all([
+        SellBillItem.aggregate([
+          { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
+          { $unwind: '$bill' },
+          { $match: { 'bill.company': { $in: pageCompanyIds } } },
+          { $group: { _id: '$bill.company', total: { $sum: '$totalProfit' } } },
+        ]),
+        SellBill.aggregate([
+          { $match: { company: { $in: pageCompanyIds }, createdAt: { $gte: sevenDaysAgo } } },
+          { $group: { _id: '$company', total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
+        ]),
       ])
       profitByCompany = Object.fromEntries(profitAgg.map((r) => [String(r._id), r.total]))
+      last7DaysSalesByCompany = Object.fromEntries(salesAgg.map((r) => [String(r._id), r.total]))
     }
 
     const list = pageCompanies.map((c) => {
       const totalProfit = profitByCompany[String(c._id)] ?? 0
+      const last7DaysSales = last7DaysSalesByCompany[String(c._id)] ?? 0
+      const outstanding = c.outstandingBalance as number
+      const showAlert = outstanding > 0 && outstanding > last7DaysSales
       return {
         ...c,
         totalProfit,
+        showAlert,
       }
     })
 

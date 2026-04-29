@@ -33,13 +33,13 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/china-bank', label: 'China Bank', icon: Landmark },
   { href: '/products', label: 'Products', icon: Package },
-  { href: '/containers', label: 'Containers', icon: Ship },
+  // { href: '/containers', label: 'Containers', icon: Ship }, // hidden for now
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/sale-bills', label: 'Sale Bills', icon: FileText },
   { href: '/carrying', label: 'Carrying', icon: Truck },
   { href: '/received-voucher', label: 'Receive Voucher', icon: Wallet },
+  { href: '/china-bank', label: 'China Bank', icon: Landmark },
   { href: '/banks', label: 'Our Banks', icon: Banknote },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/expenses', label: 'Expenses', icon: Receipt },

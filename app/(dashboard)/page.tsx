@@ -3,18 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { format, formatDistanceToNow } from 'date-fns'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-} from 'recharts'
 import { ArrowDownRight, ArrowUpRight, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -70,6 +58,7 @@ interface DashboardChinaBankHealth {
   balance: number
   lockedThisMonth: number
   readyToLock: number
+  readyToLockProducts: { productId: string; productName: string }[]
 }
 
 interface DashboardStockMovement {
@@ -166,7 +155,7 @@ interface ActivityItem {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const [period, setPeriod] = useState<DashboardPeriod>('month')
+  const [period, setPeriod] = useState<DashboardPeriod>('today')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [loadingPnl, setLoadingPnl] = useState(true)
   const [loadingStats, setLoadingStats] = useState(true)
@@ -262,8 +251,6 @@ export default function DashboardPage() {
     setPeriod(next)
     if (next !== 'custom') setDateRange(undefined)
   }
-
-  const hasChartData = pnl && pnl.chartData && pnl.chartData.length > 0
 
   const renderTrend = (value: number) => {
     const rounded = Number.isFinite(value) ? value.toFixed(1) : '0.0'
@@ -509,114 +496,8 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : stats ? (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <Link href="/china-bank">
-              <Card
-                className={cn(
-                  'transition hover:shadow-sm',
-                  stats.chinaBankBalance < 0 && 'border-destructive/50 bg-destructive/5'
-                )}
-              >
-                <CardContent className="flex items-start justify-between pt-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      China Bank Balance
-                      {stats.chinaBankBalance < 0 && (
-                        <AlertTriangle className="h-3 w-3 text-destructive" />
-                      )}
-                    </p>
-                    <p
-                      className={cn(
-                        'text-xl font-semibold',
-                        stats.chinaBankBalance < 0 && 'text-destructive'
-                      )}
-                    >
-                      <AmountDisplay amount={stats.chinaBankBalance} />
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/banks">
-              <Card
-                className={cn(
-                  'transition hover:shadow-sm',
-                  stats.cashBalance < 0 && 'border-destructive/50 bg-destructive/5'
-                )}
-              >
-                <CardContent className="pt-4">
-                  <p className="text-xs text-muted-foreground">Cash Balance</p>
-                  <p
-                    className={cn(
-                      'text-xl font-semibold',
-                      stats.cashBalance < 0 && 'text-destructive'
-                    )}
-                  >
-                    <AmountDisplay amount={stats.cashBalance} />
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/companies">
-              <Card className="transition hover:shadow-sm">
-                <CardContent className="pt-4 space-y-2">
-                  <p className="text-xs text-muted-foreground">Total Outstanding</p>
-                  <div className="flex gap-4">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground">To Receive</p>
-                      <p className="text-base font-semibold text-red-600">
-                        <AmountDisplay amount={stats.totalPositiveOutstanding ?? 0} />
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground">Advance/Credit</p>
-                      <p className="text-base font-semibold text-blue-600">
-                        <AmountDisplay amount={stats.totalNegativeOutstanding ?? 0} />
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/products">
-              <Card className="transition hover:shadow-sm">
-                <CardContent className="pt-4">
-                  <p className="text-xs text-muted-foreground">Pending Payments</p>
-                  <p className="text-xl font-semibold">
-                    {stats.pendingPaymentsCount}
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        ) : null}
-      </section>
-
-      {/* Inventory, China bank health, cash flow, stock movement */}
-      {stats && (
-        <section>
+          <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-xl font-semibold">
-                  <AmountDisplay amount={stats.inventoryValue.total} />
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  China: <AmountDisplay amount={stats.inventoryValue.chinaProducts} /> · India:{' '}
-                  <AmountDisplay amount={stats.inventoryValue.indiaProducts} />
-                </p>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/reports">View stock report</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm font-medium">China Bank Health</CardTitle>
@@ -643,70 +524,124 @@ export default function DashboardPage() {
                   <span>Ready to lock</span>
                   <span>{stats.chinaBankHealth.readyToLock}</span>
                 </div>
-                {stats.chinaBankHealth.readyToLock > 0 && (
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/products">
-                      {stats.chinaBankHealth.readyToLock} entries ready to lock
-                    </Link>
-                  </Button>
-                )}
+                {stats.chinaBankHealth.readyToLock > 0 && (() => {
+                  const products = stats.chinaBankHealth.readyToLockProducts ?? []
+                  const href = products.length === 1
+                    ? `/products/${products[0].productId}`
+                    : '/products'
+                  const label = products.length === 1
+                    ? `${stats.chinaBankHealth.readyToLock} ${stats.chinaBankHealth.readyToLock === 1 ? 'entry' : 'entries'} ready to lock — ${products[0].productName}`
+                    : `${stats.chinaBankHealth.readyToLock} entries ready to lock`
+                  return (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={href}>{label}</Link>
+                    </Button>
+                  )
+                })()}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Cash Flow (This Month)</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
+                <Button asChild variant="ghost" size="sm" className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent">
+                  <Link href="/reports">View stock report →</Link>
+                </Button>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Money IN</span>
-                  <span className="text-emerald-600 font-medium">
-                    <AmountDisplay amount={stats.cashFlow.moneyIn} />
+                  <span className="text-muted-foreground">China Products</span>
+                  <span className="font-medium">
+                    <AmountDisplay amount={stats.inventoryValue.chinaProducts} />
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Money OUT</span>
-                  <span className="text-red-600 font-medium">
-                    <AmountDisplay amount={stats.cashFlow.moneyOut} />
+                  <span className="text-muted-foreground">India Products</span>
+                  <span className="font-medium">
+                    <AmountDisplay amount={stats.inventoryValue.indiaProducts} />
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Net Cash Flow</span>
-                  <span
-                    className={cn(
-                      'font-semibold',
-                      stats.cashFlow.netCashFlow < 0 ? 'text-red-600' : 'text-emerald-600'
-                    )}
-                  >
-                    <AmountDisplay amount={stats.cashFlow.netCashFlow} />
+                <div className="border-t pt-2 flex justify-between">
+                  <span className="font-semibold">Total</span>
+                  <span className="text-lg font-bold text-emerald-600">
+                    <AmountDisplay amount={stats.inventoryValue.total} />
                   </span>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Stock Movement</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>CTN Bought</span>
-                  <span>{stats.stockMovement.ctnBoughtThisPeriod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>CTN Sold</span>
-                  <span>{stats.stockMovement.ctnSoldThisPeriod}</span>
-                </div>
-                {stats.stockMovement.ctnSoldThisPeriod >
-                stats.stockMovement.ctnBoughtThisPeriod ? (
-                  <p className="text-xs text-emerald-600 font-medium">Good turnover</p>
-                ) : stats.stockMovement.ctnBoughtThisPeriod >
-                  stats.stockMovement.ctnSoldThisPeriod * 2 ? (
-                  <p className="text-xs text-amber-600 font-medium">Stock building up</p>
-                ) : null}
-              </CardContent>
-            </Card>
+            <Link href="/banks">
+              <Card className="transition hover:shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Total Cash &amp; Bank Balance</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {(() => {
+                    const bankTotal = stats.bankBalances.reduce((sum, b) => sum + b.balance, 0)
+                    const grandTotal = stats.cashBalance + bankTotal
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cash</span>
+                          <span className={cn('font-medium', stats.cashBalance < 0 && 'text-destructive')}>
+                            <AmountDisplay amount={stats.cashBalance} />
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Banks</span>
+                          <span className={cn('font-medium', bankTotal < 0 && 'text-destructive')}>
+                            <AmountDisplay amount={bankTotal} />
+                          </span>
+                        </div>
+                        <div className="border-t pt-2 flex justify-between">
+                          <span className="font-semibold">Total</span>
+                          <span className={cn('text-lg font-bold', grandTotal < 0 ? 'text-destructive' : 'text-emerald-600')}>
+                            <AmountDisplay amount={grandTotal} />
+                          </span>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </CardContent>
+              </Card>
+            </Link>
 
+            <Link href="/companies">
+              <Card className="transition hover:shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Net Outstanding</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">To Receive</span>
+                    <span className={cn('font-medium', stats.totalPositiveOutstanding > 0 && 'text-red-600')}>
+                      <AmountDisplay amount={stats.totalPositiveOutstanding} />
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Credit</span>
+                    <span className={cn('font-medium', stats.totalNegativeOutstanding > 0 && 'text-emerald-600')}>
+                      <AmountDisplay amount={stats.totalNegativeOutstanding} />
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between">
+                    <span className="font-semibold">Net</span>
+                    <span
+                      className={cn(
+                        'text-lg font-bold',
+                        (stats.totalPositiveOutstanding - stats.totalNegativeOutstanding) >= 0
+                          ? 'text-red-600'
+                          : 'text-emerald-600'
+                      )}
+                    >
+                      <AmountDisplay amount={stats.totalPositiveOutstanding - stats.totalNegativeOutstanding} />
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Containers card — hidden for now
             {stats.containers != null && (
               <Card>
                 <CardHeader>
@@ -740,10 +675,53 @@ export default function DashboardPage() {
                   </Button>
                 </CardContent>
               </Card>
-            )}
+            )} */}
           </div>
-        </section>
-      )}
+
+          {/* Grand total equation bar */}
+          {(() => {
+            const bankTotal = stats.bankBalances.reduce((sum, b) => sum + b.balance, 0)
+            const cashAndBanks = stats.cashBalance + bankTotal
+            const netOutstanding = stats.totalPositiveOutstanding - stats.totalNegativeOutstanding
+            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + cashAndBanks + netOutstanding
+
+            const items = [
+              { label: 'Inventory', value: stats.inventoryValue.total },
+              { label: 'China Bank', value: stats.chinaBankHealth.balance },
+              { label: 'Cash & Banks', value: cashAndBanks },
+              { label: 'Net Outstanding', value: netOutstanding },
+            ]
+
+            return (
+              <div className="mt-3 rounded-lg border bg-muted/20 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-4">
+                  {items.map((item, idx) => (
+                    <div key={item.label} className="flex items-center gap-x-5">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                        <p className={cn('font-semibold text-base', item.value < 0 ? 'text-red-600' : '')}>
+                          <AmountDisplay amount={item.value} />
+                        </p>
+                      </div>
+                      {idx < items.length - 1 && (
+                        <span className="text-xl text-muted-foreground font-light select-none">+</span>
+                      )}
+                    </div>
+                  ))}
+                  <span className="text-xl font-medium text-muted-foreground select-none px-1">=</span>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Grand Total</p>
+                    <p className={cn('text-xl font-bold', grandTotal >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                      <AmountDisplay amount={grandTotal} />
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+          </>
+        ) : null}
+      </section>
 
       {/* Outstanding aging & top products */}
       {stats && (
@@ -1081,6 +1059,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Dead Stock Alert — hidden for now
         {stats && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -1139,6 +1118,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
+        */}
       </section>
     </div>
   )

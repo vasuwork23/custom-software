@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       chinaInventoryAgg,
       indiaInventoryAgg,
       chinaBankDebitsThisMonth,
-      readyToLockCount,
+      readyToLockEntries,
       periodBoughtAgg,
       periodSoldAgg,
       topProductsAgg,
@@ -178,22 +178,27 @@ export async function GET(req: NextRequest) {
         },
         { $group: { _id: null, total: { $sum: '$value' } } },
       ]),
-      // China bank debits this month
-      ChinaBankTransaction.aggregate([
+      // Entries locked this month — sum lockedAmount from BuyingEntry to avoid
+      // double-counting re-locks (which create a reversal + new debit in ChinaBankTransaction)
+      BuyingEntry.aggregate([
         {
           $match: {
-            type: 'debit',
-            transactionDate: { $gte: monthStart, $lte: monthEnd },
+            isLocked: true,
+            lockedAt: { $gte: monthStart, $lte: monthEnd },
           },
         },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
+        { $group: { _id: null, total: { $sum: '$lockedAmount' } } },
       ]),
-      // Entries ready to lock
-      BuyingEntry.countDocuments({
+      // Entries ready to lock — must have rates set, received in China WH, and not yet locked
+      BuyingEntry.find({
         avgRmbRate: { $gt: 0 },
         carryingRate: { $gt: 0 },
+        chinaWarehouseReceived: 'yes',
         isLocked: false,
-      }),
+      })
+        .select('product mark')
+        .populate('product', 'productName')
+        .lean(),
       // CTN bought this period
       BuyingEntry.aggregate([
         {
@@ -480,10 +485,20 @@ export async function GET(req: NextRequest) {
       indiaProducts: indiaInventory,
     }
 
+    const readyToLockArr = readyToLockEntries as unknown as { _id: mongoose.Types.ObjectId; product: { _id: mongoose.Types.ObjectId; productName: string } | null; mark: string }[]
+    const uniqueReadyProducts = Array.from(
+      new Map(
+        readyToLockArr
+          .filter((e) => e.product != null)
+          .map((e) => [String(e.product!._id), { productId: String(e.product!._id), productName: e.product!.productName }])
+      ).values()
+    )
+
     const chinaBankHealth = {
       balance: chinaBankBalance,
       lockedThisMonth: chinaBankDebitsThisMonth[0]?.total ?? 0,
-      readyToLock: readyToLockCount ?? 0,
+      readyToLock: readyToLockArr.length,
+      readyToLockProducts: uniqueReadyProducts,
     }
 
     const stockMovement = {
@@ -539,7 +554,7 @@ export async function GET(req: NextRequest) {
     }
 
     const expensesByMonth = new Map<string, number>()
-    for (const e of expensesThisMonth as { _id: string; expenses: number }[]) {
+    for (const e of monthlyExpensesAgg as { _id: string; expenses: number }[]) {
       expensesByMonth.set(e._id, e.expenses)
     }
     const monthlyComparison = (monthlyRevenueAgg as {
