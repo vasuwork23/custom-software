@@ -40,6 +40,7 @@ interface CompanyItem {
   openingBalanceNotes?: string
   outstandingBalance: number
   totalProfit: number
+  showAlert: boolean
 }
 
 export default function CompaniesPage() {
@@ -319,9 +320,15 @@ export default function CompaniesPage() {
                   <div className="min-w-0">
                     <Link
                       href={`/companies/${c._id}`}
-                      className="font-semibold hover:underline line-clamp-1"
+                      className="font-semibold hover:underline line-clamp-1 flex items-center gap-2"
                     >
                       {c.companyName}
+                      {c.showAlert && (
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                        </span>
+                      )}
                     </Link>
                     {c.ownerName && (
                       <p className="text-sm text-muted-foreground">{c.ownerName}</p>
@@ -452,7 +459,17 @@ export default function CompaniesPage() {
                     className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
                     onClick={() => router.push(`/companies/${c._id}`)}
                   >
-                    <td className="p-4 font-medium">{c.companyName}</td>
+                    <td className="p-4 font-medium">
+                      <span className="flex items-center gap-2">
+                        {c.companyName}
+                        {c.showAlert && (
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     {/* <td className="p-4 text-muted-foreground">{c.ownerName ?? '—'}</td> */}
                     {/* <td className="p-4 text-muted-foreground">
                       {[c.contact1Mobile, c.contact2Mobile].filter(Boolean).join(', ') || '—'}
