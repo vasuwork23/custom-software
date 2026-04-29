@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Building2, LayoutGrid, List, Plus, Pencil, Trash2, Wallet, MessageCircle } from 'lucide-react'
+import { Building2, LayoutGrid, List, Plus, Pencil, Trash2, Wallet, MessageCircle, Download } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CompanyFormSheet } from '@/components/companies/CompanyFormSheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
-import { apiGet, apiDelete, apiPost } from '@/lib/api-client'
+import { apiGet, apiDelete, apiPost, authHeaders } from '@/lib/api-client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
@@ -121,6 +121,39 @@ export default function CompaniesPage() {
     setSendingWhatsapp(false)
   }
 
+  async function handleDownloadCompanyPdf(e: React.MouseEvent, company: CompanyItem) {
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/companies/${company._id}/outstanding-pdf`, { headers: authHeaders() })
+      if (!res.ok) { toast.error('Failed to generate PDF'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${company.companyName}-outstanding.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download PDF')
+    }
+  }
+
+  async function handleDownloadOutstanding() {
+    try {
+      const res = await fetch('/api/companies/export', { headers: authHeaders() })
+      if (!res.ok) { toast.error('Export failed'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `outstanding-${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Export failed')
+    }
+  }
+
   async function handleSendWhatsapp() {
     if (!whatsappCompany) return
     const phone = whatsappPhone.trim()
@@ -142,6 +175,10 @@ export default function CompaniesPage() {
         description="Manage customer companies and their outstanding balances."
         action={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleDownloadOutstanding}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Outstanding
+            </Button>
             <Button
               variant="outline"
               onClick={() => setPaymentDialogOpen(true)}
@@ -301,6 +338,16 @@ export default function CompaniesPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-blue-600 hover:text-blue-700"
+                      onClick={(e) => handleDownloadCompanyPdf(e, c)}
+                      aria-label="Download outstanding PDF"
+                      title="Download outstanding PDF"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                     {c.outstandingBalance > 0 && (
                       <Button
                         variant="ghost"
@@ -440,6 +487,16 @@ export default function CompaniesPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-blue-600 hover:text-blue-700"
+                          onClick={(e) => handleDownloadCompanyPdf(e, c)}
+                          aria-label="Download outstanding PDF"
+                          title="Download outstanding PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button
                             variant="ghost"
                             size="icon"

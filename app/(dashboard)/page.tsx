@@ -1059,6 +1059,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Dead Stock Alert — hidden for now
         {stats && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -1117,6 +1118,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
+        */}
       </section>
     </div>
   )
