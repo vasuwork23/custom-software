@@ -18,6 +18,122 @@ import { apiGet, apiPut } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { cn, calcGrandTotal } from '@/lib/utils'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { Check, ChevronsUpDown } from 'lucide-react'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+
+interface ProductOption {
+  value: string
+  label: string
+  availableCtn: number
+  availablePcs: number
+  qtyPerCtn: number
+}
+
+type ProductSelectCallback = (value: string, label: string, qtyPerCtn: number, availableCtn: number) => void
+
+function ProductSelect({
+  value,
+  selectedLabel,
+  onValueChange,
+}: {
+  value: string
+  selectedLabel: string
+  onValueChange: ProductSelectCallback
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [options, setOptions] = useState<ProductOption[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const delay = search.trim() ? 300 : 0
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      const url = search.trim()
+        ? `/api/sell-bills/product-options?search=${encodeURIComponent(search.trim())}`
+        : '/api/sell-bills/product-options'
+      const res = await apiGet<{ products: ProductOption[] }>(url)
+      if (res.success) setOptions(res.data.products)
+      setLoading(false)
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [open, search])
+
+  function handleOpenChange(o: boolean) {
+    setOpen(o)
+    if (o) setSearch('')
+  }
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal min-w-[180px]"
+        >
+          <span className={cn('truncate', !value && 'text-muted-foreground')}>
+            {value ? (selectedLabel || value) : 'Select product'}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[360px] p-0" align="start" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Type to search products..."
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList style={{ maxHeight: '260px' }}>
+            {loading && (
+              <div className="py-3 text-center text-sm text-muted-foreground">Loading...</div>
+            )}
+            {!loading && options.length === 0 && (
+              <CommandEmpty>No available products found.</CommandEmpty>
+            )}
+            {!loading && options.length > 0 && (
+              <CommandGroup>
+                {options.map((opt) => {
+                  const isSelected = value === opt.value
+                  return (
+                    <CommandItem
+                      key={opt.value}
+                      value={opt.value}
+                      onSelect={() => {
+                        onValueChange(opt.value, opt.label, opt.qtyPerCtn, opt.availableCtn)
+                        setOpen(false)
+                        setSearch('')
+                      }}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Check className={cn('h-4 w-4 shrink-0', isSelected ? 'opacity-100' : 'opacity-0')} />
+                        <span className="truncate">{opt.label}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {opt.availableCtn} CTN · {opt.availablePcs.toLocaleString('en-IN')} PCS
+                      </span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 interface LineRow {
   id: string
@@ -41,7 +157,6 @@ export default function EditSellBillPage() {
   const params = useParams()
   const id = params?.id as string
   const [companyOptions, setCompanyOptions] = useState<SearchableSelectOption<string>[]>([])
-  const [productOptions, setProductOptions] = useState<SearchableSelectOption<string>[]>([])
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string>('')
   const [existingBillIsCashbook, setExistingBillIsCashbook] = useState(false)
@@ -146,23 +261,10 @@ export default function EditSellBillPage() {
     const res = await apiGet<{ companies: { _id: string; companyName: string }[] }>('/api/companies?limit=200')
     if (res.success) setCompanyOptions(res.data.companies.map((c) => ({ value: c._id, label: c.companyName })))
   }, [])
-  const fetchProducts = useCallback(async () => {
-    const [chinaRes, indiaRes] = await Promise.all([
-      apiGet<{ products: { _id: string; productName: string }[] }>('/api/products?limit=200'),
-      apiGet<{ products: { _id: string; productName: string }[] }>('/api/india-products?limit=200'),
-    ])
-    const options: SearchableSelectOption<string>[] = []
-    if (chinaRes.success)
-      options.push(...chinaRes.data.products.map((p) => ({ value: `china:${p._id}`, label: `${p.productName} 🇨🇳 China` })))
-    if (indiaRes.success && 'products' in indiaRes.data)
-      options.push(...(indiaRes.data as { products: { _id: string; productName: string }[] }).products.map((p) => ({ value: `india:${p._id}`, label: `${p.productName} 🇮🇳 India` })))
-    setProductOptions(options)
-  }, [])
 
   useEffect(() => {
     fetchCompanies()
-    fetchProducts()
-  }, [fetchCompanies, fetchProducts])
+  }, [fetchCompanies])
 
   useEffect(() => {
     setLoading(true)
@@ -212,27 +314,18 @@ export default function EditSellBillPage() {
     setLines((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== lineId)))
   }
 
-  function setLineProduct(lineId: string, compositeValue: string, productName: string) {
+  function setLineProduct(lineId: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number) {
     const isIndia = compositeValue.startsWith('india:')
     const source: 'china' | 'india' = isIndia ? 'india' : 'china'
     const productId = compositeValue.includes(':') ? compositeValue.slice(compositeValue.indexOf(':') + 1) : compositeValue
+    setProductStock((prev) => ({ ...prev, [productId]: { availableCtn, qtyPerCtn } }))
     setLines((prev) =>
       prev.map((r) =>
         r.id === lineId
-          ? { ...r, productSource: source, productId, productName, availableCtn: 0, originalCtn: 0, originalPcs: 0, qtyPerCtn: 0, ctnSold: 0, pcsSold: 0, lineTotal: 0 }
+          ? { ...r, productSource: source, productId, productName, availableCtn, originalCtn: 0, originalPcs: 0, qtyPerCtn, ctnSold: 0, pcsSold: 0, lineTotal: 0 }
           : r
       )
     )
-    if (productId) {
-      fetchStockAndQty(source, productId).then(({ availableCtn, qtyPerCtn }) => {
-        setProductStock((prev) => ({ ...prev, [productId]: { availableCtn, qtyPerCtn } }))
-        setLines((prev) =>
-          prev.map((r) =>
-            r.id === lineId ? { ...r, availableCtn, qtyPerCtn } : r
-          )
-        )
-      })
-    }
   }
 
   function setLineCtn(lineId: string, ctn: number) {
@@ -472,16 +565,10 @@ export default function EditSellBillPage() {
                   <tr key={row.id} className="border-b">
                     <td className="p-2">
                       <div className="space-y-1">
-                        <SearchableSelect
-                          options={productOptions}
+                        <ProductSelect
                           value={row.productId ? `${row.productSource}:${row.productId}` : ''}
-                          onValueChange={(v) => {
-                            const opt = productOptions.find((o) => o.value === v)
-                            setLineProduct(row.id, v, opt?.label ?? '')
-                          }}
-                          placeholder="Select product"
-                          searchPlaceholder="Search..."
-                          className="min-w-[180px]"
+                          selectedLabel={row.productName}
+                          onValueChange={(v, label, qtyPerCtn, availableCtn) => setLineProduct(row.id, v, label, qtyPerCtn, availableCtn)}
                         />
                         {row.productId ? (
                           <p className="text-xs text-muted-foreground">
