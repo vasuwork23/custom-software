@@ -21,6 +21,20 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Pagination } from '@/components/ui/Pagination'
 import { PaymentFormDialog } from '@/components/received-voucher/PaymentFormDialog'
 
+function AlertDots({ level }: { level: 0 | 1 | 2 | 3 }) {
+  if (level === 0) return null
+  return (
+    <span className="flex items-center gap-0.5 shrink-0">
+      {Array.from({ length: level }).map((_, i) => (
+        <span key={i} className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+        </span>
+      ))}
+    </span>
+  )
+}
+
 type ViewMode = 'card' | 'table'
 type OutstandingFilter = 'all' | 'positive' | 'negative' | 'clear'
 
@@ -40,7 +54,7 @@ interface CompanyItem {
   openingBalanceNotes?: string
   outstandingBalance: number
   totalProfit: number
-  showAlert: boolean
+  alertLevel: 0 | 1 | 2 | 3
 }
 
 export default function CompaniesPage() {
@@ -323,12 +337,7 @@ export default function CompaniesPage() {
                       className="font-semibold hover:underline line-clamp-1 flex items-center gap-2"
                     >
                       {c.companyName}
-                      {c.showAlert && (
-                        <span className="relative flex h-2 w-2 shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                        </span>
-                      )}
+                      <AlertDots level={c.alertLevel} />
                     </Link>
                     {c.ownerName && (
                       <p className="text-sm text-muted-foreground">{c.ownerName}</p>
@@ -462,12 +471,7 @@ export default function CompaniesPage() {
                     <td className="p-4 font-medium">
                       <span className="flex items-center gap-2">
                         {c.companyName}
-                        {c.showAlert && (
-                          <span className="relative flex h-2 w-2 shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                          </span>
-                        )}
+                        <AlertDots level={c.alertLevel} />
                       </span>
                     </td>
                     {/* <td className="p-4 text-muted-foreground">{c.ownerName ?? '—'}</td> */}

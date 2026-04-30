@@ -13,6 +13,7 @@ import Expense from '@/models/Expense'
 import Company from '@/models/Company'
 import Product from '@/models/Product'
 import Container from '@/models/Container'
+import Liability from '@/models/Liability'
 import mongoose from 'mongoose'
 
 export const revalidate = 300
@@ -467,6 +468,11 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
+    const liabilityDocs = await Liability.find({}).select('status amount').lean()
+    const totalLiabilities = liabilityDocs
+      .filter((l) => l.status === 'blocked')
+      .reduce((s, l) => s + (l.amount ?? 0), 0)
+
     const chinaBankBalance = chinaBankLastTx?.balanceAfter ?? 0
     const cashBalance = cashAccount?.currentBalance ?? 0
     // receivedAgg is now per-company; sum up for global total
@@ -698,6 +704,7 @@ export async function GET(req: NextRequest) {
         monthlyComparison,
         outstandingAging,
         deadStock,
+        totalLiabilities,
         unsentWhatsappBills: unsentWhatsappCount ?? 0,
         unlockedReadyEntries: unlockedReadyEntriesCount ?? 0,
         containers: {
