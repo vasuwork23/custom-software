@@ -41,6 +41,8 @@ interface ProductOption {
   qtyPerCtn: number
 }
 
+type ProductSelectCallback = (value: string, label: string, qtyPerCtn: number, availableCtn: number) => void
+
 interface LineRow {
   id: string
   productSource: 'china' | 'india'
@@ -224,28 +226,44 @@ function CompanySelect({
   )
 }
 
-// ─── Product Searchable Select (with available qty) ───────────────────────────
+// ─── Product Searchable Select (server-side search, no N+1 calls) ────────────
 
 function ProductSelect({
-  options,
   value,
+  selectedLabel,
   onValueChange,
 }: {
-  options: ProductOption[]
   value: string
-  onValueChange: (v: string, label: string) => void
+  selectedLabel: string
+  onValueChange: ProductSelectCallback
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [options, setOptions] = useState<ProductOption[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const filtered = search.trim()
-    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
-    : options
+  useEffect(() => {
+    if (!open) return
+    const delay = search.trim() ? 300 : 0
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      const url = search.trim()
+        ? `/api/sell-bills/product-options?search=${encodeURIComponent(search.trim())}`
+        : '/api/sell-bills/product-options'
+      const res = await apiGet<{ products: ProductOption[] }>(url)
+      if (res.success) setOptions(res.data.products)
+      setLoading(false)
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [open, search])
 
-  const selected = options.find((o) => o.value === value)
+  function handleOpenChange(o: boolean) {
+    setOpen(o)
+    if (o) setSearch('')
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -253,8 +271,8 @@ function ProductSelect({
           aria-expanded={open}
           className="w-full justify-between font-normal min-w-[200px]"
         >
-          <span className={cn('truncate', !selected && 'text-muted-foreground')}>
-            {selected?.label ?? 'Select product'}
+          <span className={cn('truncate', !value && 'text-muted-foreground')}>
+            {value ? (selectedLabel || value) : 'Select product'}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -262,44 +280,48 @@ function ProductSelect({
       <PopoverContent
         className="w-[360px] p-0"
         align="start"
-        // Fixed height prevents the dropdown from jumping
         style={{ maxHeight: '320px', overflowY: 'auto' }}
       >
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search products..."
+            placeholder="Type to search products..."
             value={search}
             onValueChange={setSearch}
           />
           <CommandList style={{ maxHeight: '260px' }}>
-            {filtered.length === 0 && (
+            {loading && (
+              <div className="py-3 text-center text-sm text-muted-foreground">Loading...</div>
+            )}
+            {!loading && options.length === 0 && (
               <CommandEmpty>No available products found.</CommandEmpty>
             )}
-            <CommandGroup>
-              {filtered.map((opt) => {
-                const isSelected = value === opt.value
-                return (
-                  <CommandItem
-                    key={opt.value}
-                    value={opt.value}
-                    onSelect={() => {
-                      onValueChange(opt.value, opt.label)
-                      setOpen(false)
-                      setSearch('')
-                    }}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Check className={cn('h-4 w-4 shrink-0', isSelected ? 'opacity-100' : 'opacity-0')} />
-                      <span className="truncate">{opt.label}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                      {opt.availableCtn} CTN · {opt.availablePcs.toLocaleString('en-IN')} PCS
-                    </span>
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
+            {!loading && options.length > 0 && (
+              <CommandGroup>
+                {options.map((opt) => {
+                  const isSelected = value === opt.value
+                  return (
+                    <CommandItem
+                      key={opt.value}
+                      value={opt.value}
+                      onSelect={() => {
+                        onValueChange(opt.value, opt.label, opt.qtyPerCtn, opt.availableCtn)
+                        setOpen(false)
+                        setSearch('')
+                      }}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Check className={cn('h-4 w-4 shrink-0', isSelected ? 'opacity-100' : 'opacity-0')} />
+                        <span className="truncate">{opt.label}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {opt.availableCtn} CTN · {opt.availablePcs.toLocaleString('en-IN')} PCS
+                      </span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -312,7 +334,6 @@ function ProductSelect({
 export default function NewSellBillPage() {
   const router = useRouter()
   const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([])
-  const [productOptions, setProductOptions] = useState<ProductOption[]>([])
   const [companyId, setCompanyId] = useState<string>('')
   const [billDate, setBillDate] = useState<Date>(new Date())
   const [notes, setNotes] = useState('')
@@ -333,61 +354,14 @@ export default function NewSellBillPage() {
     if (res.success) setCompanyOptions(res.data.companies)
   }, [])
 
-  const fetchProducts = useCallback(async () => {
-    const [chinaRes, indiaRes] = await Promise.all([
-      apiGet<{ products: { _id: string; productName: string; availableCtn: number; qtyPerCtn?: number }[] }>('/api/products?limit=200'),
-      apiGet<{ products: { _id: string; productName: string; availableCtn: number; qty?: number }[] }>('/api/india-products?limit=200'),
-    ])
-    const options: ProductOption[] = []
-
-    if (chinaRes.success) {
-      // Only show products with available CTN > 0
-      const available = chinaRes.data.products.filter((p) => (p.availableCtn ?? 0) > 0)
-      for (const p of available) {
-        // Fetch qty per ctn to compute available PCS
-        const qtyRes = await apiGet<{ qtyPerCtn: number }>(`/api/products/${p._id}/qty-per-ctn`).catch(() => ({ success: false as const, data: { qtyPerCtn: 0 } }))
-        const qtyPerCtn = qtyRes.success ? (qtyRes.data.qtyPerCtn ?? 0) : 0
-        options.push({
-          value: `china:${p._id}`,
-          label: `${p.productName} 🇨🇳 China`,
-          availableCtn: p.availableCtn,
-          availablePcs: Math.round(p.availableCtn * qtyPerCtn),
-          qtyPerCtn,
-        })
-      }
-    }
-
-    if (indiaRes.success && (indiaRes.data as { products?: unknown[] }).products) {
-      const indiaProds = (indiaRes.data as { products: { _id: string; productName: string; availableCtn: number; qty?: number }[] }).products
-      const availableIndia = indiaProds.filter((p) => (p.availableCtn ?? 0) > 0)
-      for (const p of availableIndia) {
-        const qtyRes = await apiGet<{ qtyPerCtn: number }>(`/api/india-products/${p._id}/qty-per-ctn`).catch(() => ({ success: false as const, data: { qtyPerCtn: 0 } }))
-        const qtyPerCtn = qtyRes.success ? (qtyRes.data.qtyPerCtn ?? 0) : 0
-        options.push({
-          value: `india:${p._id}`,
-          label: `${p.productName} 🇮🇳 India`,
-          availableCtn: p.availableCtn,
-          availablePcs: Math.round(p.availableCtn * qtyPerCtn),
-          qtyPerCtn,
-        })
-      }
-    }
-
-    setProductOptions(options)
-  }, [])
-
   useEffect(() => {
     fetchCompanies()
-    fetchProducts()
-  }, [fetchCompanies, fetchProducts])
+  }, [fetchCompanies])
 
-  function setLineProduct(id: string, compositeValue: string, productName: string) {
+  function setLineProduct(id: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number) {
     const isIndia = compositeValue.startsWith('india:')
     const source: 'china' | 'india' = isIndia ? 'india' : 'china'
     const productId = compositeValue.includes(':') ? compositeValue.slice(compositeValue.indexOf(':') + 1) : compositeValue
-
-    // Get cached stock info from productOptions
-    const opt = productOptions.find((o) => o.value === compositeValue)
 
     setLines((prev) =>
       prev.map((r) =>
@@ -397,8 +371,8 @@ export default function NewSellBillPage() {
               productSource: source,
               productId,
               productName,
-              availableCtn: opt?.availableCtn ?? 0,
-              qtyPerCtn: opt?.qtyPerCtn ?? 0,
+              availableCtn,
+              qtyPerCtn,
               ctnSold: 0,
               pcsSold: 0,
               lineTotal: 0,
@@ -606,9 +580,9 @@ export default function NewSellBillPage() {
                       {/* Fixed height container prevents row from jumping */}
                       <div className="min-h-[56px]">
                         <ProductSelect
-                          options={productOptions}
                           value={row.productId ? `${row.productSource}:${row.productId}` : ''}
-                          onValueChange={(v, label) => setLineProduct(row.id, v, label)}
+                          selectedLabel={row.productName}
+                          onValueChange={(v, label, qtyPerCtn, availableCtn) => setLineProduct(row.id, v, label, qtyPerCtn, availableCtn)}
                         />
                         {row.productId && (
                           <p className="text-xs text-muted-foreground mt-1">

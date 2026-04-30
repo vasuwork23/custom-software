@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import BankAccount from '@/models/BankAccount'
+import BankTransaction from '@/models/BankTransaction'
+import Cash from '@/models/Cash'
 import ChinaBankTransaction from '@/models/ChinaBankTransaction'
 import SellBill from '@/models/SellBill'
 import SellBillItem from '@/models/SellBillItem'
@@ -91,7 +93,7 @@ export async function GET(req: NextRequest) {
 
     const [
       chinaBankLastTx,
-      cashAccount,
+      _cashAccount,
       billedAgg,
       receivedAgg,
       pendingChina,
@@ -468,13 +470,39 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    const liabilityDocs = await Liability.find({}).select('status amount').lean()
+    // Compute online bank IDs so we can fetch their true ledger balances
+    const onlineBankAccounts = (bankAccounts as { _id: mongoose.Types.ObjectId; accountName: string; type: string }[])
+      .filter((a) => a.type !== 'cash')
+    const onlineBankIds = onlineBankAccounts.map((a) => a._id)
+
+    const [liabilityDocs, cashDoc, bankTxAgg] = await Promise.all([
+      Liability.find({}).select('status amount').lean(),
+      // True cash balance lives in the Cash ledger, not BankAccount.currentBalance
+      Cash.findOne().select('balance').lean(),
+      // True bank balances come from BankTransaction ledger (same as banks page)
+      onlineBankIds.length > 0
+        ? BankTransaction.aggregate([
+            { $match: { bankAccount: { $in: onlineBankIds } } },
+            {
+              $group: {
+                _id: '$bankAccount',
+                balance: {
+                  $sum: {
+                    $cond: [{ $eq: ['$type', 'credit'] }, '$amount', { $multiply: ['$amount', -1] }],
+                  },
+                },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+    ])
+
     const totalLiabilities = liabilityDocs
       .filter((l) => l.status === 'blocked')
       .reduce((s, l) => s + (l.amount ?? 0), 0)
 
     const chinaBankBalance = chinaBankLastTx?.balanceAfter ?? 0
-    const cashBalance = cashAccount?.currentBalance ?? 0
+    const cashBalance = (cashDoc as { balance?: number } | null)?.balance ?? 0
     // receivedAgg is now per-company; sum up for global total
     const totalReceived = (receivedAgg as { _id: unknown; totalReceived: number }[]).reduce(
       (sum, r) => sum + (r.totalReceived ?? 0),
@@ -538,14 +566,16 @@ export async function GET(req: NextRequest) {
       isDefault: Boolean(p.isDefault),
     }))
 
-    const bankBalances = (bankAccounts as {
-      accountName: string
-      currentBalance?: number
-      type: string
-      _id: mongoose.Types.ObjectId
-    }[]).map((a) => ({
+    const bankTxBalanceMap = new Map(
+      (bankTxAgg as { _id: mongoose.Types.ObjectId; balance: number }[]).map((b) => [
+        String(b._id),
+        parseFloat((b.balance ?? 0).toFixed(2)),
+      ])
+    )
+
+    const bankBalances = onlineBankAccounts.map((a) => ({
       accountName: a.accountName,
-      balance: a.currentBalance ?? 0,
+      balance: bankTxBalanceMap.get(String(a._id)) ?? 0,
       type: a.type,
       id: String(a._id),
     }))
