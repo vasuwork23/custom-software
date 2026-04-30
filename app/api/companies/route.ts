@@ -141,14 +141,20 @@ export async function GET(req: NextRequest) {
     const pageCompanies = filtered.slice(skip, skip + limit)
 
     const pageCompanyIds = pageCompanies.map((c) => c._id)
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    sevenDaysAgo.setHours(0, 0, 0, 0)
+
+    const daysAgo = (d: number) => {
+      const dt = new Date()
+      dt.setDate(dt.getDate() - d)
+      dt.setHours(0, 0, 0, 0)
+      return dt
+    }
 
     let profitByCompany: Record<string, number> = {}
-    let last7DaysSalesByCompany: Record<string, number> = {}
+    let sales7ByCompany: Record<string, number> = {}
+    let sales14ByCompany: Record<string, number> = {}
+    let sales21ByCompany: Record<string, number> = {}
     if (pageCompanyIds.length > 0) {
-      const [profitAgg, salesAgg] = await Promise.all([
+      const [profitAgg, s7Agg, s14Agg, s21Agg] = await Promise.all([
         SellBillItem.aggregate([
           { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
           { $unwind: '$bill' },
@@ -156,23 +162,37 @@ export async function GET(req: NextRequest) {
           { $group: { _id: '$bill.company', total: { $sum: '$totalProfit' } } },
         ]),
         SellBill.aggregate([
-          { $match: { company: { $in: pageCompanyIds }, createdAt: { $gte: sevenDaysAgo } } },
+          { $match: { company: { $in: pageCompanyIds }, createdAt: { $gte: daysAgo(7) } } },
+          { $group: { _id: '$company', total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
+        ]),
+        SellBill.aggregate([
+          { $match: { company: { $in: pageCompanyIds }, createdAt: { $gte: daysAgo(14) } } },
+          { $group: { _id: '$company', total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
+        ]),
+        SellBill.aggregate([
+          { $match: { company: { $in: pageCompanyIds }, createdAt: { $gte: daysAgo(21) } } },
           { $group: { _id: '$company', total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
         ]),
       ])
       profitByCompany = Object.fromEntries(profitAgg.map((r) => [String(r._id), r.total]))
-      last7DaysSalesByCompany = Object.fromEntries(salesAgg.map((r) => [String(r._id), r.total]))
+      sales7ByCompany  = Object.fromEntries(s7Agg.map((r)  => [String(r._id), r.total]))
+      sales14ByCompany = Object.fromEntries(s14Agg.map((r) => [String(r._id), r.total]))
+      sales21ByCompany = Object.fromEntries(s21Agg.map((r) => [String(r._id), r.total]))
     }
 
     const list = pageCompanies.map((c) => {
       const totalProfit = profitByCompany[String(c._id)] ?? 0
-      const last7DaysSales = last7DaysSalesByCompany[String(c._id)] ?? 0
       const outstanding = c.outstandingBalance as number
-      const showAlert = outstanding > 0 && outstanding > last7DaysSales
+      let alertLevel = 0
+      if (outstanding > 0) {
+        if (outstanding > (sales21ByCompany[String(c._id)] ?? 0)) alertLevel = 3
+        else if (outstanding > (sales14ByCompany[String(c._id)] ?? 0)) alertLevel = 2
+        else if (outstanding > (sales7ByCompany[String(c._id)] ?? 0)) alertLevel = 1
+      }
       return {
         ...c,
         totalProfit,
-        showAlert,
+        alertLevel,
       }
     })
 

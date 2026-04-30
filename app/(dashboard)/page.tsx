@@ -46,6 +46,7 @@ interface DashboardStats {
   totalPositiveOutstanding: number
   totalNegativeOutstanding: number
   pendingPaymentsCount: number
+  totalLiabilities: number
 }
 
 interface DashboardInventoryValue {
@@ -683,13 +684,15 @@ export default function DashboardPage() {
             const bankTotal = stats.bankBalances.reduce((sum, b) => sum + b.balance, 0)
             const cashAndBanks = stats.cashBalance + bankTotal
             const netOutstanding = stats.totalPositiveOutstanding - stats.totalNegativeOutstanding
-            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + cashAndBanks + netOutstanding
+            const liabilities = stats.totalLiabilities ?? 0
+            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + cashAndBanks + netOutstanding + liabilities
 
             const items = [
               { label: 'Inventory', value: stats.inventoryValue.total },
               { label: 'China Bank', value: stats.chinaBankHealth.balance },
               { label: 'Cash & Banks', value: cashAndBanks },
               { label: 'Net Outstanding', value: netOutstanding },
+              { label: 'Liabilities', value: liabilities },
             ]
 
             return (
