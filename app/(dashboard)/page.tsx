@@ -688,12 +688,17 @@ export default function DashboardPage() {
             const cashAndBanks = stats.cashBalance + bankTotal
             const toReceive = stats.totalPositiveOutstanding
             const liabilities = stats.totalLiabilities ?? 0
-            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + cashAndBanks + toReceive + liabilities
+
+            const skyLandMart = stats.bankBalances.find((b) => b.accountName === 'SKY LAND MART')?.balance ?? 0
+            const yashasviIntl = stats.bankBalances.find((b) => b.accountName === 'YASHASVI INTERNATIONAL')?.balance ?? 0
+            const adjustedCashAndBanks = cashAndBanks - skyLandMart - yashasviIntl
+            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + adjustedCashAndBanks + toReceive + liabilities
+            const finalTotal = grandTotal + skyLandMart + yashasviIntl
 
             const grandTotalItems = [
               { label: 'China Bank', value: stats.chinaBankHealth.balance },
               { label: 'Inventory', value: stats.inventoryValue.total },
-              { label: 'Cash & Banks', value: cashAndBanks },
+              { label: 'Cash & Banks', value: adjustedCashAndBanks },
               { label: 'To Receive', value: toReceive },
               { label: 'Liabilities', value: liabilities },
             ]
@@ -732,6 +737,27 @@ export default function DashboardPage() {
                       <p className="text-xs text-muted-foreground mb-1">Grand Total</p>
                       <p className={cn('text-xl font-bold', grandTotal >= 0 ? 'text-emerald-600' : 'text-red-600')}>
                         <AmountDisplay amount={grandTotal} />
+                      </p>
+                    </div>
+                    <span className="text-xl text-muted-foreground font-light select-none">+</span>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Sky Land Mart</p>
+                      <p className="font-semibold text-base">
+                        <AmountDisplay amount={skyLandMart} />
+                      </p>
+                    </div>
+                    <span className="text-xl text-muted-foreground font-light select-none">+</span>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Yashasvi International</p>
+                      <p className="font-semibold text-base">
+                        <AmountDisplay amount={yashasviIntl} />
+                      </p>
+                    </div>
+                    <span className="text-xl font-medium text-muted-foreground select-none px-1">=</span>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Total</p>
+                      <p className={cn('text-xl font-bold', finalTotal >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                        <AmountDisplay amount={finalTotal} />
                       </p>
                     </div>
                   </div>
