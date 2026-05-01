@@ -47,6 +47,9 @@ interface DashboardStats {
   totalNegativeOutstanding: number
   pendingPaymentsCount: number
   totalLiabilities: number
+  totalInvestment: number
+  allTimeNetProfit: number
+  localConst: number
 }
 
 interface DashboardInventoryValue {
@@ -679,47 +682,100 @@ export default function DashboardPage() {
             )} */}
           </div>
 
-          {/* Grand total equation bar */}
+          {/* Grand total & investment formula rows */}
           {(() => {
             const bankTotal = stats.bankBalances.reduce((sum, b) => sum + b.balance, 0)
             const cashAndBanks = stats.cashBalance + bankTotal
-            const netOutstanding = stats.totalPositiveOutstanding - stats.totalNegativeOutstanding
+            const toReceive = stats.totalPositiveOutstanding
             const liabilities = stats.totalLiabilities ?? 0
-            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + cashAndBanks + netOutstanding + liabilities
+            const grandTotal = stats.inventoryValue.total + stats.chinaBankHealth.balance + cashAndBanks + toReceive + liabilities
 
-            const items = [
-              { label: 'Inventory', value: stats.inventoryValue.total },
+            const grandTotalItems = [
               { label: 'China Bank', value: stats.chinaBankHealth.balance },
+              { label: 'Inventory', value: stats.inventoryValue.total },
               { label: 'Cash & Banks', value: cashAndBanks },
-              { label: 'Net Outstanding', value: netOutstanding },
+              { label: 'To Receive', value: toReceive },
               { label: 'Liabilities', value: liabilities },
             ]
 
+            const creditOutstanding = stats.totalNegativeOutstanding
+            const netProfit = stats.allTimeNetProfit
+            const investmentTotal = stats.totalInvestment + creditOutstanding + netProfit + stats.localConst
+            const diff = investmentTotal - grandTotal
+
+            const items = [
+              { label: 'Total Investment', value: stats.totalInvestment },
+              { label: 'Outstanding (Credit)', value: creditOutstanding },
+              { label: 'Net Profit (All Time)', value: netProfit },
+              { label: 'Local Const', value: stats.localConst },
+            ]
+
             return (
-              <div className="mt-3 rounded-lg border bg-muted/20 px-6 py-4">
-                <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-4">
-                  {items.map((item, idx) => (
-                    <div key={item.label} className="flex items-center gap-x-5">
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                        <p className={cn('font-semibold text-base', item.value < 0 ? 'text-red-600' : '')}>
-                          <AmountDisplay amount={item.value} />
-                        </p>
+              <>
+                <div className="mt-3 rounded-lg border bg-muted/20 px-6 py-4">
+                  <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-4">
+                    {grandTotalItems.map((item, idx) => (
+                      <div key={item.label} className="flex items-center gap-x-5">
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                          <p className={cn('font-semibold text-base', item.value < 0 ? 'text-red-600' : '')}>
+                            <AmountDisplay amount={item.value} />
+                          </p>
+                        </div>
+                        {idx < grandTotalItems.length - 1 && (
+                          <span className="text-xl text-muted-foreground font-light select-none">+</span>
+                        )}
                       </div>
-                      {idx < items.length - 1 && (
-                        <span className="text-xl text-muted-foreground font-light select-none">+</span>
-                      )}
+                    ))}
+                    <span className="text-xl font-medium text-muted-foreground select-none px-1">=</span>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Grand Total</p>
+                      <p className={cn('text-xl font-bold', grandTotal >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                        <AmountDisplay amount={grandTotal} />
+                      </p>
                     </div>
-                  ))}
-                  <span className="text-xl font-medium text-muted-foreground select-none px-1">=</span>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Grand Total</p>
-                    <p className={cn('text-xl font-bold', grandTotal >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-                      <AmountDisplay amount={grandTotal} />
-                    </p>
                   </div>
                 </div>
-              </div>
+
+                <div className="mt-3 rounded-lg border bg-muted/20 px-4 py-3">
+                  <div className="flex items-center justify-center gap-x-3 overflow-x-auto">
+                    {items.map((item, idx) => (
+                      <div key={item.label} className="flex items-center gap-x-3 shrink-0">
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                          <p className={cn('font-semibold text-base', item.value < 0 ? 'text-red-600' : '')}>
+                            <AmountDisplay amount={item.value} />
+                          </p>
+                        </div>
+                        {idx < items.length - 1 && (
+                          <span className="text-xl text-muted-foreground font-light select-none">+</span>
+                        )}
+                      </div>
+                    ))}
+                    <span className="text-xl font-medium text-muted-foreground select-none shrink-0">=</span>
+                    <div className="text-center shrink-0">
+                      <p className="text-xs text-muted-foreground mb-1">Total</p>
+                      <p className={cn('text-xl font-bold', investmentTotal >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                        <AmountDisplay amount={investmentTotal} />
+                      </p>
+                    </div>
+                    <span className="text-xl text-muted-foreground font-light select-none shrink-0">-</span>
+                    <div className="text-center shrink-0">
+                      <p className="text-xs text-muted-foreground mb-1">Grand Total</p>
+                      <p className="font-semibold text-base">
+                        <AmountDisplay amount={grandTotal} />
+                      </p>
+                    </div>
+                    <span className="text-xl font-medium text-muted-foreground select-none shrink-0">=</span>
+                    <div className="text-center shrink-0">
+                      <p className="text-xs text-muted-foreground mb-1">Difference</p>
+                      <p className={cn('text-xl font-bold', diff >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                        <AmountDisplay amount={diff} />
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
             )
           })()}
           </>
