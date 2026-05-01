@@ -16,6 +16,7 @@ import Company from '@/models/Company'
 import Product from '@/models/Product'
 import Container from '@/models/Container'
 import Liability from '@/models/Liability'
+import Investment from '@/models/Investment'
 import mongoose from 'mongoose'
 
 export const revalidate = 300
@@ -475,7 +476,7 @@ export async function GET(req: NextRequest) {
       .filter((a) => a.type !== 'cash')
     const onlineBankIds = onlineBankAccounts.map((a) => a._id)
 
-    const [liabilityDocs, cashDoc, bankTxAgg] = await Promise.all([
+    const [liabilityDocs, cashDoc, bankTxAgg, investmentAgg, allTimeGrossProfitAgg, allTimeExpensesAgg] = await Promise.all([
       Liability.find({}).select('status amount').lean(),
       // True cash balance lives in the Cash ledger, not BankAccount.currentBalance
       Cash.findOne().select('balance').lean(),
@@ -495,11 +496,22 @@ export async function GET(req: NextRequest) {
             },
           ])
         : Promise.resolve([]),
+      // Total investment across all investors (banks module)
+      Investment.aggregate([{ $group: { _id: null, total: { $sum: '$currentBalance' } } }]),
+      // All-time gross profit (no date filter)
+      SellBillItem.aggregate([{ $group: { _id: null, grossProfit: { $sum: '$totalProfit' } } }]),
+      // All-time total expenses
+      Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
     ])
 
     const totalLiabilities = liabilityDocs
       .filter((l) => l.status === 'blocked')
       .reduce((s, l) => s + (l.amount ?? 0), 0)
+
+    const totalInvestment = (investmentAgg as { total: number }[])[0]?.total ?? 0
+    const allTimeGrossProfit = (allTimeGrossProfitAgg as { grossProfit: number }[])[0]?.grossProfit ?? 0
+    const allTimeExpenses = (allTimeExpensesAgg as { total: number }[])[0]?.total ?? 0
+    const allTimeNetProfit = allTimeGrossProfit - allTimeExpenses
 
     const chinaBankBalance = chinaBankLastTx?.balanceAfter ?? 0
     const cashBalance = (cashDoc as { balance?: number } | null)?.balance ?? 0
@@ -735,6 +747,9 @@ export async function GET(req: NextRequest) {
         outstandingAging,
         deadStock,
         totalLiabilities,
+        totalInvestment,
+        allTimeNetProfit,
+        localConst: Number(process.env.LOCAL_CONST ?? 0),
         unsentWhatsappBills: unsentWhatsappCount ?? 0,
         unlockedReadyEntries: unlockedReadyEntriesCount ?? 0,
         containers: {
