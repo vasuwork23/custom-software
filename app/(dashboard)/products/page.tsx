@@ -126,7 +126,7 @@ export default function ProductsPage() {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('page', String(page))
-    params.set('limit', '100')
+    params.set('limit', '200')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     params.set('filter', chinaFilter)
     const result = await apiGet<{
