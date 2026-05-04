@@ -3,19 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -31,7 +25,6 @@ import type { DateRange } from 'react-day-picker'
 
 type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
 
-const PIE_COLORS = ['#22c55e', '#ef4444', '#eab308']
 
 export default function ReportsPage() {
   const [period, setPeriod] = useState<Period>('today')
@@ -434,10 +427,10 @@ export default function ReportsPage() {
                         </CardContent>
                       </Card>
                     </div>
-                    <div className="rounded-md border overflow-x-auto">
+                    <div className="rounded-md border overflow-x-auto max-h-[550px] overflow-y-auto">
                       <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/50">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="border-b bg-muted/80">
                             <th className="p-3 text-left font-medium">Product</th>
                             <th className="p-3 text-right font-medium">Total CTN</th>
                             <th className="p-3 text-right font-medium">Available CTN</th>
@@ -475,8 +468,10 @@ export default function ReportsPage() {
                               <td className="p-3 text-right">{r.lockedEntries}</td>
                             </tr>
                           ))}
-                          {stock.rows.length > 0 && (
-                            <tr className="border-t-2 bg-muted/40 font-semibold">
+                        </tbody>
+                        {stock.rows.length > 0 && (
+                          <tfoot className="sticky bottom-0 z-10">
+                            <tr className="border-t-2 bg-muted/80 font-semibold">
                               <td className="p-3">Total</td>
                               <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
                               <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
@@ -490,8 +485,8 @@ export default function ReportsPage() {
                               </td>
                               <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.lockedEntries ?? 0), 0)}</td>
                             </tr>
-                          )}
-                        </tbody>
+                          </tfoot>
+                        )}
                       </table>
                     </div>
                   </TabsContent>
@@ -529,10 +524,10 @@ export default function ReportsPage() {
                       </Card>
                     </div>
                     {stock.indiaRows && stock.indiaRows.length > 0 ? (
-                      <div className="rounded-md border overflow-x-auto">
+                      <div className="rounded-md border overflow-x-auto max-h-[550px] overflow-y-auto">
                         <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b bg-muted/50">
+                          <thead className="sticky top-0 z-10">
+                            <tr className="border-b bg-muted/80">
                               <th className="p-3 text-left font-medium">Product</th>
                               <th className="p-3 text-right font-medium">Total CTN</th>
                               <th className="p-3 text-right font-medium">Available CTN</th>
@@ -564,7 +559,9 @@ export default function ReportsPage() {
                                 </td>
                               </tr>
                             ))}
-                            <tr className="border-t-2 bg-muted/40 font-semibold">
+                          </tbody>
+                          <tfoot className="sticky bottom-0 z-10">
+                            <tr className="border-t-2 bg-muted/80 font-semibold">
                               <td className="p-3">Total</td>
                               <td className="p-3 text-right">{stock.indiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
                               <td className="p-3 text-right">{stock.indiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
@@ -576,7 +573,7 @@ export default function ReportsPage() {
                                 ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
                               </td>
                             </tr>
-                          </tbody>
+                          </tfoot>
                         </table>
                       </div>
                     ) : (
