@@ -281,27 +281,10 @@ export default function ReportsPage() {
                       </CardContent>
                     </Card>
                   </div>
-                  {pnl.chart.length > 0 && (
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={pnl.chart}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="period" />
-                          <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip formatter={(v: number) => `₹${Number(v).toLocaleString('en-IN')}`} />
-                          <Legend />
-                          <Line type="monotone" dataKey="revenue" stroke="#22c55e" name="Revenue" />
-                          <Line type="monotone" dataKey="cost" stroke="#ef4444" name="Cost" />
-                          <Line type="monotone" dataKey="grossProfit" stroke="#3b82f6" name="Gross Profit" />
-                          {withExpenses && <Line type="monotone" dataKey="netProfit" stroke="#8b5cf6" name="Net Profit" />}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <h4 className="mb-2 font-medium">By Product</h4>
-                      <div className="rounded-md border overflow-x-auto max-h-[240px] overflow-y-auto">
+                      <div className="rounded-md border overflow-x-auto max-h-[500px] overflow-y-auto">
                         <table className="w-full text-sm">
                           <thead className="sticky top-0 bg-muted/80">
                             <tr className="border-b">
@@ -328,7 +311,7 @@ export default function ReportsPage() {
                     </div>
                     <div>
                       <h4 className="mb-2 font-medium">By Company</h4>
-                      <div className="rounded-md border overflow-x-auto max-h-[240px] overflow-y-auto">
+                      <div className="rounded-md border overflow-x-auto max-h-[500px] overflow-y-auto">
                         <table className="w-full text-sm">
                           <thead className="sticky top-0 bg-muted/80">
                             <tr className="border-b">
