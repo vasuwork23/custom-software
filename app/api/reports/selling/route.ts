@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const summaryAgg = await SellBill.aggregate([
       { $match: { billDate: { $gte: start, $lte: end } } },
-      { $group: { _id: null, totalBills: { $sum: 1 }, totalRevenue: { $sum: '$totalAmount' } } },
+      { $group: { _id: null, totalBills: { $sum: 1 }, totalRevenue: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
     ])
     const summary = summaryAgg[0] ?? { totalBills: 0, totalRevenue: 0 }
 
@@ -36,7 +36,26 @@ export async function GET(req: NextRequest) {
       { $match: { 'bill.billDate': { $gte: start, $lte: end } } },
       { $lookup: { from: 'products', localField: 'product', foreignField: '_id', as: 'productDoc' } },
       { $unwind: { path: '$productDoc', preserveNullAndEmptyArrays: true } },
-      { $group: { _id: '$product', productName: { $first: '$productDoc.productName' }, revenue: { $sum: '$totalAmount' }, profit: { $sum: '$totalProfit' } } },
+      {
+        $addFields: {
+          itemCost: {
+            $reduce: {
+              input: { $ifNull: ['$fifoBreakdown', []] },
+              initialValue: 0,
+              in: { $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }] },
+            },
+          },
+          adjustedRevenue: {
+            $cond: [
+              { $gt: ['$bill.totalAmount', 0] },
+              { $multiply: ['$totalAmount', { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] }] },
+              '$totalAmount',
+            ],
+          },
+        },
+      },
+      { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
+      { $group: { _id: '$product', productName: { $first: '$productDoc.productName' }, revenue: { $sum: '$adjustedRevenue' }, profit: { $sum: '$adjustedProfit' } } },
       { $sort: { revenue: -1 } },
       { $limit: 5 },
     ])
@@ -47,7 +66,26 @@ export async function GET(req: NextRequest) {
       { $match: { 'bill.billDate': { $gte: start, $lte: end } } },
       { $lookup: { from: 'companies', localField: 'bill.company', foreignField: '_id', as: 'companyDoc' } },
       { $unwind: { path: '$companyDoc', preserveNullAndEmptyArrays: true } },
-      { $group: { _id: '$bill.company', companyName: { $first: '$companyDoc.companyName' }, revenue: { $sum: '$totalAmount' }, profit: { $sum: '$totalProfit' } } },
+      {
+        $addFields: {
+          itemCost: {
+            $reduce: {
+              input: { $ifNull: ['$fifoBreakdown', []] },
+              initialValue: 0,
+              in: { $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }] },
+            },
+          },
+          adjustedRevenue: {
+            $cond: [
+              { $gt: ['$bill.totalAmount', 0] },
+              { $multiply: ['$totalAmount', { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] }] },
+              '$totalAmount',
+            ],
+          },
+        },
+      },
+      { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
+      { $group: { _id: '$bill.company', companyName: { $first: '$companyDoc.companyName' }, revenue: { $sum: '$adjustedRevenue' }, profit: { $sum: '$adjustedProfit' } } },
       { $sort: { revenue: -1 } },
       { $limit: 5 },
     ])
@@ -57,9 +95,25 @@ export async function GET(req: NextRequest) {
       { $lookup: { from: 'companies', localField: 'company', foreignField: '_id', as: 'companyDoc' } },
       { $unwind: { path: '$companyDoc', preserveNullAndEmptyArrays: true } },
       { $lookup: { from: 'sellbillitems', localField: '_id', foreignField: 'sellBill', as: 'items' } },
-      { $addFields: { itemCount: { $size: '$items' }, totalProfit: { $sum: '$items.totalProfit' } } },
+      {
+        $addFields: {
+          itemCount: { $size: '$items' },
+          totalProfit: {
+            $cond: [
+              { $gt: ['$totalAmount', 0] },
+              {
+                $multiply: [
+                  { $sum: '$items.totalProfit' },
+                  { $divide: [{ $ifNull: ['$grandTotal', '$totalAmount'] }, '$totalAmount'] },
+                ],
+              },
+              { $sum: '$items.totalProfit' },
+            ],
+          },
+        },
+      },
       { $sort: { billDate: -1, createdAt: -1 } },
-      { $project: { billNumber: 1, billDate: 1, companyName: '$companyDoc.companyName', totalAmount: 1, itemCount: 1, totalProfit: 1 } },
+      { $project: { billNumber: 1, billDate: 1, companyName: '$companyDoc.companyName', totalAmount: { $ifNull: ['$grandTotal', '$totalAmount'] }, itemCount: 1, totalProfit: 1 } },
     ])
 
     const totalBills = summary.totalBills ?? 0

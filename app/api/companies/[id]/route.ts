@@ -31,7 +31,26 @@ async function getTotalProfit(companyId: mongoose.Types.ObjectId): Promise<numbe
     { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
     { $unwind: '$bill' },
     { $match: { 'bill.company': companyId } },
-    { $group: { _id: null, total: { $sum: '$totalProfit' } } },
+    {
+      $addFields: {
+        itemCost: {
+          $reduce: {
+            input: { $ifNull: ['$fifoBreakdown', []] },
+            initialValue: 0,
+            in: { $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }] },
+          },
+        },
+        adjustedRevenue: {
+          $cond: [
+            { $gt: ['$bill.totalAmount', 0] },
+            { $multiply: ['$totalAmount', { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] }] },
+            '$totalAmount',
+          ],
+        },
+      },
+    },
+    { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
+    { $group: { _id: null, total: { $sum: '$adjustedProfit' } } },
   ])
   return res[0]?.total ?? 0
 }
@@ -74,17 +93,19 @@ export async function GET(
     ])
 
     const sellingRows = sellingHistory.map((bill) => {
-      const items = (bill as unknown as { items?: { totalAmount: number; totalProfit: number; ctnSold?: number; product?: unknown }[] })?.items ?? []
+      const items = (bill as unknown as { items?: { totalAmount: number; totalProfit: number; ctnSold?: number; product?: unknown; fifoBreakdown?: { finalCost?: number; pcsConsumed?: number }[] }[] })?.items ?? []
       const totalCtn = items.reduce((s, i) => s + (i.ctnSold ?? 0), 0)
-      const billAmount = (bill as { grandTotal?: number }).grandTotal ?? bill.totalAmount
-      const profit = items.reduce((s, i) => s + (i.totalProfit ?? 0), 0)
+      const billGrandTotal = (bill as { grandTotal?: number }).grandTotal ?? bill.totalAmount
+      const totalFifoCost = items.reduce((s, i) =>
+        s + (i.fifoBreakdown ?? []).reduce((c, f) => c + (f.finalCost ?? 0) * (f.pcsConsumed ?? 0), 0), 0)
+      const profit = parseFloat((billGrandTotal - totalFifoCost).toFixed(2))
       return {
         _id: bill._id,
         billNumber: bill.billNumber,
         billDate: bill.billDate,
         products: items.length,
         totalCtn,
-        totalAmount: billAmount,
+        totalAmount: billGrandTotal,
         profit,
       }
     })

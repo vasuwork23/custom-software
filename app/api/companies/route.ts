@@ -159,7 +159,26 @@ export async function GET(req: NextRequest) {
           { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
           { $unwind: '$bill' },
           { $match: { 'bill.company': { $in: pageCompanyIds } } },
-          { $group: { _id: '$bill.company', total: { $sum: '$totalProfit' } } },
+          {
+            $addFields: {
+              itemCost: {
+                $reduce: {
+                  input: { $ifNull: ['$fifoBreakdown', []] },
+                  initialValue: 0,
+                  in: { $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }] },
+                },
+              },
+              adjustedRevenue: {
+                $cond: [
+                  { $gt: ['$bill.totalAmount', 0] },
+                  { $multiply: ['$totalAmount', { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] }] },
+                  '$totalAmount',
+                ],
+              },
+            },
+          },
+          { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
+          { $group: { _id: '$bill.company', total: { $sum: '$adjustedProfit' } } },
         ]),
         SellBill.aggregate([
           { $match: { company: { $in: pageCompanyIds }, createdAt: { $gte: daysAgo(7) } } },
