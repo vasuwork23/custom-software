@@ -119,7 +119,19 @@ export async function GET(
       }
     }
 
-    const totalProfit = (items as { totalProfit?: number }[]).reduce((s, i) => s + (i.totalProfit ?? 0), 0)
+    // Gross Profit = Grand Total (revenue after adjustments) − Total FIFO Cost
+    // This correctly reflects extra charges (+) and discounts (−) at the bill level.
+    const totalFifoCost = (items as { fifoBreakdown?: { finalCost?: number; pcsConsumed?: number }[] }[]).reduce(
+      (s, item) =>
+        s + (item.fifoBreakdown ?? []).reduce((c, f) => c + (f.finalCost ?? 0) * (f.pcsConsumed ?? 0), 0),
+      0
+    )
+    const billGrandTotal =
+      (bill as { grandTotal?: number }).grandTotal ??
+      (bill as { totalAmount?: number }).totalAmount ??
+      0
+    const totalProfit = parseFloat((billGrandTotal - totalFifoCost).toFixed(2))
+
     return NextResponse.json({
       success: true,
       data: { ...bill, items, totalProfit },

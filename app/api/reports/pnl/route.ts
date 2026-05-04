@@ -51,6 +51,11 @@ const itemCostField = {
   },
 }
 
+// Second $addFields stage: compute adjustedProfit from pre-computed adjustedRevenue and itemCost
+const adjustedProfitStage = {
+  $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } },
+}
+
 // Reusable lookup + unwind for joining SellBillItem → SellBill
 const billLookupStages = [
   {
@@ -105,12 +110,13 @@ export async function GET(req: NextRequest) {
             ...adjustedRevenueField,
           },
         },
+        adjustedProfitStage,
         {
           $group: {
             _id: null,
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            grossProfit: { $sum: '$totalProfit' },
+            grossProfit: { $sum: '$adjustedProfit' },
           },
         },
       ]),
@@ -128,12 +134,13 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        adjustedProfitStage,
         {
           $group: {
             _id: '$period',
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            grossProfit: { $sum: '$totalProfit' },
+            grossProfit: { $sum: '$adjustedProfit' },
           },
         },
         { $sort: { _id: 1 } },
@@ -193,13 +200,14 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        adjustedProfitStage,
         {
           $group: {
             _id: { key: '$productKey', source: '$source' },
             productName: { $first: '$productName' },
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            profit: { $sum: '$totalProfit' },
+            profit: { $sum: '$adjustedProfit' },
           },
         },
         { $sort: { revenue: -1 } },
@@ -220,15 +228,17 @@ export async function GET(req: NextRequest) {
         { $unwind: { path: '$companyDoc', preserveNullAndEmptyArrays: true } },
         {
           $addFields: {
+            ...itemCostField,
             ...adjustedRevenueField,
           },
         },
+        adjustedProfitStage,
         {
           $group: {
             _id: '$bill.company',
             companyName: { $first: '$companyDoc.companyName' },
             revenue: { $sum: '$adjustedRevenue' },
-            profit: { $sum: '$totalProfit' },
+            profit: { $sum: '$adjustedProfit' },
           },
         },
         { $sort: { revenue: -1 } },

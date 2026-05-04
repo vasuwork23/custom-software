@@ -267,15 +267,37 @@ export async function GET(req: NextRequest) {
                 { $arrayElemAt: ['$productDoc.productName', 0] },
               ],
             },
+            itemCost: {
+              $reduce: {
+                input: { $ifNull: ['$fifoBreakdown', []] },
+                initialValue: 0,
+                in: {
+                  $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }],
+                },
+              },
+            },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
           },
         },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
             _id: { key: { $ifNull: ['$product', '$indiaProduct'] }, source: '$source' },
             name: { $first: '$productName' },
             unitsSold: { $sum: '$unitsSold' },
-            revenue: { $sum: '$totalAmount' },
-            profit: { $sum: '$totalProfit' },
+            revenue: { $sum: '$adjustedRevenue' },
+            profit: { $sum: '$adjustedProfit' },
           },
         },
         {
@@ -333,17 +355,30 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
             month: {
               $dateToString: { format: '%Y-%m', date: '$bill.billDate' },
             },
           },
         },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
             _id: '$month',
-            revenue: { $sum: '$totalAmount' },
+            revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            profit: { $sum: '$totalProfit' },
+            profit: { $sum: '$adjustedProfit' },
           },
         },
         { $sort: { _id: 1 } },
@@ -498,8 +533,45 @@ export async function GET(req: NextRequest) {
         : Promise.resolve([]),
       // Total investment across all investors (banks module)
       Investment.aggregate([{ $group: { _id: null, total: { $sum: '$currentBalance' } } }]),
-      // All-time gross profit (no date filter)
-      SellBillItem.aggregate([{ $group: { _id: null, grossProfit: { $sum: '$totalProfit' } } }]),
+      // All-time gross profit (no date filter) — adjusted for bill-level extra charges and discounts
+      SellBillItem.aggregate([
+        {
+          $lookup: {
+            from: 'sellbills',
+            localField: 'sellBill',
+            foreignField: '_id',
+            as: 'bill',
+          },
+        },
+        { $unwind: '$bill' },
+        {
+          $addFields: {
+            itemCost: {
+              $reduce: {
+                input: { $ifNull: ['$fifoBreakdown', []] },
+                initialValue: 0,
+                in: {
+                  $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }],
+                },
+              },
+            },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                {
+                  $multiply: [
+                    '$totalAmount',
+                    { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] },
+                  ],
+                },
+                '$totalAmount',
+              ],
+            },
+          },
+        },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
+        { $group: { _id: null, grossProfit: { $sum: '$adjustedProfit' } } },
+      ]),
       // All-time total expenses
       Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
     ])

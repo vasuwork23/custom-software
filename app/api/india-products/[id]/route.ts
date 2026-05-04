@@ -55,7 +55,28 @@ export async function GET(
       ]),
       SellBillItem.aggregate([
         { $match: { indiaProduct: productId } },
-        { $group: { _id: null, totalProfit: { $sum: '$totalProfit' } } },
+        { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
+        { $unwind: '$bill' },
+        {
+          $addFields: {
+            itemCost: {
+              $reduce: {
+                input: { $ifNull: ['$fifoBreakdown', []] },
+                initialValue: 0,
+                in: { $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }] },
+              },
+            },
+            adjustedRevenue: {
+              $cond: [
+                { $gt: ['$bill.totalAmount', 0] },
+                { $multiply: ['$totalAmount', { $divide: [{ $ifNull: ['$bill.grandTotal', '$bill.totalAmount'] }, '$bill.totalAmount'] }] },
+                '$totalAmount',
+              ],
+            },
+          },
+        },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
+        { $group: { _id: null, totalProfit: { $sum: '$adjustedProfit' } } },
       ]),
       SellBillItem.find({ indiaProduct: productId })
         .sort({ createdAt: -1 })

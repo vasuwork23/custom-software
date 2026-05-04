@@ -187,12 +187,13 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
             _id: null,
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            grossProfit: { $sum: '$totalProfit' },
+            grossProfit: { $sum: '$adjustedProfit' },
           },
         },
       ]),
@@ -236,12 +237,13 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
             _id: '$period',
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            grossProfit: { $sum: '$totalProfit' },
+            grossProfit: { $sum: '$adjustedProfit' },
           },
         },
         { $sort: { _id: 1 } },
@@ -286,6 +288,15 @@ export async function GET(req: NextRequest) {
         { $unwind: { path: '$companyDoc', preserveNullAndEmptyArrays: true } },
         {
           $addFields: {
+            itemCost: {
+              $reduce: {
+                input: { $ifNull: ['$fifoBreakdown', []] },
+                initialValue: 0,
+                in: {
+                  $add: ['$$value', { $multiply: ['$$this.finalCost', '$$this.pcsConsumed'] }],
+                },
+              },
+            },
             adjustedRevenue: {
               $cond: [
                 { $gt: ['$bill.totalAmount', 0] },
@@ -300,12 +311,13 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
             _id: '$bill.company',
             name: { $first: '$companyDoc.companyName' },
             revenue: { $sum: '$adjustedRevenue' },
-            profit: { $sum: '$totalProfit' },
+            profit: { $sum: '$adjustedProfit' },
           },
         },
         { $sort: { revenue: -1 } },
@@ -356,12 +368,13 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
             _id: null,
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
-            grossProfit: { $sum: '$totalProfit' },
+            grossProfit: { $sum: '$adjustedProfit' },
           },
         },
       ]),
