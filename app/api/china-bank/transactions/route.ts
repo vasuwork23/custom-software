@@ -20,37 +20,47 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '10', 10)))
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const typesParam = searchParams.get('types')?.trim() ?? ''
+    const selectedTypes = typesParam
+      ? typesParam.split(',').filter((t): t is 'credit' | 'debit' | 'reversal' =>
+          ['credit', 'debit', 'reversal'].includes(t)
+        )
+      : []
 
     await connectDB()
 
-    const filter: Record<string, unknown> = {}
-    if (startDate || endDate) {
-      filter.transactionDate = {}
-      if (startDate) (filter.transactionDate as Record<string, Date>).$gte = new Date(startDate)
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999)
-        ;(filter.transactionDate as Record<string, Date>).$lte = end
-      }
-    }
-
-    const all = await ChinaBankTransaction.find(filter)
-      .sort({ createdAt: 1 })
-      .lean()
+    // Fetch ALL transactions for running balance, then apply date + type filters for display
+    const all = await ChinaBankTransaction.find({}).sort({ createdAt: 1 }).lean()
 
     let balance = 0
     const withBalance = all.map((tx) => {
-      if (tx.type === 'credit') {
-        balance += tx.amount
-      } else if (tx.type === 'debit') {
-        balance -= tx.amount
-      } else if (tx.type === 'reversal') {
-        balance += tx.amount
-      }
+      if (tx.type === 'credit') balance += tx.amount
+      else if (tx.type === 'debit') balance -= tx.amount
+      else if (tx.type === 'reversal') balance += tx.amount
       return { ...tx, runningBalance: balance }
     })
 
-    const reversed = [...withBalance].reverse()
+    // Apply date filter
+    let filtered = withBalance
+    if (startDate || endDate) {
+      const startMs = startDate ? new Date(startDate).getTime() : null
+      const endObj = endDate ? new Date(endDate) : null
+      if (endObj) endObj.setHours(23, 59, 59, 999)
+      const endMs = endObj ? endObj.getTime() : null
+      filtered = filtered.filter((tx) => {
+        const tMs = new Date(tx.transactionDate).getTime()
+        if (startMs != null && tMs < startMs) return false
+        if (endMs != null && tMs > endMs) return false
+        return true
+      })
+    }
+
+    // Apply type filter (only when specific types are selected)
+    if (selectedTypes.length > 0) {
+      filtered = filtered.filter((tx) => selectedTypes.includes(tx.type as 'credit' | 'debit' | 'reversal'))
+    }
+
+    const reversed = [...filtered].reverse()
     const total = reversed.length
     const start = (page - 1) * limit
     const pageItems = reversed.slice(start, start + limit)

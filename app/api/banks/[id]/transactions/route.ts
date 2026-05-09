@@ -122,6 +122,9 @@ export async function GET(
     })
 
     let filtered = allWithBalance
+    if (typeFilter && typeFilter !== 'all') {
+      filtered = filtered.filter((tx) => tx.type === typeFilter)
+    }
     if (startDate || endDate) {
       const startMs = startDate ? new Date(startDate).getTime() : null
       const endObj = endDate ? new Date(endDate) : null

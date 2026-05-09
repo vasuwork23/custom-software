@@ -43,6 +43,17 @@ export function TransactionHistory({
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{ transactions: Transaction[]; pagination: Pagination } | null>(null)
+  const [selectedTypes, setSelectedTypes] = useState<Set<'credit' | 'debit' | 'reversal'>>(new Set())
+
+  function toggleType(t: 'credit' | 'debit' | 'reversal') {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev)
+      if (next.has(t)) next.delete(t)
+      else next.add(t)
+      return next
+    })
+    setPage(1)
+  }
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
@@ -51,13 +62,14 @@ export function TransactionHistory({
     params.set('limit', '10')
     if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
     if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
+    if (selectedTypes.size > 0) params.set('types', Array.from(selectedTypes).join(','))
     const result = await apiGet<{ transactions: Transaction[]; pagination: Pagination }>(
       `/api/china-bank/transactions?${params}`
     )
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, dateRange?.from, dateRange?.to])
+  }, [page, dateRange?.from, dateRange?.to, selectedTypes])
 
   useEffect(() => {
     fetchTransactions()
@@ -76,14 +88,29 @@ export function TransactionHistory({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="font-semibold">Transaction History</h3>
-        <DateRangePicker
-          value={dateRange}
-          onChange={setDateRange}
-          placeholder="Filter by date range"
-          className="w-full sm:w-auto"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1 rounded-md border p-0.5 bg-muted/40">
+            {(['credit', 'debit', 'reversal'] as const).map((t) => (
+              <Button
+                key={t}
+                variant={selectedTypes.has(t) ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs capitalize"
+                onClick={() => toggleType(t)}
+              >
+                {t === 'credit' ? '↑ Credit' : t === 'debit' ? '↓ Debit' : '↩ Reversal'}
+              </Button>
+            ))}
+          </div>
+          <DateRangePicker
+            value={dateRange}
+            onChange={(v) => { setDateRange(v); setPage(1) }}
+            placeholder="Filter by date range"
+            className="w-full sm:w-auto"
+          />
+        </div>
       </div>
 
       <div className="rounded-md border">

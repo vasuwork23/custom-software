@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const [chinaStock, indiaStock, chinaProducts, indiaProducts] = await Promise.all([
       BuyingEntry.aggregate([
-        { $match: { chinaWarehouseReceived: 'yes', availableCtn: { $gt: 0 } } },
+        { $match: { chinaWarehouseReceived: 'yes', isLocked: true, availableCtn: { $gt: 0 } } },
         { $sort: { createdAt: -1 } },
         {
           $group: {

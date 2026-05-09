@@ -31,6 +31,7 @@ export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [withExpenses, setWithExpenses] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true)
   const [pnl, setPnl] = useState<{
     summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number }
     chart: { period: string; revenue: number; cost: number; grossProfit: number; netProfit: number }[]
@@ -99,6 +100,7 @@ export default function ReportsPage() {
     async (reportType: 'pnl' | 'stock' | 'selling' | 'buying', formatType: 'pdf' | 'excel') => {
       const params = buildParams()
       if (reportType === 'pnl') params.set('withExpenses', String(withExpenses))
+      if (reportType === 'stock') params.set('availableOnly', String(showAvailableOnly))
       const url = `/api/reports/export?format=${formatType}&reportType=${reportType}&${params.toString()}`
       try {
         const res = await fetch(url, { headers: authHeaders() })
@@ -121,7 +123,7 @@ export default function ReportsPage() {
         toast.error('Export failed')
       }
     },
-    [buildParams, withExpenses]
+    [buildParams, withExpenses, showAvailableOnly]
   )
 
   const fetchAll = useCallback(async () => {
@@ -151,6 +153,16 @@ export default function ReportsPage() {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  const displayRows = showAvailableOnly
+    ? (stock?.rows ?? []).filter((r) => r.availableCtn > 0)
+    : (stock?.rows ?? [])
+  const displayIndiaRows = showAvailableOnly
+    ? (stock?.indiaRows ?? []).filter((r) => r.availableCtn > 0)
+    : (stock?.indiaRows ?? [])
+
+  const chinaStockCost = Number(displayRows.reduce((s, r) => s + (r.totalCost ?? 0), 0).toFixed(2))
+  const indiaStockCost = Number(displayIndiaRows.reduce((s, r) => s + ((r as { totalCost?: number }).totalCost ?? 0), 0).toFixed(2))
 
   return (
     <div className="space-y-8">
@@ -347,32 +359,49 @@ export default function ReportsPage() {
                     <div>
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wide">China Stock</p>
                       <p className="text-lg font-bold text-blue-600">
-                        ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
+                        ₹{chinaStockCost.toLocaleString('en-IN')}
                       </p>
                     </div>
                     <div className="text-muted-foreground self-end pb-0.5 text-lg font-light">+</div>
                     <div>
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wide">India Stock</p>
                       <p className="text-lg font-bold text-emerald-600">
-                        ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                        ₹{indiaStockCost.toLocaleString('en-IN')}
                       </p>
                     </div>
                     <div className="text-muted-foreground self-end pb-0.5 text-lg font-light">=</div>
                     <div className="rounded-lg border bg-muted/40 px-3 py-1">
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total Stock Valuation</p>
                       <p className="text-xl font-bold">
-                        ₹{(
-                          Number(stock.summary.totalStockCost ?? 0) +
-                          Number(stock.summary.totalIndiaStockCost ?? 0)
-                        ).toLocaleString('en-IN')}
+                        ₹{(chinaStockCost + indiaStockCost).toLocaleString('en-IN')}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
-              <div className="flex gap-2 shrink-0">
-                <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'pdf')}>Download PDF</Button>
-                <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'excel')}>Download Excel</Button>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <div className="flex gap-1 rounded-md border p-0.5 bg-muted/40">
+                  <Button
+                    variant={showAvailableOnly ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setShowAvailableOnly(true)}
+                  >
+                    Available Only
+                  </Button>
+                  <Button
+                    variant={!showAvailableOnly ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setShowAvailableOnly(false)}
+                  >
+                    All Products
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'pdf')}>Download PDF</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'excel')}>Download Excel</Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -389,32 +418,32 @@ export default function ReportsPage() {
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Products</p>
-                          <p className="text-xl font-semibold">{stock.summary.totalProducts}</p>
+                          <p className="text-xl font-semibold">{displayRows.length}</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">In China</p>
-                          <p className="text-xl font-semibold">{stock.summary.totalInChina}</p>
+                          <p className="text-xl font-semibold">{displayRows.reduce((s, r) => s + (r.chinaWarehouse ?? 0), 0)}</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">In Transit</p>
-                          <p className="text-xl font-semibold">{stock.summary.totalInTransit}</p>
+                          <p className="text-xl font-semibold">{displayRows.reduce((s, r) => s + (r.inTransit ?? 0), 0)}</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Available (India)</p>
-                          <p className="text-xl font-semibold">{stock.summary.totalInIndia}</p>
+                          <p className="text-xl font-semibold">{displayRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Available PCS</p>
                           <p className="text-xl font-semibold">
-                            {stock.summary.totalAvailablePcs?.toLocaleString('en-IN')}
+                            {displayRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0).toLocaleString('en-IN')}
                           </p>
                         </CardContent>
                       </Card>
@@ -422,7 +451,7 @@ export default function ReportsPage() {
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Stock Valuation</p>
                           <p className="text-xl font-semibold text-blue-600">
-                            ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
+                            ₹{chinaStockCost.toLocaleString('en-IN')}
                           </p>
                         </CardContent>
                       </Card>
@@ -444,7 +473,7 @@ export default function ReportsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {stock.rows.map((r, i) => (
+                          {displayRows.map((r, i) => (
                             <tr key={i} className="border-b hover:bg-muted/30">
                               <td className="p-3">{r.productName}</td>
                               <td className="p-3 text-right">{r.totalCtnBought}</td>
@@ -469,21 +498,21 @@ export default function ReportsPage() {
                             </tr>
                           ))}
                         </tbody>
-                        {stock.rows.length > 0 && (
+                        {displayRows.length > 0 && (
                           <tfoot className="sticky bottom-0 z-10">
                             <tr className="border-t-2 bg-muted/80 font-semibold">
                               <td className="p-3">Total</td>
-                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
-                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
-                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.chinaWarehouse ?? 0), 0)}</td>
-                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.inTransit ?? 0), 0)}</td>
-                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.indiaWarehouse ?? 0), 0)}</td>
-                              <td className="p-3 text-right">{stock.summary.totalAvailablePcs?.toLocaleString('en-IN')}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.chinaWarehouse ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.inTransit ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.indiaWarehouse ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0).toLocaleString('en-IN')}</td>
                               <td className="p-3 text-right">—</td>
                               <td className="p-3 text-right text-blue-700">
-                                ₹{Number(stock.summary.totalStockCost ?? 0).toLocaleString('en-IN')}
+                                ₹{chinaStockCost.toLocaleString('en-IN')}
                               </td>
-                              <td className="p-3 text-right">{stock.rows.reduce((s, r) => s + (r.lockedEntries ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.lockedEntries ?? 0), 0)}</td>
                             </tr>
                           </tfoot>
                         )}
@@ -497,20 +526,20 @@ export default function ReportsPage() {
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Products</p>
-                          <p className="text-xl font-semibold">{stock.summary.totalIndiaProducts ?? 0}</p>
+                          <p className="text-xl font-semibold">{displayIndiaRows.length}</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Available CTN</p>
-                          <p className="text-xl font-semibold">{stock.summary.totalIndiaAvailableCtn ?? 0}</p>
+                          <p className="text-xl font-semibold">{displayIndiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</p>
                         </CardContent>
                       </Card>
                       <Card>
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Available PCS</p>
                           <p className="text-xl font-semibold">
-                            {(stock.summary.totalIndiaAvailablePcs ?? 0).toLocaleString('en-IN')}
+                            {displayIndiaRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0).toLocaleString('en-IN')}
                           </p>
                         </CardContent>
                       </Card>
@@ -518,12 +547,12 @@ export default function ReportsPage() {
                         <CardContent className="pt-4">
                           <p className="text-xs text-muted-foreground">Stock Valuation</p>
                           <p className="text-xl font-semibold text-emerald-600">
-                            ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                            ₹{indiaStockCost.toLocaleString('en-IN')}
                           </p>
                         </CardContent>
                       </Card>
                     </div>
-                    {stock.indiaRows && stock.indiaRows.length > 0 ? (
+                    {displayIndiaRows.length > 0 ? (
                       <div className="rounded-md border overflow-x-auto max-h-[550px] overflow-y-auto">
                         <table className="w-full text-sm">
                           <thead className="sticky top-0 z-10">
@@ -537,7 +566,7 @@ export default function ReportsPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {stock.indiaRows.map((r, i) => (
+                            {displayIndiaRows.map((r, i) => (
                               <tr key={i} className="border-b hover:bg-muted/30">
                                 <td className="p-3">{r.productName}</td>
                                 <td className="p-3 text-right">{r.totalCtnBought}</td>
@@ -563,14 +592,14 @@ export default function ReportsPage() {
                           <tfoot className="sticky bottom-0 z-10">
                             <tr className="border-t-2 bg-muted/80 font-semibold">
                               <td className="p-3">Total</td>
-                              <td className="p-3 text-right">{stock.indiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
-                              <td className="p-3 text-right">{stock.indiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayIndiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
+                              <td className="p-3 text-right">{displayIndiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
                               <td className="p-3 text-right">
-                                {(stock.summary.totalIndiaAvailablePcs ?? 0).toLocaleString('en-IN')}
+                                {displayIndiaRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0).toLocaleString('en-IN')}
                               </td>
                               <td className="p-3 text-right">—</td>
                               <td className="p-3 text-right text-emerald-700">
-                                ₹{Number(stock.summary.totalIndiaStockCost ?? 0).toLocaleString('en-IN')}
+                                ₹{indiaStockCost.toLocaleString('en-IN')}
                               </td>
                             </tr>
                           </tfoot>
