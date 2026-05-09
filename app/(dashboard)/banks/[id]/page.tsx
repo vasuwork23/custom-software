@@ -56,6 +56,7 @@ export default function BankAccountHistoryPage() {
   const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
   const [exportingAll, setExportingAll] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'credit' | 'debit'>('all')
 
   const fetchData = useCallback(async () => {
     if (!id) return
@@ -66,6 +67,7 @@ export default function BankAccountHistoryPage() {
     if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
     if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     if (debouncedSearch) params.set('search', debouncedSearch)
+    if (typeFilter !== 'all') params.set('type', typeFilter)
     const result = await apiGet<PageData>(`/api/banks/${id}/transactions?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
@@ -74,7 +76,11 @@ export default function BankAccountHistoryPage() {
       if (result.error === 'Not found' || (result as { message?: string }).message?.toLowerCase().includes('not found'))
         router.push('/banks')
     }
-  }, [id, page, dateRange?.from, dateRange?.to, debouncedSearch, router])
+  }, [id, page, dateRange?.from, dateRange?.to, debouncedSearch, typeFilter, router])
+
+  useEffect(() => {
+    setPage(1)
+  }, [typeFilter, debouncedSearch, dateRange])
 
   useEffect(() => {
     fetchData()
@@ -133,6 +139,7 @@ export default function BankAccountHistoryPage() {
       if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
       if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
       if (debouncedSearch) params.set('search', debouncedSearch)
+      if (typeFilter !== 'all') params.set('type', typeFilter)
       const result = await apiGet<PageData>(
         `/api/banks/${id}/transactions?${params.toString()}`
       )
@@ -178,12 +185,27 @@ export default function BankAccountHistoryPage() {
       />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <DateRangePicker
-          value={dateRange}
-          onChange={setDateRange}
-          placeholder="Filter by date range"
-          className="w-full sm:w-auto"
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            placeholder="Filter by date range"
+            className="w-full sm:w-auto"
+          />
+          <div className="flex gap-1 rounded-md border p-0.5 bg-muted/40">
+            {(['all', 'credit', 'debit'] as const).map((t) => (
+              <Button
+                key={t}
+                variant={typeFilter === t ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs capitalize"
+                onClick={() => setTypeFilter(t)}
+              >
+                {t === 'credit' ? '↑ Credit' : t === 'debit' ? '↓ Debit' : 'All'}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Input
             placeholder="Search transactions..."

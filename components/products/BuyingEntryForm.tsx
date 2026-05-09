@@ -358,8 +358,8 @@ export function BuyingEntryForm({
       advanceChinaPerson: values.hasAdvancePayment && values.advanceChinaPerson ? values.advanceChinaPerson : null,
       advanceDate: values.hasAdvancePayment && values.advanceDate ? format(values.advanceDate, 'yyyy-MM-dd') : null,
       advanceNote: values.hasAdvancePayment ? (values.advanceNote ?? null) : null,
-      carryingRate: values.carryingRate,
-      avgRmbRate: values.avgRmbRate,
+      carryingRate: values.carryingRate ?? null,
+      avgRmbRate: values.avgRmbRate ?? null,
       chinaWarehouseReceived: values.chinaWarehouseReceived,
       chinaWarehouseCtn:
         values.chinaWarehouseReceived === 'yes'
