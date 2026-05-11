@@ -32,7 +32,7 @@ interface ExpenseRow {
 interface ExpensesData {
   expenses: ExpenseRow[]
   pagination: { page: number; limit: number; total: number; pages: number }
-  summary: { today: number; thisMonth: number; thisYear: number }
+  summary: { today: number; thisMonth: number; thisYear: number; dateRange: number | null }
 }
 
 export default function ExpensesPage() {
@@ -101,7 +101,7 @@ export default function ExpensesPage() {
 
   const expenses = data?.expenses ?? []
   const pagination = data?.pagination ?? { page: 1, limit: 20, total: 0, pages: 0 }
-  const summary = data?.summary ?? { today: 0, thisMonth: 0, thisYear: 0 }
+  const summary = data?.summary ?? { today: 0, thisMonth: 0, thisYear: 0, dateRange: null }
 
   return (
     <div className="space-y-6">
@@ -116,7 +116,7 @@ export default function ExpensesPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={`grid gap-4 ${dateRange?.from ? 'grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Expenses Today</p>
@@ -141,6 +141,20 @@ export default function ExpensesPage() {
             </p>
           </CardContent>
         </Card>
+        {dateRange?.from && (
+          <Card className="border-primary/40 bg-primary/5">
+            <CardContent className="pt-4">
+              <p className="text-sm text-muted-foreground">
+                {dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime()
+                  ? `${format(dateRange.from, 'dd MMM')} – ${format(dateRange.to, 'dd MMM yyyy')}`
+                  : format(dateRange.from, 'dd MMM yyyy')}
+              </p>
+              <p className="text-2xl font-semibold">
+                <AmountDisplay amount={summary.dateRange ?? 0} />
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center flex-wrap">
