@@ -60,7 +60,15 @@ export async function GET(req: NextRequest) {
     const yearStart = new Date(now.getFullYear(), 0, 1)
     const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999)
 
-    const [list, total, todayAgg, monthAgg, yearAgg] = await Promise.all([
+    const dateRangeAggPromise =
+      startDate || endDate
+        ? Expense.aggregate([
+            { $match: filter },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+          ]).then((r) => r[0]?.total ?? 0)
+        : Promise.resolve(null)
+
+    const [list, total, todayAgg, monthAgg, yearAgg, dateRangeAgg] = await Promise.all([
       Expense.find(filter)
         .sort({ expenseDate: -1, createdAt: -1 })
         .skip(skip)
@@ -80,6 +88,7 @@ export async function GET(req: NextRequest) {
         { $match: { ...baseFilter, expenseDate: { $gte: yearStart, $lte: yearEnd } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]).then((r) => r[0]?.total ?? 0),
+      dateRangeAggPromise,
     ])
 
     const expenses = list.map((e) => ({
@@ -97,7 +106,7 @@ export async function GET(req: NextRequest) {
       data: {
         expenses,
         pagination: { page, limit, total, pages: Math.ceil(total / limit) },
-        summary: { today: todayAgg, thisMonth: monthAgg, thisYear: yearAgg },
+        summary: { today: todayAgg, thisMonth: monthAgg, thisYear: yearAgg, dateRange: dateRangeAgg },
       },
     })
   } catch (error) {
