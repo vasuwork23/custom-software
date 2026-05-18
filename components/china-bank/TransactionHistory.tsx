@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
-import { Trash2 } from 'lucide-react'
+import { Trash2, FileDown } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
+import { exportTableToPdf } from '@/lib/exportPdf'
 import { apiGet, apiDelete } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
@@ -44,6 +46,52 @@ export function TransactionHistory({
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{ transactions: Transaction[]; pagination: Pagination } | null>(null)
   const [selectedTypes, setSelectedTypes] = useState<Set<'credit' | 'debit' | 'reversal'>>(new Set())
+  const [exportingAll, setExportingAll] = useState(false)
+
+  const pdfColumns = ['Date', 'Type', 'Reference', 'Notes', 'Amount', 'Balance After']
+
+  const mapRows = (rows: Transaction[]) =>
+    rows.map((tx) => [
+      format(new Date(tx.transactionDate), 'dd MMM yyyy'),
+      tx.type,
+      tx.reference ?? '',
+      tx.notes ?? '',
+      tx.type === 'debit' ? -tx.amount : tx.amount,
+      tx.balanceAfter,
+    ])
+
+  async function handleExportAll() {
+    try {
+      setExportingAll(true)
+      const params = new URLSearchParams()
+      params.set('page', '1')
+      params.set('limit', '10000')
+      if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
+      if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
+      if (selectedTypes.size > 0) params.set('types', Array.from(selectedTypes).join(','))
+      const result = await apiGet<{ transactions: Transaction[]; pagination: { page: number; limit: number; total: number; pages: number } }>(
+        `/api/china-bank/transactions?${params}`
+      )
+      if (!result.success) {
+        toast.error(result.message ?? 'Failed to export')
+        return
+      }
+      if (!result.data.transactions.length) {
+        toast.info('No transactions to export')
+        return
+      }
+      exportTableToPdf({
+        title: 'China Bank — Transaction History',
+        columns: pdfColumns,
+        rows: mapRows(result.data.transactions),
+        landscape: true,
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setExportingAll(false)
+    }
+  }
 
   function toggleType(t: 'credit' | 'debit' | 'reversal') {
     setSelectedTypes((prev) => {
@@ -110,6 +158,22 @@ export function TransactionHistory({
             placeholder="Filter by date range"
             className="w-full sm:w-auto"
           />
+          <ExportPdfButton
+            title="China Bank — Transaction History"
+            landscape
+            columns={pdfColumns}
+            rows={data ? mapRows(data.transactions) : []}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportingAll}
+            onClick={handleExportAll}
+            className="gap-2"
+          >
+            <FileDown className="h-4 w-4" />
+            {exportingAll ? 'Exporting...' : 'Export All'}
+          </Button>
         </div>
       </div>
 

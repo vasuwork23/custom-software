@@ -53,6 +53,8 @@ export async function GET(
     const startDate = searchParams.get('startDate')?.trim()
     const endDate = searchParams.get('endDate')?.trim()
     const exportAll = searchParams.get('exportAll') === '1'
+    const txTypeParam = searchParams.get('type')?.trim()
+    const txType = txTypeParam === 'pay_in' || txTypeParam === 'pay_out' ? txTypeParam : null
 
     await connectDB()
 
@@ -81,8 +83,6 @@ export async function GET(
       .sort({ transactionDate: 1, sortOrder: 1, createdAt: 1, _id: 1 })
       .lean()) as LeanTx[]
 
-    const totalFiltered = timelineAsc.length
-
     // Use currentBalance as the authoritative anchor. Subtracting the net of all
     // transactions in this view gives the balance just before the earliest shown tx,
     // keeping every row's balanceAfter consistent with the stored currentBalance.
@@ -106,7 +106,11 @@ export async function GET(
       }
     })
 
-    const computedDesc = computedAsc.slice().reverse()
+    // Filter by type AFTER computing balances so balanceAfter stays accurate
+    const typeFiltered = txType ? computedAsc.filter((t) => t.type === txType) : computedAsc
+    const totalFiltered = typeFiltered.length
+
+    const computedDesc = typeFiltered.slice().reverse()
     const selected = exportAll
       ? computedDesc
       : computedDesc.slice((page - 1) * limit, page * limit)
