@@ -118,12 +118,13 @@ export default function BankAccountHistoryPage() {
   const { account, transactions, pagination } = data
   const isNegative = account.currentBalance < 0
 
-  const pdfColumns = ['Date', 'Description', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']
+  const pdfColumns = ['Date', 'Description', 'Notes', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']
 
   const mapRows = (rows: BankTransactionRow[]) =>
     rows.map((t) => [
       format(new Date(t.transactionDate), 'dd MMM yyyy'),
       t.sourceLabel ?? t.source,
+      t.notes ?? '',
       t.type === 'debit' ? t.amount : '',
       t.type === 'credit' ? t.amount : '',
       t.runningBalance ?? t.balanceAfter,
