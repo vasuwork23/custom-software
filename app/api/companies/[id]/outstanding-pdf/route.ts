@@ -163,11 +163,13 @@ export async function GET(
       }
     })
 
+    const fullReport = req.nextUrl.searchParams.get('full') === 'true'
+
     let transactions = computedTransactions
     let modifiedOpeningBalance = company.openingBalance || 0
     let modifiedOpeningBalanceNotes = company.openingBalanceNotes
 
-    if (lastZeroBalanceIndex !== -1) {
+    if (!fullReport && lastZeroBalanceIndex !== -1) {
       transactions = computedTransactions.slice(lastZeroBalanceIndex + 1)
       modifiedOpeningBalance = 0
       modifiedOpeningBalanceNotes = 'Balance Brought Forward (Cleared)'

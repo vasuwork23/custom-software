@@ -74,6 +74,7 @@ export default function CompanyDetailPage() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<PaymentFormValues | null>(null)
   const [downloadingOutstanding, setDownloadingOutstanding] = useState(false)
+  const [downloadingFullOutstanding, setDownloadingFullOutstanding] = useState(false)
   const [sendingOutstanding, setSendingOutstanding] = useState(false)
   const [sendPdfOpen, setSendPdfOpen] = useState(false)
   const [sendPdfPhone, setSendPdfPhone] = useState('')
@@ -137,6 +138,29 @@ export default function CompanyDetailPage() {
         toast.error('Failed to download outstanding statement')
       })
       .finally(() => setDownloadingOutstanding(false))
+  }
+
+  function handleDownloadFullOutstanding() {
+    setDownloadingFullOutstanding(true)
+    fetch(`/api/companies/${id}/outstanding-pdf?full=true`, { headers: authHeaders() })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to generate full outstanding PDF')
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = generateOutstandingFileName(company.companyName, 'full')
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+        toast.success('Full outstanding statement downloaded')
+      })
+      .catch((err) => {
+        console.error(err)
+        toast.error('Failed to download full outstanding statement')
+      })
+      .finally(() => setDownloadingFullOutstanding(false))
   }
 
   async function handleSendPdfOnWhatsApp() {
@@ -215,6 +239,16 @@ export default function CompanyDetailPage() {
             >
               <Download className="mr-2 h-4 w-4" />
               {downloadingOutstanding ? 'Downloading...' : 'Download Outstanding'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadFullOutstanding}
+              disabled={downloadingFullOutstanding}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {downloadingFullOutstanding ? 'Downloading...' : 'Download Full Outstanding'}
             </Button>
             <Button
               type="button"
