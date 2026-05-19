@@ -89,7 +89,9 @@ export async function GET(
 
     const stats = entryStats[0] ?? { totalCtn: 0, availableCtn: 0, count: 0 }
     const totalCtn = stats.totalCtn ?? 0
-    const availableCtn = stats.availableCtn ?? 0
+    // Snap tiny float residuals (< 0.001) from FIFO division to zero
+    const rawAvailableCtn = stats.availableCtn ?? 0
+    const availableCtn = rawAvailableCtn < 0.001 ? 0 : Math.round(rawAvailableCtn * 100) / 100
     const totalProfit = Math.round(profitAgg[0]?.totalProfit ?? 0)
     const totalInvested = await IndiaBuyingEntry.aggregate([
       { $match: { product: productId } },
