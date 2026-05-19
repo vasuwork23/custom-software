@@ -82,6 +82,9 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Snap tiny float residuals (< 0.001 CTN) from FIFO division to zero
+      const rawAvailableCtn = stats.availableCtn as number ?? 0
+      const availableCtn = rawAvailableCtn < 0.001 ? 0 : Math.round(rawAvailableCtn * 100) / 100
       return {
         _id: p._id,
         productName: p.productName,
@@ -89,7 +92,7 @@ export async function GET(req: NextRequest) {
         productImage: p.productImage,
         buyingEntriesCount: stats.count as number,
         totalCtn: stats.totalCtn as number,
-        availableCtn: stats.availableCtn as number,
+        availableCtn,
         availablePcs: productAvailablePcs,
         availableValue: Number(productAvailableValue.toFixed(2)),
         hasUnpaidEntries: (stats.hasUnpaid as number) > 0,
