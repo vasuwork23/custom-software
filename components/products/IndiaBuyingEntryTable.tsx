@@ -56,14 +56,16 @@ export function IndiaBuyingEntryTable({
   const [paymentsLoading, setPaymentsLoading] = useState<string | null>(null)
 
   function stockBadge(entry: IndiaBuyingEntryRow) {
-    const soldCtn = entry.totalCtn - (entry.availableCtn ?? entry.totalCtn)
+    // Snap tiny float residuals (< 0.001 CTN) from FIFO division to zero
+    const availableCtn = (entry.availableCtn ?? 0) < 0.001 ? 0 : entry.availableCtn
+    const soldCtn = entry.totalCtn - availableCtn
     if (soldCtn === 0)
       return (
         <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 dark:bg-green-950 dark:text-green-300 dark:border-green-700">
           Available
         </Badge>
       )
-    if (entry.availableCtn === 0)
+    if (availableCtn === 0)
       return (
         <Badge variant="outline" className="border-red-600 text-red-700 bg-red-50 dark:bg-red-950 dark:text-red-300 dark:border-red-700">
           Fully Sold
