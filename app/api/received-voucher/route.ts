@@ -165,9 +165,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount === 0) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Amount must be a positive number' },
+        { success: false, error: 'Validation failed', message: 'Amount must be a non-zero number' },
         { status: 400 }
       )
     }
@@ -245,12 +245,19 @@ export async function POST(req: NextRequest) {
       updatedBy: createdBy,
     })
 
+    const txType = amount > 0 ? 'credit' : 'debit'
+    const absAmount = Math.abs(amount)
+    const companyName = (company as { companyName?: string }).companyName
+    const txDescription = amount > 0
+      ? `Payment received from ${companyName}`
+      : `Payment made to ${companyName}`
+
     if (paymentMode === 'cash') {
       const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
       await createCashTransaction({
-        type: 'credit',
-        amount,
-        description: `Payment received from ${(company as { companyName?: string }).companyName}`,
+        type: txType,
+        amount: absAmount,
+        description: txDescription,
         date: paymentDate,
         category: 'payment_received',
         referenceId: payment._id as mongoose.Types.ObjectId,
@@ -265,12 +272,12 @@ export async function POST(req: NextRequest) {
       const newBalance = lastBalance + amount
       await BankTransaction.create({
         bankAccount: bankAccount!._id,
-        type: 'credit',
-        amount,
+        type: txType,
+        amount: absAmount,
         balanceAfter: newBalance,
         source: 'payment_receipt',
         sourceRef: payment._id,
-        sourceLabel: `Payment received from ${(company as { companyName?: string }).companyName}`,
+        sourceLabel: txDescription,
         transactionDate: paymentDate,
         notes: remark,
         createdBy,
