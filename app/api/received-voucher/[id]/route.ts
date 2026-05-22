@@ -114,9 +114,9 @@ export async function PUT(
         { status: 400 }
       )
     }
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount === 0) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Amount must be a positive number' },
+        { success: false, error: 'Validation failed', message: 'Amount must be a non-zero number' },
         { status: 400 }
       )
     }
@@ -163,14 +163,17 @@ export async function PUT(
     }
 
     const originalWasCash = (payment as { paymentMode?: string }).paymentMode === 'cash'
+    const originalAmount = (payment as { amount: number }).amount
     const originalTx = await BankTransaction.findOne({ source: 'payment_receipt', sourceRef: payment._id })
       .sort({ transactionDate: -1, createdAt: -1 })
       .lean()
 
     if (originalWasCash) {
+      // Reverse the original: if it was a credit (positive), reverse with debit; if debit (negative), reverse with credit
+      const reversalType = originalAmount > 0 ? 'debit' : 'credit'
       await createCashTransaction({
-        type: 'debit',
-        amount: (payment as { amount: number }).amount,
+        type: reversalType,
+        amount: Math.abs(originalAmount),
         description: `Reversal of payment from ${(company as { companyName?: string }).companyName}`,
         date: new Date(new Date().setHours(0, 0, 0, 0)),
         category: 'reversal',
@@ -181,9 +184,10 @@ export async function PUT(
       })
     } else if (originalTx) {
       const originalDate = (originalTx as { transactionDate?: Date }).transactionDate
+      const reversalType = (originalTx as { type: string }).type === 'credit' ? 'debit' : 'credit'
       await BankTransaction.create({
         bankAccount: originalTx.bankAccount,
-        type: 'debit',
+        type: reversalType,
         amount: originalTx.amount,
         balanceAfter: 0,
         source: 'payment_receipt',
@@ -236,11 +240,18 @@ export async function PUT(
     payment.updatedBy = updatedBy
     await payment.save()
 
+    const txType = amount > 0 ? 'credit' : 'debit'
+    const absAmount = Math.abs(amount)
+    const companyName = (company as { companyName?: string }).companyName
+    const txDescription = amount > 0
+      ? `Payment received from ${companyName}`
+      : `Payment made to ${companyName}`
+
     if (paymentMode === 'cash') {
       await createCashTransaction({
-        type: 'credit',
-        amount,
-        description: `Payment received from ${(company as { companyName?: string }).companyName}`,
+        type: txType,
+        amount: absAmount,
+        description: txDescription,
         date: paymentDate,
         category: 'payment_received',
         referenceId: payment._id as mongoose.Types.ObjectId,
@@ -255,12 +266,12 @@ export async function PUT(
       const newBalance = lastBalance + amount
       await BankTransaction.create({
         bankAccount: bankAccount!._id,
-        type: 'credit',
-        amount,
+        type: txType,
+        amount: absAmount,
         balanceAfter: newBalance,
         source: 'payment_receipt',
         sourceRef: payment._id,
-        sourceLabel: `Payment received from ${(company as { companyName?: string }).companyName}`,
+        sourceLabel: txDescription,
         transactionDate: paymentDate,
         notes: remark,
         createdBy: updatedBy,
@@ -322,9 +333,11 @@ export async function DELETE(
         await recalcIndiaBuyingEntryGivenAndStatus(buyingEntryId)
       }
     } else if (paymentMode === 'cash') {
+      const deletedAmount = (payment as { amount: number }).amount
+      const reversalType = deletedAmount > 0 ? 'debit' : 'credit'
       await createCashTransaction({
-        type: 'debit',
-        amount: (payment as { amount: number }).amount,
+        type: reversalType,
+        amount: Math.abs(deletedAmount),
         description: 'Reversal of deleted payment',
         date: new Date(new Date().setHours(0, 0, 0, 0)),
         category: 'reversal',
@@ -339,9 +352,10 @@ export async function DELETE(
         .lean()
       if (tx) {
         const originalDate = (tx as { transactionDate?: Date }).transactionDate
+        const reversalType = (tx as { type: string }).type === 'credit' ? 'debit' : 'credit'
         await BankTransaction.create({
           bankAccount: tx.bankAccount,
-          type: 'debit',
+          type: reversalType,
           amount: tx.amount,
           balanceAfter: 0,
           source: 'payment_receipt',

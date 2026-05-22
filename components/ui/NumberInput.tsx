@@ -14,6 +14,7 @@ export interface NumberInputProps {
   min?: number
   max?: number
   decimal?: boolean
+  allowNegative?: boolean
   step?: number
   className?: string
   title?: string
@@ -40,6 +41,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       min,
       max,
       decimal = true,
+      allowNegative = false,
       step,
       className,
       title,
@@ -60,51 +62,41 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value
 
-      // Allow only digits and at most one dot for decimal inputs
+      const decimalPattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/
+      const intPattern = allowNegative ? /^-?\d*$/ : /^\d*$/
+
       if (decimal) {
-        if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) {
-          // Invalid character for decimal, ignore change
-          return
-        }
+        if (raw !== '' && raw !== '-' && !decimalPattern.test(raw)) return
       } else {
-        if (raw !== '' && !/^\d*$/.test(raw)) {
-          // Invalid character for integer, ignore change
-          return
-        }
+        if (raw !== '' && raw !== '-' && !intPattern.test(raw)) return
       }
 
-      // Empty -> clear and propagate undefined
+      // Empty or lone minus -> clear propagation but keep draft
       if (raw === '') {
         setDraft('')
         onChange?.(undefined)
         return
       }
+      if (raw === '-') {
+        setDraft('-')
+        return
+      }
 
       if (decimal) {
-        // For decimal inputs, keep intermediate states like "0." / "1."
         setDraft(raw)
-
-        // Do not propagate while user is still typing the decimal point
-        if (raw === '.' || raw.endsWith('.')) {
-          return
-        }
-
+        if (raw === '.' || raw.endsWith('.')) return
         const num = parseFloat(raw)
-        if (!Number.isNaN(num)) {
-          onChange?.(num)
-        }
+        if (!Number.isNaN(num)) onChange?.(num)
       } else {
-        // Integer mode
         setDraft(raw)
         const num = parseInt(raw, 10)
-        if (!Number.isNaN(num)) {
-          onChange?.(num)
-        }
+        if (!Number.isNaN(num)) onChange?.(num)
       }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (['e', 'E', '+', '-'].includes(e.key)) {
+      const blocked = allowNegative ? ['e', 'E', '+'] : ['e', 'E', '+', '-']
+      if (blocked.includes(e.key)) {
         e.preventDefault()
         return
       }

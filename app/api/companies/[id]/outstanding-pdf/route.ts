@@ -109,8 +109,11 @@ export async function GET(
       ...payments.map((p) => {
         const pAny = p as { paymentDate?: Date; date?: Date; companyNote?: string; remark?: string; paymentMode?: string }
         const isSetOff = pAny.paymentMode === 'set_off'
+        const isPaymentOut = p.amount < 0
         let description: string
-        if (isSetOff) {
+        if (isPaymentOut) {
+          description = `Payment made to company${pAny.companyNote ? ` — ${pAny.companyNote}` : ''}`
+        } else if (isSetOff) {
           const cleanRemark = pAny.remark
             ? pAny.remark
                 .replace(/^Payment for India Product:\s*/i, '')
@@ -127,8 +130,8 @@ export async function GET(
           date: (pAny.paymentDate || pAny.date || new Date()) as Date,
           createdAt: p.createdAt,
           description,
-          debit: null as number | null,
-          credit: p.amount,
+          debit: isPaymentOut ? Math.abs(p.amount) : null,
+          credit: isPaymentOut ? null : p.amount,
         }
       }),
     ].sort((a, b) => {
