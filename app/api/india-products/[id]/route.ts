@@ -49,6 +49,7 @@ export async function GET(
             _id: null,
             totalCtn: { $sum: '$totalCtn' },
             availableCtn: { $sum: '$availableCtn' },
+            availablePcs: { $sum: { $multiply: ['$availableCtn', '$qty'] } },
             count: { $sum: 1 },
           },
         },
@@ -87,11 +88,13 @@ export async function GET(
         .lean(),
     ])
 
-    const stats = entryStats[0] ?? { totalCtn: 0, availableCtn: 0, count: 0 }
+    const stats = entryStats[0] ?? { totalCtn: 0, availableCtn: 0, availablePcs: 0, count: 0 }
     const totalCtn = stats.totalCtn ?? 0
     // Snap tiny float residuals (< 0.001) from FIFO division to zero
     const rawAvailableCtn = stats.availableCtn ?? 0
     const availableCtn = rawAvailableCtn < 0.001 ? 0 : Math.round(rawAvailableCtn * 100) / 100
+    const rawAvailablePcs = stats.availablePcs ?? 0
+    const availablePcs = rawAvailablePcs < 0.001 ? 0 : Math.round(rawAvailablePcs * 100) / 100
     const totalProfit = Math.round(profitAgg[0]?.totalProfit ?? 0)
     const totalInvested = await IndiaBuyingEntry.aggregate([
       { $match: { product: productId } },
@@ -126,6 +129,7 @@ export async function GET(
         buyingEntriesCount: stats.count,
         totalCtn,
         availableCtn,
+        availablePcs,
         totalSoldCtn: totalCtn - availableCtn,
         totalInvested,
         totalProfit,

@@ -45,6 +45,7 @@ interface IndiaProductDetail {
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
+  availablePcs: number
   totalSoldCtn: number
   totalInvested: number
   totalProfit: number
@@ -160,7 +161,7 @@ export default function IndiaProductDetailPage() {
             </div>
           )}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <Card>
             <CardContent className="pt-4">
               <p className="text-sm text-muted-foreground">Total CTN Bought</p>
@@ -171,6 +172,12 @@ export default function IndiaProductDetailPage() {
             <CardContent className="pt-4">
               <p className="text-sm text-muted-foreground">Available CTN</p>
               <p className="text-2xl font-semibold">{product.availableCtn}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-sm text-muted-foreground">Available Pcs</p>
+              <p className="text-2xl font-semibold">{product.availablePcs}</p>
             </CardContent>
           </Card>
           <Card>
