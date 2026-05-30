@@ -62,6 +62,15 @@ export async function GET(
                 ],
               },
             },
+            availablePcsIndia: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$chinaWarehouseReceived', 'yes'] },
+                  { $multiply: ['$availableCtn', '$qty'] },
+                  0,
+                ],
+              },
+            },
             chinaFactoryCtn: {
               $sum: {
                 $cond: [
@@ -125,6 +134,7 @@ export async function GET(
       entryStats[0] ?? {
         totalCtn: 0,
         availableCtnIndia: 0,
+        availablePcsIndia: 0,
         inTransitCtn: 0,
         chinaFactoryCtn: 0,
         chinaWhCtn: 0,
@@ -136,6 +146,7 @@ export async function GET(
     const totalCtn = stats.totalCtn ?? 0
     // Round to 2dp to eliminate floating-point residuals from FIFO division
     const availableCtn = Math.round((stats.availableCtnIndia ?? 0) * 100) / 100
+    const availablePcs = Math.round((stats.availablePcsIndia ?? 0) * 100) / 100
     const totalSoldCtn = Math.round((stats.soldCtn ?? 0) * 100) / 100
     const inTransitCtn = stats.inTransitCtn ?? 0
     const chinaFactoryCtn = stats.chinaFactoryCtn ?? 0
@@ -189,6 +200,7 @@ export async function GET(
         buyingEntriesCount: stats.count,
         totalCtn,
         availableCtn,
+        availablePcs,
         totalSoldCtn,
         chinaWhCtn,
         inTransitCtn,

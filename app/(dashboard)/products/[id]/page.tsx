@@ -48,6 +48,7 @@ interface ProductDetail {
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
+  availablePcs: number
   totalSoldCtn: number
   chinaWhCtn: number
   inTransitCtn: number
@@ -198,6 +199,11 @@ export default function ProductDetailPage() {
           label="Available CTN"
           value={product.availableCtn}
           color={product.availableCtn > 0 ? 'text-green-600' : 'text-muted-foreground'}
+        />
+        <StatCard
+          label="Available Pcs"
+          value={product.availablePcs}
+          color={product.availablePcs > 0 ? 'text-green-600' : 'text-muted-foreground'}
         />
         <StatCard
           label="Total Sold CTN"
