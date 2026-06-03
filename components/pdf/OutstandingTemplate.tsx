@@ -138,6 +138,11 @@ export function OutstandingTemplate({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {/* ACCOUNT LEDGER TITLE */}
+        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', letterSpacing: 1 }}>ACCOUNT LEDGER</Text>
+        </View>
+
         {/* INFO SECTION */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
           <View>
@@ -146,8 +151,7 @@ export function OutstandingTemplate({
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#111827' }}>ACCOUNT STATEMENT</Text>
-            <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>DATE: {generatedAtStr}, {generatedAtTime}</Text>
+            <Text style={{ fontSize: 10, color: '#6b7280' }}>DATE: {generatedAtStr}, {generatedAtTime}</Text>
           </View>
         </View>
 

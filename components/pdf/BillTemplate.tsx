@@ -275,6 +275,11 @@ export function BillTemplate({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {/* INVOICE TITLE */}
+        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', letterSpacing: 1 }}>INVOICE</Text>
+        </View>
+
         {/* BILL TO */}
         <View style={styles.toSection}>
           <View>
