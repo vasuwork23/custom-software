@@ -277,7 +277,7 @@ export function BillTemplate({
       <Page size="A4" style={styles.page}>
         {/* INVOICE TITLE */}
         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', letterSpacing: 1 }}>INVOICE</Text>
+          <Text style={{ fontSize: 15, fontFamily: 'Times-Bold', color: '#111827', letterSpacing: 0.5 }}>INVOICE</Text>
         </View>
 
         {/* BILL TO */}
