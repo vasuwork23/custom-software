@@ -140,7 +140,7 @@ export function OutstandingTemplate({
       <Page size="A4" style={styles.page}>
         {/* ACCOUNT LEDGER TITLE */}
         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', letterSpacing: 1 }}>ACCOUNT LEDGER</Text>
+          <Text style={{ fontSize: 15, fontFamily: 'Times-Bold', color: '#111827', letterSpacing: 0.5 }}>ACCOUNT LEDGER</Text>
         </View>
 
         {/* INFO SECTION */}
