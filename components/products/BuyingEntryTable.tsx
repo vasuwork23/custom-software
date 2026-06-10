@@ -99,18 +99,6 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
     )
   }
 
-  function stockBadge(entry: BuyingEntryRow) {
-    const available = calculatedAvailableCtn(entry)
-    const soldCtn = entry.soldCtn ?? 0
-    if (soldCtn === 0) {
-      return <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 dark:bg-green-950 dark:text-green-300 dark:border-green-700">Available</Badge>
-    }
-    if (available === 0) {
-      return <Badge variant="outline" className="border-red-600 text-red-700 bg-red-50 dark:bg-red-950 dark:text-red-300 dark:border-red-700">Fully Sold</Badge>
-    }
-    return <Badge variant="outline" className="border-amber-600 text-amber-700 bg-amber-50 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700">Partially Sold</Badge>
-  }
-
   function availableCtnClass(entry: BuyingEntryRow) {
     const available = calculatedAvailableCtn(entry)
     const sold = entry.soldCtn ?? 0
@@ -284,9 +272,18 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
               </tr>
             </thead>
                 <tbody>
-              {filteredEntries.map((entry) => (
+              {filteredEntries.map((entry) => {
+                const availCtn = calculatedAvailableCtn(entry)
+                return (
                 <React.Fragment key={entry._id}>
-                  <tr className="border-b hover:bg-muted/50">
+                  <tr className={cn(
+                    "border-b",
+                    (entry.soldCtn ?? 0) >= entry.totalCtn && entry.totalCtn > 0
+                      ? "bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30"
+                      : availCtn > 0 && entry.chinaWarehouseReceived === 'yes'
+                        ? "bg-green-50 hover:bg-green-100 dark:bg-green-950/20 dark:hover:bg-green-950/30"
+                        : "hover:bg-muted/50"
+                  )}>
                     <td className="p-1">
                       <Button
                         variant="ghost"
@@ -782,7 +779,8 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                     </tr>
                   )}
                 </React.Fragment>
-              ))}
+              )})}
+
             </tbody>
            
           </table>

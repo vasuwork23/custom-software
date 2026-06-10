@@ -26,6 +26,7 @@ interface DashboardPnl {
     expenses: number
     netProfit: number
     margin: number
+    ctnSold: number
   }
   trends: {
     revenue: number
@@ -33,6 +34,7 @@ interface DashboardPnl {
     grossProfit: number
     expenses: number
     netProfit: number
+    ctnSold: number
   }
   chartData: { label: string; revenue: number; cost: number; netProfit: number }[]
   topCompanies: { name: string; revenue: number; profit: number }[]
@@ -337,8 +339,8 @@ export default function DashboardPage() {
       {/* P&L summary row */}
       <section className="space-y-4">
         {loadingPnl ? (
-          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
+            {Array.from({ length: 7 }).map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <CardContent className="space-y-2 pt-4">
                   <div className="h-3 w-20 rounded bg-muted" />
@@ -349,7 +351,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : pnl ? (
-          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
             <Card>
               <CardContent className="pt-4 space-y-1">
                 <p className="text-xs text-muted-foreground">Revenue</p>
@@ -414,6 +416,15 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">
                   Net profit / revenue
                 </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 space-y-1">
+                <p className="text-xs text-muted-foreground">CTN Sold</p>
+                <p className="text-xl font-semibold text-blue-600">
+                  {pnl.summary.ctnSold}
+                </p>
+                {renderTrend(pnl.trends.ctnSold)}
               </CardContent>
             </Card>
           </div>
