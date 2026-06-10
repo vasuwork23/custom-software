@@ -33,7 +33,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [showAvailableOnly, setShowAvailableOnly] = useState(true)
   const [pnl, setPnl] = useState<{
-    summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number }
+    summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number; ctnSold: number }
     chart: { period: string; revenue: number; cost: number; grossProfit: number; netProfit: number }[]
     byProduct: { productName: string; revenue: number; cost: number; profit: number; marginPct: number }[]
     byCompany: { companyName: string; revenue: number; profit: number; outstanding: number }[]
@@ -235,7 +235,7 @@ export default function ReportsPage() {
             <CardContent className="space-y-6">
               {pnl && (
                 <>
-                  <div className={cn('grid gap-4 sm:grid-cols-2', withExpenses ? 'lg:grid-cols-6' : 'lg:grid-cols-4')}>
+                  <div className={cn('grid gap-4 sm:grid-cols-2', withExpenses ? 'lg:grid-cols-7' : 'lg:grid-cols-5')}>
                     <Card>
                       <CardContent className="pt-4">
                         <p className="text-xs text-muted-foreground">Total Revenue</p>
@@ -282,6 +282,14 @@ export default function ReportsPage() {
                             ? pnl.summary.netMarginPct.toFixed(2)
                             : pnl.summary.marginPct.toFixed(2)}
                           %
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <p className="text-xs text-muted-foreground">CTN Sold</p>
+                        <p className="text-xl font-semibold text-blue-600">
+                          {pnl.summary.ctnSold}
                         </p>
                       </CardContent>
                     </Card>

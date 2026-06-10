@@ -117,6 +117,7 @@ export async function GET(req: NextRequest) {
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
             grossProfit: { $sum: '$adjustedProfit' },
+            ctnSold: { $sum: '$ctnSold' },
           },
         },
       ]),
@@ -266,11 +267,12 @@ export async function GET(req: NextRequest) {
 
     void withExpenses // used in query param only; kept for future use
 
-    const summary = summaryResult[0] ?? { revenue: 0, cost: 0, grossProfit: 0 }
+    const summary = summaryResult[0] ?? { revenue: 0, cost: 0, grossProfit: 0, ctnSold: 0 }
     const totalExpenses = expensesSum[0]?.total ?? 0
     const revenue = summary.revenue ?? 0
     const cost = summary.cost ?? 0
     const grossProfit = summary.grossProfit ?? 0
+    const ctnSold = summary.ctnSold ?? 0
     const netProfit = grossProfit - totalExpenses
     const marginPct = grossProfitPct(revenue, cost)
     const netMarginPct = revenue > 0 ? (netProfit / revenue) * 100 : 0
@@ -338,6 +340,7 @@ export async function GET(req: NextRequest) {
           netProfit,
           marginPct,
           netMarginPct,
+          ctnSold,
         },
         chart: chartResult.map(
           (r: { _id: string; revenue: number; cost: number; grossProfit: number }) => ({

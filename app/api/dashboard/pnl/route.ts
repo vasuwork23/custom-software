@@ -194,6 +194,7 @@ export async function GET(req: NextRequest) {
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
             grossProfit: { $sum: '$adjustedProfit' },
+            ctnSold: { $sum: '$ctnSold' },
           },
         },
       ]),
@@ -375,6 +376,7 @@ export async function GET(req: NextRequest) {
             revenue: { $sum: '$adjustedRevenue' },
             cost: { $sum: '$itemCost' },
             grossProfit: { $sum: '$adjustedProfit' },
+            ctnSold: { $sum: '$ctnSold' },
           },
         },
       ]),
@@ -389,11 +391,13 @@ export async function GET(req: NextRequest) {
       revenue: 0,
       cost: 0,
       grossProfit: 0,
+      ctnSold: 0,
     }
     const totalExpensesCurrent = expensesSum[0]?.total ?? 0
     const revenueCurrent = summaryCurrent.revenue ?? 0
     const costCurrent = summaryCurrent.cost ?? 0
     const grossProfitCurrent = summaryCurrent.grossProfit ?? 0
+    const ctnSoldCurrent = summaryCurrent.ctnSold ?? 0
     const netProfitCurrent = grossProfitCurrent - totalExpensesCurrent
     const margin =
       revenueCurrent > 0 ? (netProfitCurrent / revenueCurrent) * 100 : 0
@@ -402,11 +406,13 @@ export async function GET(req: NextRequest) {
       revenue: 0,
       cost: 0,
       grossProfit: 0,
+      ctnSold: 0,
     }
     const totalExpensesPrev = prevExpensesSum[0]?.total ?? 0
     const revenuePrev = summaryPrev.revenue ?? 0
     const costPrev = summaryPrev.cost ?? 0
     const grossProfitPrev = summaryPrev.grossProfit ?? 0
+    const ctnSoldPrev = summaryPrev.ctnSold ?? 0
     const netProfitPrev = grossProfitPrev - totalExpensesPrev
 
     const expenseByPeriodMap = Object.fromEntries(
@@ -472,16 +478,15 @@ export async function GET(req: NextRequest) {
           expenses: totalExpensesCurrent,
           netProfit: netProfitCurrent,
           margin,
+          ctnSold: ctnSoldCurrent,
         },
         trends: {
           revenue: calcTrend(revenueCurrent, revenuePrev),
           cost: calcTrend(costCurrent, costPrev),
           grossProfit: calcTrend(grossProfitCurrent, grossProfitPrev),
-          expenses: calcTrend(
-            totalExpensesCurrent,
-            totalExpensesPrev
-          ),
+          expenses: calcTrend(totalExpensesCurrent, totalExpensesPrev),
           netProfit: calcTrend(netProfitCurrent, netProfitPrev),
+          ctnSold: calcTrend(ctnSoldCurrent, ctnSoldPrev),
         },
         chartData,
         topCompanies,
