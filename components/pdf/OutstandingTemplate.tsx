@@ -89,8 +89,8 @@ export interface OutstandingTemplateProps {
   yourPhone?: string
 }
 
-// ~20 transactions per page keeps react-pdf layout fast
-const TRANSACTIONS_PER_PAGE = 20
+// Max visual rows per page (each transaction = 1 row + N item sub-rows)
+const MAX_ROWS_PER_PAGE = 28
 
 function TableHeader() {
   return (
@@ -168,12 +168,22 @@ export function OutstandingTemplate({
       ? transactions[transactions.length - 1].balance
       : (company.openingBalance || 0)
 
-  // Chunk transactions so each page has a bounded number of rows
+  // Chunk by visual row count (1 per transaction + 1 per item sub-row)
   const chunks: OutstandingTemplateProps['transactions'][] = []
-  for (let i = 0; i < transactions.length; i += TRANSACTIONS_PER_PAGE) {
-    chunks.push(transactions.slice(i, i + TRANSACTIONS_PER_PAGE))
+  let currentChunk: OutstandingTemplateProps['transactions'] = []
+  let currentRows = 0
+
+  for (const tx of transactions) {
+    const txRows = 1 + (tx.items?.length || 0)
+    if (currentRows + txRows > MAX_ROWS_PER_PAGE && currentChunk.length > 0) {
+      chunks.push(currentChunk)
+      currentChunk = []
+      currentRows = 0
+    }
+    currentChunk.push(tx)
+    currentRows += txRows
   }
-  // Always at least one chunk (even if no transactions)
+  if (currentChunk.length > 0) chunks.push(currentChunk)
   if (chunks.length === 0) chunks.push([])
 
   const totalPages = chunks.length
@@ -183,8 +193,6 @@ export function OutstandingTemplate({
       {chunks.map((chunk, pageIndex) => {
         const isFirstPage = pageIndex === 0
         const isLastPage = pageIndex === totalPages - 1
-        // global row index offset for alternating row colors
-        const offset = pageIndex * TRANSACTIONS_PER_PAGE
 
         return (
           <Page key={pageIndex} size="A4" style={styles.page}>
@@ -242,7 +250,7 @@ export function OutstandingTemplate({
               )}
 
               {chunk.map((tx, i) => (
-                <TransactionRow key={offset + i} tx={tx} i={offset + i} />
+                <TransactionRow key={i} tx={tx} i={i} />
               ))}
             </View>
 
