@@ -89,8 +89,11 @@ export interface OutstandingTemplateProps {
   yourPhone?: string
 }
 
-// Max visual rows per page (each transaction = 1 row + N item sub-rows)
-const MAX_ROWS_PER_PAGE = 28
+// Estimated heights in pt (A4 usable = ~802pt)
+const FIRST_PAGE_BUDGET = 580  // less due to title + info header + opening balance row
+const PAGE_BUDGET = 700        // continued pages (includes table header + contd header)
+const MAIN_ROW_H = 24          // paddingVertical:6*2 + ~10pt font + 2pt wrapper margin
+const ITEM_ROW_H = 15          // paddingVertical:3*2 + ~8pt font + 1pt border
 
 function TableHeader() {
   return (
@@ -168,20 +171,23 @@ export function OutstandingTemplate({
       ? transactions[transactions.length - 1].balance
       : (company.openingBalance || 0)
 
-  // Chunk by visual row count (1 per transaction + 1 per item sub-row)
+  // Chunk by estimated pt height so each chunk fills its A4 page without overflow
   const chunks: OutstandingTemplateProps['transactions'][] = []
   let currentChunk: OutstandingTemplateProps['transactions'] = []
-  let currentRows = 0
+  let currentHeight = 0
+  let firstPage = true
 
   for (const tx of transactions) {
-    const txRows = 1 + (tx.items?.length || 0)
-    if (currentRows + txRows > MAX_ROWS_PER_PAGE && currentChunk.length > 0) {
+    const budget = firstPage ? FIRST_PAGE_BUDGET : PAGE_BUDGET
+    const txH = MAIN_ROW_H + (tx.items?.length || 0) * ITEM_ROW_H
+    if (currentHeight + txH > budget && currentChunk.length > 0) {
       chunks.push(currentChunk)
       currentChunk = []
-      currentRows = 0
+      currentHeight = 0
+      firstPage = false
     }
     currentChunk.push(tx)
-    currentRows += txRows
+    currentHeight += txH
   }
   if (currentChunk.length > 0) chunks.push(currentChunk)
   if (chunks.length === 0) chunks.push([])
