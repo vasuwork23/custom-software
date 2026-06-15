@@ -14,6 +14,7 @@ import { OutstandingTemplate, type OutstandingTemplateProps } from '@/components
 import { generateOutstandingFileName } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function GET(
   req: NextRequest,
@@ -61,20 +62,25 @@ export async function GET(
     }
 
     const companyId = new mongoose.Types.ObjectId(id)
+    const showItems = req.nextUrl.searchParams.get('items') === 'true'
 
     // Build full statement: bills (debit) + payments (credit), with running balance.
+    const billsQuery = SellBill.find({ company: companyId })
+      .sort({ billDate: 1, createdAt: 1 })
+
+    if (showItems) {
+      billsQuery.populate({
+        path: 'items',
+        model: 'SellBillItem',
+        populate: [
+          { path: 'product', model: 'Product', select: 'productName' },
+          { path: 'indiaProduct', model: 'IndiaProduct', select: 'productName' },
+        ],
+      })
+    }
+
     const [bills, payments] = await Promise.all([
-      SellBill.find({ company: companyId })
-        .sort({ billDate: 1, createdAt: 1 })
-        .populate({
-          path: 'items',
-          model: 'SellBillItem',
-          populate: [
-            { path: 'product', model: 'Product', select: 'productName' },
-            { path: 'indiaProduct', model: 'IndiaProduct', select: 'productName' },
-          ],
-        })
-        .lean(),
+      billsQuery.lean(),
       PaymentReceipt.find({ company: companyId })
         .sort({ paymentDate: 1, createdAt: 1 })
         .lean(),
@@ -84,15 +90,17 @@ export async function GET(
       ...bills.map((b) => {
         const bAny = b as any
         const items: { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[] =
-          (bAny.items || []).map((item: any) => ({
-            productName:
-              item.product?.productName ||
-              item.indiaProduct?.productName ||
-              'Product',
-            ctnSold: item.ctnSold ?? 0,
-            pcsSold: item.pcsSold ?? 0,
-            ratePerPcs: item.ratePerPcs ?? 0,
-          }))
+          showItems
+            ? (bAny.items || []).map((item: any) => ({
+                productName:
+                  item.product?.productName ||
+                  item.indiaProduct?.productName ||
+                  'Product',
+                ctnSold: item.ctnSold ?? 0,
+                pcsSold: item.pcsSold ?? 0,
+                ratePerPcs: item.ratePerPcs ?? 0,
+              }))
+            : []
         return {
           date: b.billDate,
           createdAt: b.createdAt,

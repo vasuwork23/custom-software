@@ -324,7 +324,7 @@ export function OutstandingTemplate({
         </View>
 
         {/* SUMMARY BOX */}
-        <View style={{ marginTop: 'auto' }}>
+        <View style={{ marginTop: 16 }}>
           <View
             style={{
               backgroundColor: '#ffffff',
