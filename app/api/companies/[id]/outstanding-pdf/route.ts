@@ -24,11 +24,7 @@ export async function GET(
     const user = await getUserFromRequest(req)
     if (!user) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Unauthorized',
-          message: 'Invalid or expired token',
-        },
+        { success: false, error: 'Unauthorized', message: 'Invalid or expired token' },
         { status: 401 }
       )
     }
@@ -36,11 +32,7 @@ export async function GET(
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Validation failed',
-          message: 'Invalid company id',
-        },
+        { success: false, error: 'Validation failed', message: 'Invalid company id' },
         { status: 400 }
       )
     }
@@ -63,7 +55,6 @@ export async function GET(
 
     const companyId = new mongoose.Types.ObjectId(id)
 
-    // Build full statement: bills (debit) + payments (credit), with running balance.
     const [bills, payments] = await Promise.all([
       SellBill.find({ company: companyId })
         .sort({ billDate: 1, createdAt: 1 })
@@ -98,9 +89,7 @@ export async function GET(
           date: b.billDate,
           createdAt: b.createdAt,
           description: `INV-${b.billNumber}${
-            (b as { notes?: string }).notes
-              ? ` — ${(b as { notes?: string }).notes}`
-              : ''
+            (b as { notes?: string }).notes ? ` — ${(b as { notes?: string }).notes}` : ''
           }`,
           debit: bAny.grandTotal ?? b.totalAmount,
           credit: null as number | null,
@@ -139,7 +128,6 @@ export async function GET(
       const aDate = a.date instanceof Date ? a.date.getTime() : new Date(a.date as string).getTime()
       const bDate = b.date instanceof Date ? b.date.getTime() : new Date(b.date as string).getTime()
       if (aDate !== bDate) return aDate - bDate
-      
       const ad = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
       const bd = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
       return ad - bd
@@ -151,12 +139,7 @@ export async function GET(
     const computedTransactions = allTx.map((tx, index) => {
       if (tx.debit) balance += tx.debit
       if (tx.credit) balance -= tx.credit
-      
-      // If balance hits zero (safely comparing floating point), we keep track of this index.
-      if (Math.abs(balance) < 0.001) {
-        lastZeroBalanceIndex = index
-      }
-
+      if (Math.abs(balance) < 0.001) lastZeroBalanceIndex = index
       return {
         date: tx.date,
         description: tx.description,
@@ -200,7 +183,6 @@ export async function GET(
     })
 
     const pdfBuffer = await renderToBuffer(doc as any)
-
     const filename = generateOutstandingFileName(company.companyName)
 
     return new NextResponse(pdfBuffer as any, {
@@ -221,4 +203,3 @@ export async function GET(
     )
   }
 }
-
