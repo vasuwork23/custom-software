@@ -1,6 +1,7 @@
 import { MongoClient } from 'mongodb'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { resolveAtlasUri } from '@/lib/resolve-atlas-uri'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,8 +49,10 @@ export async function POST(req: NextRequest) {
   let atlasClient: MongoClient | null = null
 
   try {
+    const directAtlasUri = await resolveAtlasUri(atlasUri)
+
     localClient = new MongoClient(localUri)
-    atlasClient = new MongoClient(atlasUri)
+    atlasClient = new MongoClient(directAtlasUri)
 
     await localClient.connect()
     await atlasClient.connect()
