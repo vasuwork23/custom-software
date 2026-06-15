@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mongod --version)",
+      "Bash(npm --version)",
+      "PowerShell(Get-Command mongod -ErrorAction SilentlyContinue)",
+      "PowerShell(mongod --version 2>&1)",
+      "PowerShell(winget --version 2>&1)",
+      "PowerShell(winget install MongoDB.Server --accept-source-agreements --accept-package-agreements)",
+      "PowerShell(Start-Service MongoDB -ErrorAction SilentlyContinue)",
+      "Bash(npm run *)"
+    ]
+  }
+}
