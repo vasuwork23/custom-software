@@ -62,25 +62,20 @@ export async function GET(
     }
 
     const companyId = new mongoose.Types.ObjectId(id)
-    const showItems = req.nextUrl.searchParams.get('items') === 'true'
 
     // Build full statement: bills (debit) + payments (credit), with running balance.
-    const billsQuery = SellBill.find({ company: companyId })
-      .sort({ billDate: 1, createdAt: 1 })
-
-    if (showItems) {
-      billsQuery.populate({
-        path: 'items',
-        model: 'SellBillItem',
-        populate: [
-          { path: 'product', model: 'Product', select: 'productName' },
-          { path: 'indiaProduct', model: 'IndiaProduct', select: 'productName' },
-        ],
-      })
-    }
-
     const [bills, payments] = await Promise.all([
-      billsQuery.lean(),
+      SellBill.find({ company: companyId })
+        .sort({ billDate: 1, createdAt: 1 })
+        .populate({
+          path: 'items',
+          model: 'SellBillItem',
+          populate: [
+            { path: 'product', model: 'Product', select: 'productName' },
+            { path: 'indiaProduct', model: 'IndiaProduct', select: 'productName' },
+          ],
+        })
+        .lean(),
       PaymentReceipt.find({ company: companyId })
         .sort({ paymentDate: 1, createdAt: 1 })
         .lean(),
@@ -90,17 +85,15 @@ export async function GET(
       ...bills.map((b) => {
         const bAny = b as any
         const items: { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[] =
-          showItems
-            ? (bAny.items || []).map((item: any) => ({
-                productName:
-                  item.product?.productName ||
-                  item.indiaProduct?.productName ||
-                  'Product',
-                ctnSold: item.ctnSold ?? 0,
-                pcsSold: item.pcsSold ?? 0,
-                ratePerPcs: item.ratePerPcs ?? 0,
-              }))
-            : []
+          (bAny.items || []).map((item: any) => ({
+            productName:
+              item.product?.productName ||
+              item.indiaProduct?.productName ||
+              'Product',
+            ctnSold: item.ctnSold ?? 0,
+            pcsSold: item.pcsSold ?? 0,
+            ratePerPcs: item.ratePerPcs ?? 0,
+          }))
         return {
           date: b.billDate,
           createdAt: b.createdAt,
