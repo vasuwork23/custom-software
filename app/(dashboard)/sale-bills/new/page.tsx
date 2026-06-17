@@ -132,6 +132,68 @@ function QuickAddCompanyDialog({
   )
 }
 
+// ─── Bank Account Select ──────────────────────────────────────────────────────
+
+function BankAccountSelect({
+  options,
+  value,
+  onValueChange,
+}: {
+  options: { _id: string; accountName: string; currentBalance: number }[]
+  value: string
+  onValueChange: (v: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find((b) => b._id === value)
+
+  return (
+    <div className="space-y-1.5 mt-2">
+      <div className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1">
+        🏦 Bill amount will be added directly to the selected bank account
+      </div>
+      <Label className="text-xs">Select Bank Account *</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+          >
+            <span className={cn(!selected && 'text-muted-foreground')}>
+              {selected ? `${selected.accountName} — ₹${selected.currentBalance.toLocaleString('en-IN')}` : 'Select bank account'}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search bank accounts..." />
+            <CommandList>
+              {options.length === 0 && (
+                <CommandEmpty>No bank accounts found. Add one in the Banks section.</CommandEmpty>
+              )}
+              <CommandGroup>
+                {options.map((b) => (
+                  <CommandItem
+                    key={b._id}
+                    value={b.accountName}
+                    onSelect={() => { onValueChange(b._id); setOpen(false) }}
+                  >
+                    <Check className={cn('mr-2 h-4 w-4', value === b._id ? 'opacity-100' : 'opacity-0')} />
+                    <span className="flex-1">{b.accountName}</span>
+                    <span className="text-xs text-muted-foreground ml-2">₹{b.currentBalance.toLocaleString('en-IN')}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
+
 // ─── Company Searchable Select (with "Add Company" fallback) ──────────────────
 
 function CompanySelect({
@@ -149,7 +211,8 @@ function CompanySelect({
   const [search, setSearch] = useState('')
 
   const cashbookOpt = { _id: 'cashbook', companyName: '💵 Cashbook — Local buyer, direct cash payment' }
-  const allOptions = [cashbookOpt, ...options]
+  const bankOpt = { _id: 'bankaccount', companyName: '🏦 Bank Account — Direct bank payment' }
+  const allOptions = [cashbookOpt, bankOpt, ...options]
 
   const filtered = search.trim()
     ? allOptions.filter((c) =>
@@ -170,7 +233,7 @@ function CompanySelect({
           className="w-full justify-between font-normal"
         >
           <span className={cn(!selected && 'text-muted-foreground')}>
-            {selected?.companyName ?? 'Select company or Cashbook'}
+            {selected?.companyName ?? 'Select company, Cashbook, or Bank'}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -329,12 +392,20 @@ function ProductSelect({
   )
 }
 
+interface BankAccountOption {
+  _id: string
+  accountName: string
+  currentBalance: number
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function NewSellBillPage() {
   const router = useRouter()
   const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([])
   const [companyId, setCompanyId] = useState<string>('')
+  const [bankAccountId, setBankAccountId] = useState<string>('')
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([])
   const [billDate, setBillDate] = useState<Date>(new Date())
   const [notes, setNotes] = useState('')
   const [extraChargesStr, setExtraChargesStr] = useState('')
@@ -354,9 +425,17 @@ export default function NewSellBillPage() {
     if (res.success) setCompanyOptions(res.data.companies)
   }, [])
 
+  const fetchBankAccounts = useCallback(async () => {
+    const res = await apiGet<{ accounts: BankAccountOption[] }>('/api/banks')
+    if (res.success) {
+      setBankAccounts(res.data.accounts.filter((a: BankAccountOption & { type?: string }) => (a as { type?: string }).type === 'online'))
+    }
+  }, [])
+
   useEffect(() => {
     fetchCompanies()
-  }, [fetchCompanies])
+    fetchBankAccounts()
+  }, [fetchCompanies, fetchBankAccounts])
 
   function setLineProduct(id: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number) {
     const isIndia = compositeValue.startsWith('india:')
@@ -421,14 +500,15 @@ export default function NewSellBillPage() {
 
   const subtotal = lines.reduce((s, r) => s + r.lineTotal, 0)
   const grandTotal = calcGrandTotal(subtotal, extraCharges, discount)
-  const canSave = companyId && lines.some((r) => r.productId && r.pcsSold > 0 && r.ratePerPcs >= 0)
+  const isBankSale = companyId === 'bankaccount'
+  const canSave = companyId && (!isBankSale || bankAccountId) && lines.some((r) => r.productId && r.pcsSold > 0 && r.ratePerPcs >= 0)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSave) return
     const availablePcsByLine = lines.filter((r) => r.productId && r.pcsSold > 0).map((r) => ({
       id: r.id,
-      availablePcs: r.availableCtn * r.qtyPerCtn,
+      availablePcs: Math.round(r.availableCtn * r.qtyPerCtn),
       pcs: r.pcsSold,
       productName: r.productName,
     }))
@@ -440,6 +520,7 @@ export default function NewSellBillPage() {
     setSaving(true)
     const payload = {
       companyId,
+      bankAccountId: isBankSale ? bankAccountId : undefined,
       billDate: format(billDate, 'yyyy-MM-dd'),
       notes: notes.trim() || undefined,
       extraCharges,
@@ -495,13 +576,20 @@ export default function NewSellBillPage() {
               <CompanySelect
                 options={companyOptions}
                 value={companyId}
-                onValueChange={setCompanyId}
+                onValueChange={(v) => { setCompanyId(v); if (v !== 'bankaccount') setBankAccountId('') }}
                 onRequestAdd={(name) => setAddCompanyName(name)}
               />
               {companyId === 'cashbook' && (
                 <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded p-2 text-xs text-green-700 dark:text-green-400 flex items-center gap-1 mt-1">
                   💵 Bill amount will be added directly to Cash balance
                 </div>
+              )}
+              {isBankSale && (
+                <BankAccountSelect
+                  options={bankAccounts}
+                  value={bankAccountId}
+                  onValueChange={setBankAccountId}
+                />
               )}
             </div>
             <div className="space-y-2">

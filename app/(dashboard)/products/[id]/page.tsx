@@ -26,6 +26,8 @@ interface SellingHistoryRow {
   sellBillId: string
   billNumber: number
   billDate: string
+  isCashbook?: boolean
+  isBankSale?: boolean
   companyId?: string
   companyName: string
   ctnSold: number
@@ -277,7 +279,16 @@ export default function ProductDetailPage() {
                       </td>
                       <td className="p-3">{format(new Date(row.billDate), 'dd MMM yyyy')}</td>
                       <td className="p-3">
-                        {row.companyId ? (
+                        {row.isCashbook ? (
+                          <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400 text-xs font-semibold">
+                            💵 CASHBOOK
+                          </span>
+                        ) : row.isBankSale ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {row.companyName}
+                            <span className="text-blue-700 dark:text-blue-400 text-[10px] font-semibold tracking-wide">🏦 BANK</span>
+                          </span>
+                        ) : row.companyId ? (
                           <Link href={`/companies/${row.companyId}`} className="text-primary hover:underline">
                             {row.companyName}
                           </Link>

@@ -36,7 +36,7 @@ export default function ReportsPage() {
     summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number; ctnSold: number }
     chart: { period: string; revenue: number; cost: number; grossProfit: number; netProfit: number }[]
     byProduct: { productName: string; revenue: number; cost: number; profit: number; marginPct: number }[]
-    byCompany: { companyName: string; revenue: number; profit: number; outstanding: number }[]
+    byCompany: { companyName: string; isCashbook?: boolean; isBankSale?: boolean; revenue: number; profit: number; outstanding: number }[]
   } | null>(null)
   const [stock, setStock] = useState<{
     summary: {
@@ -337,7 +337,18 @@ export default function ReportsPage() {
                           <tbody>
                             {pnl.byCompany.map((r, i) => (
                               <tr key={i} className="border-b">
-                                <td className="p-2">{r.companyName}</td>
+                                <td className="p-2">
+                                  {r.isCashbook ? (
+                                    <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400 text-xs font-semibold">
+                                      💵 CASHBOOK
+                                    </span>
+                                  ) : r.isBankSale ? (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      {r.companyName}
+                                      <span className="text-blue-700 dark:text-blue-400 text-[10px] font-semibold tracking-wide">🏦 BANK</span>
+                                    </span>
+                                  ) : r.companyName}
+                                </td>
                                 <td className="p-2 text-right"><AmountDisplay amount={r.revenue} /></td>
                                 <td className="p-2 text-right"><AmountDisplay amount={r.profit} /></td>
                                 <td className="p-2 text-right"><AmountDisplay amount={r.outstanding} /></td>

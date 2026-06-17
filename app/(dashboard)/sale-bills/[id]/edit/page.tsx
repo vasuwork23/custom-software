@@ -152,6 +152,12 @@ interface LineRow {
   lineTotal: number
 }
 
+interface BankAccountOption {
+  _id: string
+  accountName: string
+  currentBalance: number
+}
+
 export default function EditSellBillPage() {
   const router = useRouter()
   const params = useParams()
@@ -160,6 +166,10 @@ export default function EditSellBillPage() {
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string>('')
   const [existingBillIsCashbook, setExistingBillIsCashbook] = useState(false)
+  const [existingBillIsBankSale, setExistingBillIsBankSale] = useState(false)
+  const [bankAccountId, setBankAccountId] = useState<string>('')
+  const [bankAccountName, setBankAccountName] = useState<string>('')
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([])
   const [billDate, setBillDate] = useState<Date>(new Date())
   const [notes, setNotes] = useState('')
   const [extraChargesStr, setExtraChargesStr] = useState('')
@@ -192,10 +202,22 @@ export default function EditSellBillPage() {
       toast.error(res.message)
       return
     }
-    const d = res.data as { company?: { _id: string } | null; isCashbook?: boolean; billDate: string; notes?: string; extraCharges?: number; extraChargesNote?: string; discount?: number; discountNote?: string; items: { productSource?: string; product?: { _id: string }; indiaProduct?: { _id: string }; productName?: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[] }
-    const isCashbook = !!d.isCashbook || !d.company
-    setCompanyId(isCashbook ? 'cashbook' : String(d.company!._id))
-    setExistingBillIsCashbook(isCashbook)
+    const d = res.data as { company?: { _id: string } | null; isCashbook?: boolean; isBankSale?: boolean; bankAccount?: { _id: string; accountName?: string } | null; companyName?: string | null; billDate: string; notes?: string; extraCharges?: number; extraChargesNote?: string; discount?: number; discountNote?: string; items: { productSource?: string; product?: { _id: string }; indiaProduct?: { _id: string }; productName?: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[] }
+    const isCashbook = !!d.isCashbook
+    const isBankSale = !!d.isBankSale
+    if (isCashbook) {
+      setCompanyId('cashbook')
+      setExistingBillIsCashbook(true)
+    } else if (isBankSale) {
+      setCompanyId('bankaccount')
+      setExistingBillIsBankSale(true)
+      const baId = d.bankAccount?._id ? String(d.bankAccount._id) : ''
+      const baName = d.bankAccount?.accountName ?? d.companyName ?? 'Bank Account'
+      setBankAccountId(baId)
+      setBankAccountName(baName)
+    } else {
+      setCompanyId(d.company ? String(d.company._id) : '')
+    }
     setBillDate(new Date(d.billDate))
     setNotes(d.notes ?? '')
     setExtraChargesStr(d.extraCharges ? String(d.extraCharges) : '')
@@ -262,9 +284,15 @@ export default function EditSellBillPage() {
     if (res.success) setCompanyOptions(res.data.companies.map((c) => ({ value: c._id, label: c.companyName })))
   }, [])
 
+  const fetchBankAccounts = useCallback(async () => {
+    const res = await apiGet<{ accounts: (BankAccountOption & { type?: string })[] }>('/api/banks')
+    if (res.success) setBankAccounts(res.data.accounts.filter((a) => a.type === 'online'))
+  }, [])
+
   useEffect(() => {
     fetchCompanies()
-  }, [fetchCompanies])
+    fetchBankAccounts()
+  }, [fetchCompanies, fetchBankAccounts])
 
   useEffect(() => {
     setLoading(true)
@@ -418,6 +446,7 @@ export default function EditSellBillPage() {
     setSaving(true)
     const payload = {
       companyId,
+      bankAccountId: existingBillIsBankSale ? bankAccountId : undefined,
       billDate: format(billDate, 'yyyy-MM-dd'),
       notes: notes.trim() || undefined,
       extraCharges,
@@ -470,26 +499,39 @@ export default function EditSellBillPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Company *</Label>
-              <SearchableSelect
-                options={[
-                  { value: 'cashbook', label: '💵 Cashbook — Local buyer, direct cash payment' },
-                  ...companyOptions,
-                ]}
-                value={companyId}
-                onValueChange={setCompanyId}
-                placeholder="Select company or Cashbook"
-                searchPlaceholder="Search companies..."
-                disabled={existingBillIsCashbook}
-              />
-              {companyId === 'cashbook' && !existingBillIsCashbook && (
-                <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded p-2 text-xs text-green-700 dark:text-green-400 flex items-center gap-1 mt-1">
-                  💵 Bill amount will be added directly to Cash balance
+              {existingBillIsBankSale ? (
+                <div className="space-y-1.5">
+                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground cursor-not-allowed">
+                    🏦 {bankAccountName}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    🏦 Bank account bills cannot change type
+                  </p>
                 </div>
-              )}
-              {existingBillIsCashbook && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  💵 Cashbook bills cannot be changed to company bills
-                </p>
+              ) : (
+                <>
+                  <SearchableSelect
+                    options={[
+                      { value: 'cashbook', label: '💵 Cashbook — Local buyer, direct cash payment' },
+                      ...companyOptions,
+                    ]}
+                    value={companyId}
+                    onValueChange={setCompanyId}
+                    placeholder="Select company or Cashbook"
+                    searchPlaceholder="Search companies..."
+                    disabled={existingBillIsCashbook}
+                  />
+                  {companyId === 'cashbook' && !existingBillIsCashbook && (
+                    <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded p-2 text-xs text-green-700 dark:text-green-400 flex items-center gap-1 mt-1">
+                      💵 Bill amount will be added directly to Cash balance
+                    </div>
+                  )}
+                  {existingBillIsCashbook && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      💵 Cashbook bills cannot be changed to company bills
+                    </p>
+                  )}
+                </>
               )}
             </div>
             <div className="space-y-2">

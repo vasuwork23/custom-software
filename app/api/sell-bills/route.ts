@@ -6,6 +6,8 @@ import SellBillItem from '@/models/SellBillItem'
 import Company from '@/models/Company'
 import { getNextBillNumber } from '@/models/Counter'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import { createBankSaleTransaction } from '@/lib/bank-sale-transaction-helper'
+import BankAccount from '@/models/BankAccount'
 import { calcGrandTotal } from '@/lib/utils'
 import { processFIFO } from '@/lib/fifo'
 import { processIndiaFIFO } from '@/lib/india-fifo'
@@ -66,20 +68,28 @@ export async function GET(req: NextRequest) {
         { $limit: limit },
         { $lookup: { from: 'companies', localField: 'company', foreignField: '_id', as: 'companyDoc' } },
         { $unwind: { path: '$companyDoc', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: 'bankaccounts', localField: 'bankAccount', foreignField: '_id', as: 'bankAccountDoc' } },
+        { $unwind: { path: '$bankAccountDoc', preserveNullAndEmptyArrays: true } },
         { $lookup: { from: 'sellbillitems', localField: '_id', foreignField: 'sellBill', as: 'itemList' } },
         {
           $addFields: {
             itemCount: { $size: '$itemList' },
             companyName: {
               $cond: [
-                { $eq: ['$isCashbook', true] },
-                'Cashbook',
+                '$company',
                 '$companyDoc.companyName',
+                {
+                  $cond: [
+                    '$isBankSale',
+                    { $ifNull: ['$bankAccountDoc.accountName', '$companyName'] },
+                    { $ifNull: ['$companyName', '—'] },
+                  ],
+                },
               ],
             },
           },
         },
-        { $project: { _id: 1, billNumber: 1, billDate: 1, company: 1, isCashbook: 1, companyName: 1, contact1Mobile: '$companyDoc.contact1Mobile', contact2Mobile: '$companyDoc.contact2Mobile', totalAmount: 1, grandTotal: 1, extraCharges: 1, discount: 1, whatsappSent: 1, whatsappSentAt: 1, itemCount: 1, itemList: 1 } },
+        { $project: { _id: 1, billNumber: 1, billDate: 1, company: 1, isCashbook: 1, isBankSale: 1, bankAccount: 1, companyName: 1, contact1Mobile: '$companyDoc.contact1Mobile', contact2Mobile: '$companyDoc.contact2Mobile', totalAmount: 1, grandTotal: 1, extraCharges: 1, discount: 1, whatsappSent: 1, whatsappSentAt: 1, itemCount: 1, itemList: 1 } },
       ]),
       SellBill.countDocuments(filter),
     ])
@@ -111,6 +121,8 @@ export async function GET(req: NextRequest) {
         billDate: b.billDate,
         company: b.company,
         isCashbook: !!b.isCashbook,
+        isBankSale: !!b.isBankSale,
+        bankAccount: b.bankAccount,
         companyName: b.companyName ?? '—',
         contact1Mobile: b.contact1Mobile,
         contact2Mobile: b.contact2Mobile,
@@ -168,15 +180,23 @@ export async function POST(req: NextRequest) {
     const extraChargesNote = body.extraChargesNote != null ? String(body.extraChargesNote).trim() : ''
     const discount = Number(body.discount) || 0
     const discountNote = body.discountNote != null ? String(body.discountNote).trim() : ''
+    const bankAccountId = body.bankAccountId != null ? String(body.bankAccountId).trim() : ''
 
     const isCashbook = companyId === 'cashbook'
+    const isBankSale = companyId === 'bankaccount'
     if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', message: 'Select company or Cashbook' },
         { status: 400 }
       )
     }
-    if (!isCashbook && !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (isBankSale && !mongoose.Types.ObjectId.isValid(bankAccountId)) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: 'Select a bank account' },
+        { status: 400 }
+      )
+    }
+    if (!isCashbook && !isBankSale && !mongoose.Types.ObjectId.isValid(companyId)) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', message: 'Valid company is required' },
         { status: 400 }
@@ -198,13 +218,19 @@ export async function POST(req: NextRequest) {
     await connectDB()
     const createdBy = await resolveCreatedBy(user.id)
 
+    const bankAccDoc = isBankSale
+      ? await BankAccount.findById(bankAccountId).lean<{ accountName?: string }>()
+      : null
+
     const billNumber = await getNextBillNumber()
 
     const bill = await SellBill.create({
       billNumber,
-      company: isCashbook ? null : new mongoose.Types.ObjectId(companyId),
+      company: (isCashbook || isBankSale) ? null : new mongoose.Types.ObjectId(companyId),
       isCashbook: !!isCashbook,
-      companyName: isCashbook ? 'Cashbook' : null,
+      isBankSale: !!isBankSale,
+      bankAccount: isBankSale ? new mongoose.Types.ObjectId(bankAccountId) : null,
+      companyName: isCashbook ? 'Cashbook' : isBankSale ? (bankAccDoc?.accountName ?? 'Bank Account') : null,
       billDate: new Date(billDate),
       items: [],
       totalAmount: 0,
@@ -271,6 +297,15 @@ export async function POST(req: NextRequest) {
         category: 'cashbook_sale',
         referenceId: bill._id as mongoose.Types.ObjectId,
         referenceType: 'SellBill',
+      })
+    } else if (isBankSale) {
+      await createBankSaleTransaction({
+        bankAccountId: new mongoose.Types.ObjectId(bankAccountId),
+        amount: grandTotal,
+        description: `Bank sale — Bill #${bill.billNumber}${bankAccDoc ? ` (${bankAccDoc.accountName})` : ''}`,
+        date: new Date(billDate),
+        referenceId: bill._id as mongoose.Types.ObjectId,
+        createdBy,
       })
     } else {
       await Company.findByIdAndUpdate(companyId, {

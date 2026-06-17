@@ -5,6 +5,8 @@ export interface ISellBill {
   billNumber: number
   company: mongoose.Types.ObjectId | null
   isCashbook: boolean
+  isBankSale: boolean
+  bankAccount?: mongoose.Types.ObjectId | null
   companyName?: string | null
   billDate: Date
   items: mongoose.Types.ObjectId[]
@@ -28,6 +30,8 @@ const SellBillSchema = new Schema<ISellBill>(
     billNumber: { type: Number, required: true },
     company: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
     isCashbook: { type: Boolean, default: false },
+    isBankSale: { type: Boolean, default: false },
+    bankAccount: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
     companyName: { type: String, default: null },
     billDate: { type: Date, required: true },
     items: [{ type: Schema.Types.ObjectId, ref: 'SellBillItem' }],
