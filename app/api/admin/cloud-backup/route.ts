@@ -6,6 +6,7 @@ import { MongoClient } from 'mongodb'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
+import { resolveAtlasUri } from '@/lib/resolve-atlas-uri'
 
 const execAsync = promisify(exec)
 
@@ -140,8 +141,10 @@ export async function POST(req: NextRequest) {
     // ============================================
     // STEP 1: Connect to both databases
     // ============================================
+    const directAtlasUri = await resolveAtlasUri(atlasUri)
+
     localClient = new MongoClient(localUri)
-    atlasClient = new MongoClient(atlasUri)
+    atlasClient = new MongoClient(directAtlasUri)
     await localClient.connect()
     await atlasClient.connect()
 

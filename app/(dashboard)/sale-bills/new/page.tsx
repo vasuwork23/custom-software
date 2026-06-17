@@ -508,7 +508,7 @@ export default function NewSellBillPage() {
     if (!canSave) return
     const availablePcsByLine = lines.filter((r) => r.productId && r.pcsSold > 0).map((r) => ({
       id: r.id,
-      availablePcs: r.availableCtn * r.qtyPerCtn,
+      availablePcs: Math.round(r.availableCtn * r.qtyPerCtn),
       pcs: r.pcsSold,
       productName: r.productName,
     }))
