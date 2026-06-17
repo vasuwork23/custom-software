@@ -85,7 +85,24 @@ export async function GET(req: NextRequest) {
         },
       },
       { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
-      { $group: { _id: '$bill.company', companyName: { $first: '$companyDoc.companyName' }, revenue: { $sum: '$adjustedRevenue' }, profit: { $sum: '$adjustedProfit' } } },
+      {
+        $group: {
+          _id: { company: '$bill.company', bankAccount: '$bill.bankAccount' },
+          companyName: {
+            $first: {
+              $cond: [
+                '$bill.company',
+                '$companyDoc.companyName',
+                { $ifNull: ['$bill.companyName', '—'] },
+              ],
+            },
+          },
+          isCashbook: { $first: { $ifNull: ['$bill.isCashbook', false] } },
+          isBankSale: { $first: { $ifNull: ['$bill.isBankSale', false] } },
+          revenue: { $sum: '$adjustedRevenue' },
+          profit: { $sum: '$adjustedProfit' },
+        },
+      },
       { $sort: { revenue: -1 } },
       { $limit: 5 },
     ])
@@ -113,7 +130,18 @@ export async function GET(req: NextRequest) {
         },
       },
       { $sort: { billDate: -1, createdAt: -1 } },
-      { $project: { billNumber: 1, billDate: 1, companyName: '$companyDoc.companyName', totalAmount: { $ifNull: ['$grandTotal', '$totalAmount'] }, itemCount: 1, totalProfit: 1 } },
+      {
+        $project: {
+          billNumber: 1, billDate: 1, totalAmount: { $ifNull: ['$grandTotal', '$totalAmount'] }, itemCount: 1, totalProfit: 1,
+          companyName: {
+            $cond: [
+              '$company',
+              '$companyDoc.companyName',
+              { $ifNull: ['$companyName', '—'] },
+            ],
+          },
+        },
+      },
     ])
 
     const totalBills = summary.totalBills ?? 0

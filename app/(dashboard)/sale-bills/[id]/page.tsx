@@ -63,6 +63,8 @@ interface BillDetail {
     city?: string
   } | null
   isCashbook?: boolean
+  isBankSale?: boolean
+  bankAccount?: { _id: string; accountName: string } | null
   items: BillItem[]
 }
 
@@ -108,7 +110,7 @@ export default function SellBillDetailPage() {
     const a = document.createElement('a')
     a.href = url
     a.download = generateBillFileName({
-      companyName: bill.isCashbook ? 'Cashbook' : (bill.company?.companyName ?? '—'),
+      companyName: bill.isCashbook ? 'Cashbook' : bill.isBankSale ? (bill.bankAccount?.accountName ?? 'BankAccount') : (bill.company?.companyName ?? '—'),
       billNumber: bill.billNumber,
       billDate: bill.billDate,
     })
@@ -199,11 +201,11 @@ export default function SellBillDetailPage() {
               variant="outline"
               size="sm"
               onClick={handleSendWhatsApp}
-              disabled={bill.isCashbook || bill.whatsappSent || sendingWhatsApp}
-              title={bill.isCashbook ? 'Not available for Cashbook bills' : undefined}
+              disabled={bill.isCashbook || bill.isBankSale || bill.whatsappSent || sendingWhatsApp}
+              title={bill.isCashbook ? 'Not available for Cashbook bills' : bill.isBankSale ? 'Not available for Bank Account bills' : undefined}
             >
               <MessageCircle className="mr-2 h-4 w-4" />
-              {bill.isCashbook ? 'WhatsApp N/A' : bill.whatsappSent ? 'Sent' : sendingWhatsApp ? 'Sending...' : 'Send WhatsApp'}
+              {(bill.isCashbook || bill.isBankSale) ? 'WhatsApp N/A' : bill.whatsappSent ? 'Sent' : sendingWhatsApp ? 'Sending...' : 'Send WhatsApp'}
             </Button>
             <ConfirmDialog
               title="Delete sale bill"
@@ -227,8 +229,12 @@ export default function SellBillDetailPage() {
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">To</p>
-              {bill.isCashbook || !bill.company ? (
+              {bill.isCashbook ? (
                 <span className="font-medium text-green-700 dark:text-green-400">💵 Cashbook</span>
+              ) : bill.isBankSale ? (
+                <span className="font-medium text-blue-700 dark:text-blue-400">🏦 {bill.bankAccount?.accountName ?? 'Bank Account'}</span>
+              ) : !bill.company ? (
+                <span className="font-medium text-muted-foreground">—</span>
               ) : (
                 <>
                   <Link href={`/companies/${bill.company._id}`} className="font-medium hover:underline">

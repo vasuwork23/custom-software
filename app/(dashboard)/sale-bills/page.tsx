@@ -26,6 +26,7 @@ interface BillRow {
   billDate: string
   company: string
   isCashbook?: boolean
+  isBankSale?: boolean
   companyName: string
   totalAmount: number
   grandTotal?: number
@@ -180,8 +181,13 @@ export default function SellBillsPage() {
                     <td className="p-4 whitespace-nowrap">{new Date(b.billDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                     <td className="p-4">
                       {b.isCashbook ? (
-                        <span className="flex items-center gap-1 text-green-700 dark:text-green-400 font-medium">
-                          💵 Cashbook
+                        <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400 text-xs font-semibold">
+                          💵 CASHBOOK
+                        </span>
+                      ) : b.isBankSale ? (
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          {b.companyName}
+                          <span className="text-blue-700 dark:text-blue-400 text-[10px] font-semibold tracking-wide">🏦 BANK</span>
                         </span>
                       ) : (
                         <div className="flex flex-col">

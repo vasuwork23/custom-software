@@ -315,8 +315,18 @@ export async function GET(req: NextRequest) {
         { $addFields: { adjustedProfit: { $subtract: ['$adjustedRevenue', '$itemCost'] } } },
         {
           $group: {
-            _id: '$bill.company',
-            name: { $first: '$companyDoc.companyName' },
+            _id: { company: '$bill.company', bankAccount: '$bill.bankAccount' },
+            name: {
+              $first: {
+                $cond: [
+                  '$bill.company',
+                  '$companyDoc.companyName',
+                  { $ifNull: ['$bill.companyName', '—'] },
+                ],
+              },
+            },
+            isCashbook: { $first: { $ifNull: ['$bill.isCashbook', false] } },
+            isBankSale: { $first: { $ifNull: ['$bill.isBankSale', false] } },
             revenue: { $sum: '$adjustedRevenue' },
             profit: { $sum: '$adjustedProfit' },
           },
@@ -442,31 +452,36 @@ export async function GET(req: NextRequest) {
     })
 
     const topCompanies = (topCompaniesAgg as {
-      _id: mongoose.Types.ObjectId
+      _id: { company: mongoose.Types.ObjectId; bankAccount: mongoose.Types.ObjectId }
       name?: string
+      isCashbook?: boolean
+      isBankSale?: boolean
       revenue: number
       profit: number
-    }[]).map((r) => ({
-      name: r.name ?? '—',
-      revenue: r.revenue ?? 0,
-      profit: r.profit ?? 0,
-    }))
+    }[]).map((r) => {
+      const hasCompany = r._id?.company != null
+      const isCashbook = !hasCompany && !!r.isCashbook
+      const isBankSale = !hasCompany && !!r.isBankSale
+      const name = isCashbook ? '💵 Cashbook' : isBankSale ? (r.name ?? 'Bank Account') : (r.name ?? '—')
+      return { name, revenue: r.revenue ?? 0, profit: r.profit ?? 0 }
+    })
 
     const recentBills = (recentBillsRaw as {
       _id: mongoose.Types.ObjectId
       billNumber: number
       billDate: Date
-      company: { companyName?: string } | mongoose.Types.ObjectId
+      company: { companyName?: string } | mongoose.Types.ObjectId | null
+      isCashbook?: boolean
+      isBankSale?: boolean
+      companyName?: string
       totalAmount: number
-    }[]).map((b) => ({
-      id: String(b._id),
-      billNumber: b.billNumber,
-      date: b.billDate,
-      company:
-        (b.company as { companyName?: string })?.companyName ??
-        '—',
-      amount: b.totalAmount ?? 0,
-    }))
+    }[]).map((b) => {
+      let company: string
+      if (b.isCashbook) company = 'Cashbook'
+      else if (b.isBankSale) company = b.companyName ?? 'Bank Account'
+      else company = (b.company as { companyName?: string })?.companyName ?? '—'
+      return { id: String(b._id), billNumber: b.billNumber, date: b.billDate, company, amount: b.totalAmount ?? 0 }
+    })
 
     return NextResponse.json({
       success: true,

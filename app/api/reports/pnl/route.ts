@@ -236,8 +236,18 @@ export async function GET(req: NextRequest) {
         adjustedProfitStage,
         {
           $group: {
-            _id: '$bill.company',
-            companyName: { $first: '$companyDoc.companyName' },
+            _id: { company: '$bill.company', bankAccount: '$bill.bankAccount' },
+            companyName: {
+              $first: {
+                $cond: [
+                  '$bill.company',
+                  '$companyDoc.companyName',
+                  { $ifNull: ['$bill.companyName', '—'] },
+                ],
+              },
+            },
+            isCashbook: { $first: { $ifNull: ['$bill.isCashbook', false] } },
+            isBankSale: { $first: { $ifNull: ['$bill.isBankSale', false] } },
             revenue: { $sum: '$adjustedRevenue' },
             profit: { $sum: '$adjustedProfit' },
           },
@@ -308,19 +318,28 @@ export async function GET(req: NextRequest) {
       ])
     )
     const companyBreakdown = byCompany.map(
-      (r: { _id: mongoose.Types.ObjectId; companyName?: string; revenue: number; profit: number }) => {
-        const isCashbook = r._id == null
+      (r: { _id: { company: mongoose.Types.ObjectId; bankAccount: mongoose.Types.ObjectId }; companyName?: string; isCashbook?: boolean; isBankSale?: boolean; revenue: number; profit: number }) => {
+        const companyId = r._id?.company
+        const hasCompany = companyId != null
+        const isCashbook = !hasCompany && !!r.isCashbook
+        const isBankSale = !hasCompany && !!r.isBankSale
+        const displayName = isCashbook
+          ? '💵 Cashbook'
+          : isBankSale
+          ? (r.companyName ?? 'Bank Account')
+          : (r.companyName ?? '—')
         return {
-          companyId: r._id,
-          companyName: isCashbook ? '💵 Cashbook' : (r.companyName ?? '—'),
+          companyId,
+          isCashbook,
+          isBankSale,
+          companyName: displayName,
           revenue: r.revenue,
           profit: r.profit,
-          // Cashbook bills are paid at point of sale — no outstanding
-          outstanding: isCashbook
-            ? 0
-            : (billedMap[String(r._id)] ?? 0) -
-              (receivedMap[String(r._id)] ?? 0) +
-              (openingBalanceMap[String(r._id)] ?? 0),
+          outstanding: hasCompany
+            ? (billedMap[String(companyId)] ?? 0) -
+              (receivedMap[String(companyId)] ?? 0) +
+              (openingBalanceMap[String(companyId)] ?? 0)
+            : 0,
         }
       }
     )

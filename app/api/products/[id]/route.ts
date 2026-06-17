@@ -125,7 +125,11 @@ export async function GET(
         .sort({ createdAt: -1 })
         .populate({
           path: 'sellBill',
-          populate: { path: 'company', select: 'companyName' },
+          select: 'billNumber billDate company companyName isCashbook isBankSale bankAccount',
+          populate: [
+            { path: 'company', select: 'companyName' },
+            { path: 'bankAccount', select: 'accountName' },
+          ],
         })
         .lean(),
     ])
@@ -158,7 +162,7 @@ export async function GET(
     const sellingHistoryList = sellingHistory
       .filter((item) => item.sellBill && typeof item.sellBill === 'object')
       .map((item) => {
-        const sellBill = item.sellBill as unknown as { _id: mongoose.Types.ObjectId; billNumber: number; billDate: Date; company: { _id: mongoose.Types.ObjectId; companyName: string } }
+        const sellBill = item.sellBill as unknown as { _id: mongoose.Types.ObjectId; billNumber: number; billDate: Date; company: { _id: mongoose.Types.ObjectId; companyName: string }; isCashbook: boolean; isBankSale: boolean; companyName?: string; bankAccount?: { _id: mongoose.Types.ObjectId; accountName: string } }
         const breakdown = (item.fifoBreakdown ?? []) as {
           buyingEntry: mongoose.Types.ObjectId
           ctnConsumed: number
@@ -178,8 +182,14 @@ export async function GET(
           sellBillId: sellBill._id,
           billNumber: sellBill.billNumber,
           billDate: sellBill.billDate,
-          companyId: sellBill.company?._id,
-          companyName: sellBill.company?.companyName ?? '—',
+          isCashbook: !!sellBill.isCashbook,
+          isBankSale: !!sellBill.isBankSale,
+          companyId: sellBill.isCashbook || sellBill.isBankSale ? undefined : sellBill.company?._id,
+          companyName: sellBill.isCashbook
+            ? 'Cashbook'
+            : sellBill.isBankSale
+            ? (sellBill.bankAccount?.accountName ?? sellBill.companyName ?? 'Bank Account')
+            : (sellBill.company?.companyName ?? '—'),
           ctnSold: item.ctnSold,
           pcsSold: item.pcsSold,
           ratePerPcs: item.ratePerPcs,

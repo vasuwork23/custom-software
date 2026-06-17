@@ -8,6 +8,8 @@ import BuyingEntry from '@/models/BuyingEntry'
 import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
 import CashTransaction from '@/models/CashTransaction'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import BankAccount from '@/models/BankAccount'
+import BankTransaction from '@/models/BankTransaction'
 import { processFIFO, reverseFIFO, applyFIFO } from '@/lib/fifo'
 import { processIndiaFIFO, reverseIndiaFIFO, applyIndiaFIFO } from '@/lib/india-fifo'
 import { round } from '@/lib/round'
@@ -73,6 +75,7 @@ export async function GET(
     const bill = await SellBill.findById(id)
       .lean()
       .populate('company')
+      .populate('bankAccount', 'accountName')
       .populate({
         path: 'items',
         populate: [
@@ -190,15 +193,23 @@ export async function PUT(
     const extraChargesNote = body.extraChargesNote != null ? String(body.extraChargesNote).trim() : ''
     const discount = Number(body.discount) || 0
     const discountNote = body.discountNote != null ? String(body.discountNote).trim() : ''
+    const bankAccountId = body.bankAccountId != null ? String(body.bankAccountId).trim() : ''
 
     const isCashbook = companyId === 'cashbook'
+    const isBankSale = companyId === 'bankaccount'
     if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', message: 'Select company or Cashbook' },
         { status: 400 }
       )
     }
-    if (!isCashbook && !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (isBankSale && !mongoose.Types.ObjectId.isValid(bankAccountId)) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: 'Select a bank account' },
+        { status: 400 }
+      )
+    }
+    if (!isCashbook && !isBankSale && !mongoose.Types.ObjectId.isValid(companyId)) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', message: 'Valid company is required' },
         { status: 400 }
@@ -255,22 +266,30 @@ export async function PUT(
     }
 
     const existingIsCashbook = (bill as { isCashbook?: boolean }).isCashbook === true
+    const existingIsBankSale = (bill as { isBankSale?: boolean }).isBankSale === true
     const oldGrandTotal =
       (bill as { grandTotal?: number }).grandTotal ??
       (bill as { totalAmount?: number }).totalAmount ??
       0
     const existingCompanyId = (bill as { company?: mongoose.Types.ObjectId }).company
+    const existingBankAccountId = (bill as { bankAccount?: mongoose.Types.ObjectId }).bankAccount
 
-    // Cannot switch cashbook ↔ company on edit
-    if (existingIsCashbook && companyId !== 'cashbook') {
+    // Cannot switch between bill types on edit
+    if (existingIsCashbook && !isCashbook) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Cashbook bills cannot be changed to company bills' },
+        { success: false, error: 'Validation failed', message: 'Cashbook bills cannot be changed to another type' },
         { status: 400 }
       )
     }
-    if (!existingIsCashbook && companyId === 'cashbook') {
+    if (existingIsBankSale && !isBankSale) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Company bills cannot be changed to Cashbook' },
+        { success: false, error: 'Validation failed', message: 'Bank account bills cannot be changed to another type' },
+        { status: 400 }
+      )
+    }
+    if (!existingIsCashbook && !existingIsBankSale && (isCashbook || isBankSale)) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: 'Company bills cannot be changed to Cashbook or Bank Account' },
         { status: 400 }
       )
     }
@@ -428,7 +447,7 @@ export async function PUT(
     const newGrandTotal = calcGrandTotal(newSubtotal, extraCharges, discount)
     const amountDiff = newGrandTotal - oldGrandTotal
 
-    // Step 3 — Adjust cash or company outstanding by the grand total difference
+    // Step 3 — Adjust cash / bank / company outstanding by the grand total difference
     if (amountDiff !== 0) {
       if (existingIsCashbook) {
         await createCashTransaction({
@@ -441,6 +460,24 @@ export async function PUT(
           referenceType: 'SellBill',
           sortOrder: 1,
         })
+      } else if (existingIsBankSale && existingBankAccountId) {
+        const bankAcc = await BankAccount.findById(existingBankAccountId)
+        if (bankAcc) {
+          bankAcc.currentBalance = (bankAcc.currentBalance ?? 0) + amountDiff
+          await bankAcc.save()
+          await BankTransaction.create({
+            bankAccount: existingBankAccountId,
+            type: amountDiff > 0 ? 'credit' : 'debit',
+            amount: Math.abs(amountDiff),
+            balanceAfter: bankAcc.currentBalance,
+            source: 'bankaccount_sale',
+            sourceRef: new mongoose.Types.ObjectId(id),
+            sourceLabel: `Bank bill edited — adjustment for Bill #${(bill as { billNumber?: number }).billNumber ?? id}`,
+            transactionDate: billDate ? new Date(billDate) : new Date(),
+            createdBy: updatedBy,
+            sortOrder: 1,
+          })
+        }
       } else if (existingCompanyId) {
         await Company.findByIdAndUpdate(existingCompanyId, {
           $inc: { outstanding: amountDiff },
@@ -448,9 +485,11 @@ export async function PUT(
       }
     }
 
-    ;(bill as { company: mongoose.Types.ObjectId | null; isCashbook: boolean; companyName: string | null }).company = isCashbook ? null : new mongoose.Types.ObjectId(companyId)
+    ;(bill as { company: mongoose.Types.ObjectId | null; isCashbook: boolean; isBankSale: boolean; bankAccount: mongoose.Types.ObjectId | null; companyName: string | null }).company = (isCashbook || isBankSale) ? null : new mongoose.Types.ObjectId(companyId)
     ;(bill as { isCashbook: boolean }).isCashbook = !!isCashbook
-    ;(bill as { companyName: string | null }).companyName = isCashbook ? 'Cashbook' : null
+    ;(bill as { isBankSale: boolean }).isBankSale = !!isBankSale
+    ;(bill as { bankAccount: mongoose.Types.ObjectId | null }).bankAccount = isBankSale ? (existingBankAccountId ?? null) : null
+    ;(bill as { companyName: string | null }).companyName = isCashbook ? 'Cashbook' : isBankSale ? ((bill as { companyName?: string }).companyName ?? 'Bank Account') : null
     bill.billDate = new Date(billDate)
     bill.items = createdItems
     bill.totalAmount = newSubtotal
@@ -520,6 +559,8 @@ export async function DELETE(
     await SellBillItem.deleteMany({ sellBill: id })
 
     const isCashbook = (bill as { isCashbook?: boolean }).isCashbook === true
+    const isBankSale = (bill as { isBankSale?: boolean }).isBankSale === true
+    const deleteBankAccountId = (bill as { bankAccount?: mongoose.Types.ObjectId }).bankAccount
     const amountToReverse =
       (bill as { grandTotal?: number }).grandTotal ??
       (bill as { totalAmount?: number }).totalAmount ??
@@ -545,6 +586,24 @@ export async function DELETE(
           referenceType: 'SellBill',
           isReversal: true,
           reversalOf: originalCashTx?._id ?? null,
+          sortOrder: 1,
+        })
+      }
+    } else if (isBankSale && deleteBankAccountId && amountToReverse > 0) {
+      const bankAcc = await BankAccount.findById(deleteBankAccountId)
+      if (bankAcc) {
+        bankAcc.currentBalance = (bankAcc.currentBalance ?? 0) - amountToReverse
+        await bankAcc.save()
+        await BankTransaction.create({
+          bankAccount: deleteBankAccountId,
+          type: 'debit',
+          amount: amountToReverse,
+          balanceAfter: bankAcc.currentBalance,
+          source: 'bankaccount_sale',
+          sourceRef: new mongoose.Types.ObjectId(id),
+          sourceLabel: `Reversal — Bank bill deleted #${(bill as { billNumber?: number }).billNumber ?? id}`,
+          transactionDate: (bill as { billDate?: Date }).billDate ?? new Date(),
+          createdBy: (bill as { createdBy?: mongoose.Types.ObjectId }).createdBy ?? new mongoose.Types.ObjectId(),
           sortOrder: 1,
         })
       }

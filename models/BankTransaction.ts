@@ -18,6 +18,7 @@ export interface IBankTransaction {
     | 'india_buying_advance'
     | 'cashbook_sale'
     | 'china_bank_withdrawal'
+    | 'bankaccount_sale'
   sourceRef?: mongoose.Types.ObjectId
   sourceLabel?: string
   transferTo?: mongoose.Types.ObjectId
@@ -51,6 +52,7 @@ const BankTransactionSchema = new Schema<IBankTransaction>(
         'india_buying_advance',
         'cashbook_sale',
         'china_bank_withdrawal',
+        'bankaccount_sale',
       ],
       default: 'manual',
     },
