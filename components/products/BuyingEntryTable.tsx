@@ -163,7 +163,11 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
     if (result.success) {
       toast.success('Entry deleted')
       setDeleteConfirm(null)
-      fetchEntries()
+      if (currentPage === 1) {
+        fetchEntries()
+      } else {
+        setCurrentPage(1)
+      }
       onRefresh()
     } else toast.error(result.message ?? result.error)
   }

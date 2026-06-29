@@ -110,7 +110,7 @@ export function MakeIndiaPaymentDialog({
       apiGet<{ entries: { _id: string; entryDate: string; totalCtn: number; remainingAmount: number }[] }>(
         `/api/india-buying-entries?productId=${productId}&limit=100`
       ).then((r) => {
-        if (r.success) setEntries(r.data.entries ?? [])
+        if (r.success) setEntries((r.data.entries ?? []).filter((e) => (e.remainingAmount ?? 0) > 0))
         else setEntries([])
       })
       apiGet<{ accounts: { _id: string; accountName: string; currentBalance: number }[] }>('/api/banks').then((r) => {

@@ -128,7 +128,11 @@ export function IndiaBuyingEntryTable({
     const result = await apiDelete(`/api/india-buying-entries/${entryId}`)
     if (result.success) {
       toast.success('Entry deleted')
-      fetchEntries()
+      if (currentPage === 1) {
+        fetchEntries()
+      } else {
+        setCurrentPage(1)
+      }
       onRefresh()
     } else toast.error(result.message ?? result.error)
   }
