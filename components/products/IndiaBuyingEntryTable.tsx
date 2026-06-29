@@ -49,6 +49,7 @@ export function IndiaBuyingEntryTable({
   const [loading, setLoading] = useState(true)
   const [entries, setEntries] = useState<IndiaBuyingEntryRow[]>([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const [currentPage, setCurrentPage] = useState(1)
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
   const [paymentsByEntry, setPaymentsByEntry] = useState<
     Record<string, { _id: string; amount: number; paymentDate: string; paymentSource?: string; bankAccountName?: string; companyName?: string; notes?: string }[]>
@@ -78,18 +79,18 @@ export function IndiaBuyingEntryTable({
     )
   }
 
-  const fetchEntries = useCallback(async () => {
+  const fetchEntries = useCallback(async (page = currentPage) => {
     setLoading(true)
     const result = await apiGet<{
       entries: IndiaBuyingEntryRow[]
       pagination: { page: number; pages: number; total: number }
-    }>(`/api/india-buying-entries?productId=${productId}&limit=20`)
+    }>(`/api/india-buying-entries?productId=${productId}&limit=20&page=${page}`)
     setLoading(false)
     if (result.success) {
       setEntries(result.data.entries)
       setPagination(result.data.pagination)
     } else toast.error(result.message)
-  }, [productId])
+  }, [productId, currentPage])
 
   useEffect(() => {
     fetchEntries()
@@ -296,6 +297,24 @@ export function IndiaBuyingEntryTable({
           <p className="text-sm text-muted-foreground">
             Page {pagination.page} of {pagination.pages} ({pagination.total} total)
           </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1 || loading}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= pagination.pages || loading}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
     </div>
