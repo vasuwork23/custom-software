@@ -98,14 +98,14 @@ export async function GET(req: NextRequest) {
     const itemsWithProduct = await SellBillItem.find({ sellBill: { $in: billIds } })
       .populate('product', 'productName')
       .populate('indiaProduct', 'productName')
-      .select('sellBill product indiaProduct ctnSold pcsSold')
+      .select('sellBill product indiaProduct ctnSold pcsSold ratePerPcs')
       .lean()
-    const itemsByBill = new Map<string | mongoose.Types.ObjectId, { productName: string; ctnSold: number; pcsSold: number }[]>()
+    const itemsByBill = new Map<string | mongoose.Types.ObjectId, { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[]>()
     for (const item of itemsWithProduct) {
       const bid = String(item.sellBill)
       if (!itemsByBill.has(bid)) itemsByBill.set(bid, [])
       const productName = (item.product as { productName?: string })?.productName ?? (item.indiaProduct as { productName?: string })?.productName ?? '—'
-      itemsByBill.get(bid)!.push({ productName, ctnSold: item.ctnSold, pcsSold: item.pcsSold })
+      itemsByBill.get(bid)!.push({ productName, ctnSold: item.ctnSold, pcsSold: item.pcsSold, ratePerPcs: item.ratePerPcs })
     }
 
     const formatCtnPcs = (ctn: number, pcs: number): string => {
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
         whatsappSent: b.whatsappSent ?? false,
         whatsappSentAt: b.whatsappSentAt,
         itemCount: b.itemCount ?? 0,
-        productsSummary: items.map((i) => `${i.productName}: ${formatCtnPcs(i.ctnSold, i.pcsSold)}`).join('\n') || (b.itemCount != null ? `${b.itemCount} product${b.itemCount !== 1 ? 's' : ''}` : '—'),
+        productsSummary: items.map((i) => `${i.productName}: ${formatCtnPcs(i.ctnSold, i.pcsSold)} @₹${i.ratePerPcs}`).join('\n') || (b.itemCount != null ? `${b.itemCount} product${b.itemCount !== 1 ? 's' : ''}` : '—'),
       }
     })
 
