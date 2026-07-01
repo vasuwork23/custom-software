@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/SearchableSelect'
@@ -12,6 +13,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ExpenseFormDialog, type ExpenseFormValues } from '@/components/expenses/ExpenseFormDialog'
 import { apiGet, apiDelete } from '@/lib/api-client'
+import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -40,6 +42,8 @@ export default function ExpensesPage() {
   const [data, setData] = useState<ExpensesData | null>(null)
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [paidFromFilter, setPaidFromFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400)
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<ExpenseFormValues | null>(null)
@@ -53,11 +57,12 @@ export default function ExpensesPage() {
     if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
     if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     if (paidFromFilter) params.set('paidFrom', paidFromFilter)
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     const result = await apiGet<ExpensesData>(`/api/expenses?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, dateRange?.from, dateRange?.to, paidFromFilter])
+  }, [page, dateRange?.from, dateRange?.to, paidFromFilter, debouncedSearch])
 
   const fetchAccounts = useCallback(async () => {
     const res = await apiGet<{ accounts: { _id: string; accountName: string }[] }>('/api/banks')
@@ -68,6 +73,10 @@ export default function ExpensesPage() {
   useEffect(() => {
     fetchExpenses()
   }, [fetchExpenses])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, dateRange?.from, dateRange?.to, paidFromFilter])
 
   useEffect(() => {
     fetchAccounts()
@@ -159,6 +168,12 @@ export default function ExpensesPage() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center flex-wrap">
         <div className="flex flex-wrap items-center gap-4">
+          <Input
+            placeholder="Search by title or remark..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-[200px]"
+          />
           <DateRangePicker value={dateRange} onChange={setDateRange} placeholder="Date range" />
           <SearchableSelect
             options={accountOptions}

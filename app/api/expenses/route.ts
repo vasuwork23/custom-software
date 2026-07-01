@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get('startDate')?.trim()
     const endDate = searchParams.get('endDate')?.trim()
     const paidFrom = searchParams.get('paidFrom')?.trim()
+    const search = searchParams.get('search')?.trim()
 
     await connectDB()
 
@@ -49,6 +50,10 @@ export async function GET(req: NextRequest) {
     if (paidFrom && mongoose.Types.ObjectId.isValid(paidFrom)) {
       filter.paidFrom = new mongoose.Types.ObjectId(paidFrom)
       baseFilter.paidFrom = filter.paidFrom
+    }
+    if (search) {
+      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      filter.$or = [{ title: regex }, { remark: regex }]
     }
 
     const skip = (page - 1) * limit
