@@ -6,12 +6,14 @@ import { Trash2, FileDown } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
 import { exportTableToPdf } from '@/lib/exportPdf'
 import { apiGet, apiDelete } from '@/lib/api-client'
+import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 
@@ -47,6 +49,8 @@ export function TransactionHistory({
   const [data, setData] = useState<{ transactions: Transaction[]; pagination: Pagination } | null>(null)
   const [selectedTypes, setSelectedTypes] = useState<Set<'credit' | 'debit' | 'reversal'>>(new Set())
   const [exportingAll, setExportingAll] = useState(false)
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400)
 
   const pdfColumns = ['Date', 'Type', 'Reference', 'Notes', 'Amount', 'Balance After']
 
@@ -69,6 +73,7 @@ export function TransactionHistory({
       if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
       if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
       if (selectedTypes.size > 0) params.set('types', Array.from(selectedTypes).join(','))
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
       const result = await apiGet<{ transactions: Transaction[]; pagination: { page: number; limit: number; total: number; pages: number } }>(
         `/api/china-bank/transactions?${params}`
       )
@@ -111,13 +116,18 @@ export function TransactionHistory({
     if (dateRange?.from) params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
     if (dateRange?.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     if (selectedTypes.size > 0) params.set('types', Array.from(selectedTypes).join(','))
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     const result = await apiGet<{ transactions: Transaction[]; pagination: Pagination }>(
       `/api/china-bank/transactions?${params}`
     )
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, dateRange?.from, dateRange?.to, selectedTypes])
+  }, [page, dateRange?.from, dateRange?.to, selectedTypes, debouncedSearch])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, dateRange?.from, dateRange?.to])
 
   useEffect(() => {
     fetchTransactions()
@@ -139,6 +149,12 @@ export function TransactionHistory({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="font-semibold">Transaction History</h3>
         <div className="flex flex-wrap items-center gap-2">
+          <Input
+            placeholder="Search by reference or notes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full sm:w-[220px]"
+          />
           <div className="flex gap-1 rounded-md border p-0.5 bg-muted/40">
             {(['credit', 'debit', 'reversal'] as const).map((t) => (
               <Button
