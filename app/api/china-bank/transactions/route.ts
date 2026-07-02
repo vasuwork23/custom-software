@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
           ['credit', 'debit', 'reversal'].includes(t)
         )
       : []
+    const search = searchParams.get('search')?.trim() ?? ''
 
     await connectDB()
 
@@ -58,6 +59,12 @@ export async function GET(req: NextRequest) {
     // Apply type filter (only when specific types are selected)
     if (selectedTypes.length > 0) {
       filtered = filtered.filter((tx) => selectedTypes.includes(tx.type as 'credit' | 'debit' | 'reversal'))
+    }
+
+    // Apply search filter (reference or notes)
+    if (search) {
+      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      filtered = filtered.filter((tx) => regex.test(tx.reference ?? '') || regex.test(tx.notes ?? ''))
     }
 
     const reversed = [...filtered].reverse()
