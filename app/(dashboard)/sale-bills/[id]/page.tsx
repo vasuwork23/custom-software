@@ -251,10 +251,13 @@ export default function SellBillDetailPage() {
               )}
             </div>
             <div className="text-right space-y-1 text-sm">
-              <div className="flex justify-between gap-4 text-muted-foreground">
-                <span>Subtotal</span>
-                <span>₹{bill.totalAmount.toLocaleString('en-IN')}</span>
-              </div>
+              {((bill.extraCharges != null && bill.extraCharges > 0) ||
+                (bill.discount != null && bill.discount > 0)) && (
+                <div className="flex justify-between gap-4 text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>₹{bill.totalAmount.toLocaleString('en-IN')}</span>
+                </div>
+              )}
               {bill.extraCharges != null && bill.extraCharges > 0 && (
                 <div className="flex justify-between gap-4 text-orange-600 dark:text-orange-400">
                   <span>Extra Charges {bill.extraChargesNote && `(${bill.extraChargesNote})`}</span>
