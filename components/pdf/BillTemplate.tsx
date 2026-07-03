@@ -325,12 +325,15 @@ export function BillTemplate({
 
         {/* TOTALS */}
         <View style={styles.totalsSection}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal</Text>
-            <Text style={styles.totalValue}>
-              {formatINR(bill.totalAmount)}
-            </Text>
-          </View>
+          {((bill.extraCharges != null && bill.extraCharges > 0) ||
+            (bill.discount != null && bill.discount > 0)) && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Subtotal</Text>
+              <Text style={styles.totalValue}>
+                {formatINR(bill.totalAmount)}
+              </Text>
+            </View>
+          )}
           {bill.extraCharges != null && bill.extraCharges > 0 && (
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>
