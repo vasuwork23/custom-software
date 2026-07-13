@@ -27,6 +27,7 @@ interface ProductItem {
   totalCtn: number
   availableCtn: number
   availablePcs: number
+  stockValueINR: number
   chinaWarehouseCtn: number
   chinaFactoryCtn: number
   inTransitCtn: number
@@ -75,7 +76,7 @@ export default function ProductsPage() {
       unpaid: number
     }
     pagination: { page: number; limit: number; total: number; pages: number }
-    totals?: { cbm: number; weight: number; remainingToPay: number; lockedAmountRMB: number; lockedAmountINR: number }
+    totals?: { cbm: number; weight: number; remainingToPay: number; lockedAmountRMB: number; lockedAmountINR: number; stockValueINR: number }
   } | null>(null)
   const [indiaData, setIndiaData] = useState<{
     products: IndiaProductItem[]
@@ -141,7 +142,7 @@ export default function ProductsPage() {
         unpaid: number
       }
       pagination: { page: number; limit: number; total: number; pages: number }
-      totals?: { cbm: number; weight: number; remainingToPay: number; lockedAmountRMB: number; lockedAmountINR: number }
+      totals?: { cbm: number; weight: number; remainingToPay: number; lockedAmountRMB: number; lockedAmountINR: number; stockValueINR: number }
     }>(`/api/products?${params}`)
     setLoading(false)
     if (result.success) setData(result.data)
@@ -345,6 +346,19 @@ export default function ProductsPage() {
                     })}
                   </p>
                 </div>
+                {(data.totals?.stockValueINR ?? 0) > 0 && (
+                  <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 px-3 py-2">
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                      Total Stock Value
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                      ₹{(data.totals?.stockValueINR ?? 0).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                )}
                 {(data.totals?.lockedAmountRMB ?? 0) > 0 && (
                   <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 px-3 py-2">
                     <p className="text-[11px] text-blue-700 dark:text-blue-400 uppercase tracking-wide">
@@ -508,6 +522,7 @@ export default function ProductsPage() {
                     totalCtn={p.totalCtn}
                     availableCtn={p.availableCtn}
                     availablePcs={p.availablePcs}
+                    availableValue={p.stockValueINR}
                     chinaFactoryCtn={p.chinaFactoryCtn}
                     chinaWarehouseCtn={p.chinaWarehouseCtn}
                     inTransitCtn={p.inTransitCtn}
@@ -537,6 +552,7 @@ export default function ProductsPage() {
                       <th className="h-10 px-4 text-right font-medium text-blue-600">In Transit</th>
                       <th className="h-10 px-4 text-right font-medium text-emerald-600">Available</th>
                       <th className="h-10 px-4 text-right font-medium text-red-500">Sold</th>
+                      <th className="h-10 px-4 text-right font-medium text-emerald-600">Stock Value (₹)</th>
                       <th className="h-10 px-4 text-right font-medium">Entries</th>
                       <th className="h-10 px-4 text-left font-medium">Status</th>
                       <th className="h-10 w-24 px-4" />
@@ -564,6 +580,12 @@ export default function ProductsPage() {
                             }`}
                         >
                           {p.soldCtn}
+                        </td>
+                        <td className="p-4 text-right text-emerald-600">
+                          ₹{p.stockValueINR.toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
                         <td className="p-4 text-right">{p.buyingEntriesCount}</td>
                         <td className="p-4">

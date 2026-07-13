@@ -4,6 +4,8 @@ import { connectDB } from '@/lib/mongodb'
 import SellBill from '@/models/SellBill'
 import SellBillItem from '@/models/SellBillItem'
 import Company from '@/models/Company'
+import Product from '@/models/Product'
+import IndiaProduct from '@/models/IndiaProduct'
 import { getNextBillNumber } from '@/models/Counter'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
 import { createBankSaleTransaction } from '@/lib/bank-sale-transaction-helper'
@@ -14,6 +16,11 @@ import { processIndiaFIFO } from '@/lib/india-fifo'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
+
+const formatCtnPcs = (ctn: number, pcs: number): string => {
+  const isWhole = Number.isInteger(ctn)
+  return isWhole ? `${ctn} CTN (${pcs} pcs)` : `${ctn.toFixed(2)} CTN (${pcs} pcs)`
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -106,11 +113,6 @@ export async function GET(req: NextRequest) {
       if (!itemsByBill.has(bid)) itemsByBill.set(bid, [])
       const productName = (item.product as { productName?: string })?.productName ?? (item.indiaProduct as { productName?: string })?.productName ?? '—'
       itemsByBill.get(bid)!.push({ productName, ctnSold: item.ctnSold, pcsSold: item.pcsSold, ratePerPcs: item.ratePerPcs })
-    }
-
-    const formatCtnPcs = (ctn: number, pcs: number): string => {
-      const isWhole = Number.isInteger(ctn)
-      return isWhole ? `${ctn} CTN (${pcs} pcs)` : `${ctn.toFixed(2)} CTN (${pcs} pcs)`
     }
 
     const list = billsRaw.map((b) => {
@@ -245,8 +247,18 @@ export async function POST(req: NextRequest) {
       updatedBy: createdBy,
     })
 
+    const chinaProductIds = Array.from(new Set(items.filter((i) => i.productSource !== 'india').map((i) => i.productId)))
+    const indiaProductIds = Array.from(new Set(items.filter((i) => i.productSource === 'india').map((i) => i.productId)))
+    const [chinaProducts, indiaProducts] = await Promise.all([
+      chinaProductIds.length ? Product.find({ _id: { $in: chinaProductIds } }).select('productName').lean() : [],
+      indiaProductIds.length ? IndiaProduct.find({ _id: { $in: indiaProductIds } }).select('productName').lean() : [],
+    ])
+    const productNameById = new Map<string, string>()
+    for (const p of [...chinaProducts, ...indiaProducts]) productNameById.set(String(p._id), p.productName)
+
     const createdItems: mongoose.Types.ObjectId[] = []
     let totalAmount = 0
+    const summaryLines: string[] = []
 
     for (const row of items) {
       const productId = new mongoose.Types.ObjectId(row.productId)
@@ -274,7 +286,14 @@ export async function POST(req: NextRequest) {
         updatedBy: createdBy,
       })
       createdItems.push(item._id as mongoose.Types.ObjectId)
+
+      const productName = productNameById.get(row.productId) ?? '—'
+      summaryLines.push(`${productName}: ${formatCtnPcs(ctnSold, pcsSold)} @₹${row.ratePerPcs}`)
     }
+    const trimmedNotes = notes != null && String(notes).trim() !== '' ? String(notes).trim() : ''
+    const productsSummary = [summaryLines.join('\n'), trimmedNotes ? `Note: ${trimmedNotes}` : '']
+      .filter(Boolean)
+      .join('\n')
 
     const subtotal = Math.round(totalAmount * 100) / 100
     const grandTotal = calcGrandTotal(subtotal, extraCharges, discount)
@@ -292,7 +311,7 @@ export async function POST(req: NextRequest) {
       await createCashTransaction({
         type: 'credit',
         amount: grandTotal,
-        description: `Cashbook sale — Bill #${bill.billNumber}`,
+        description: `Cashbook sale — Bill #${bill.billNumber}\n${productsSummary}`,
         date: new Date(billDate),
         category: 'cashbook_sale',
         referenceId: bill._id as mongoose.Types.ObjectId,
@@ -302,7 +321,7 @@ export async function POST(req: NextRequest) {
       await createBankSaleTransaction({
         bankAccountId: new mongoose.Types.ObjectId(bankAccountId),
         amount: grandTotal,
-        description: `Bank sale — Bill #${bill.billNumber}${bankAccDoc ? ` (${bankAccDoc.accountName})` : ''}`,
+        description: `Bank sale — Bill #${bill.billNumber}${bankAccDoc ? ` (${bankAccDoc.accountName})` : ''}\n${productsSummary}`,
         date: new Date(billDate),
         referenceId: bill._id as mongoose.Types.ObjectId,
         createdBy,

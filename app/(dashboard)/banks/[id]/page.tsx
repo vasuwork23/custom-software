@@ -257,7 +257,19 @@ export default function BankAccountHistoryPage() {
                 <tr key={t._id} className="border-b last:border-0">
                   <td className="p-3">{format(new Date(t.transactionDate), 'dd MMM yyyy')}</td>
                   <td className="p-3" title={t.notes ?? undefined}>
-                    {t.sourceLabel ?? t.source}
+                    {(() => {
+                      const [mainLine, ...breakdown] = (t.sourceLabel ?? t.source).split('\n')
+                      return (
+                        <>
+                          {mainLine}
+                          {breakdown.length > 0 && (
+                            <span className="text-muted-foreground block whitespace-pre-line text-[11px] leading-relaxed mt-0.5">
+                              {breakdown.join('\n')}
+                            </span>
+                          )}
+                        </>
+                      )
+                    })()}
                     {t.notes ? (
                       <span className="text-muted-foreground block truncate max-w-[200px]">{t.notes}</span>
                     ) : null}

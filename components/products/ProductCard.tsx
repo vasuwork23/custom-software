@@ -26,7 +26,7 @@ interface ProductCardProps {
   totalWeight?: number
     /** Sum of remainingAmount (¥ RMB) across unpaid/partially paid entries */
   remainingAmount?: number
-  /** Sum of availableValue (₹ INR) across entries for India products */
+  /** ₹ INR value of available (unsold) stock, summed across entries */
   availableValue?: number
   /** Total available pcs across entries (India products) */
   availablePcs?: number
@@ -115,14 +115,6 @@ export function ProductCard({
                 </span>
               </div>
             )}
-            {availableValue != null && availableValue > 0 && (
-              <div className="flex items-center justify-between col-span-2 py-1 border-y border-emerald-100 bg-emerald-50/30 -mx-1 px-1 dark:bg-emerald-950/10 dark:border-emerald-900/20">
-                <span className="text-emerald-600 font-medium">Available Value</span>
-                <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                  ₹{availableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            )}
             {chinaWarehouseCtn != null && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">China WH</span>
@@ -170,7 +162,7 @@ export function ProductCard({
               </div>
             )}
             {totalCbm != null && (
-              <div className="flex items-center justify-between col-span-2">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">📦 Total CBM</span>
                 <span className="font-semibold">
                   {(totalCbm ?? 0).toLocaleString('en-IN', {
@@ -180,7 +172,7 @@ export function ProductCard({
               </div>
             )}
             {totalWeight != null && (
-              <div className="flex items-center justify-between col-span-2">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">⚖️ Total Weight</span>
                 <span className="font-semibold">
                   {(totalWeight ?? 0).toFixed(2)} kg
@@ -188,7 +180,7 @@ export function ProductCard({
               </div>
             )}
             {lockedAmountRMB != null && lockedAmountRMB > 0 && (
-              <div className="flex items-center justify-between col-span-2">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">🔒 Locked (¥)</span>
                 <span className="font-semibold text-blue-600 dark:text-blue-400">
                   ¥{lockedAmountRMB.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -196,15 +188,23 @@ export function ProductCard({
               </div>
             )}
             {lockedAmountINR != null && lockedAmountINR > 0 && (
-              <div className="flex items-center justify-between col-span-2">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">🔒 Locked (₹)</span>
                 <span className="font-semibold text-blue-600 dark:text-blue-400">
                   ₹{lockedAmountINR.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </span>
               </div>
             )}
+            {availableValue != null && availableValue > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-600 font-medium">A Value</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                  ₹{availableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             {remainingAmount != null && remainingAmount > 0 && (
-              <div className="flex items-center justify-between col-span-2">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Remaining to pay</span>
                 <span className="font-semibold text-amber-600 dark:text-amber-400">
                   ¥{(remainingAmount ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
