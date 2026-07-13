@@ -12,7 +12,23 @@
       "Bash(git show *)",
       "Bash(git commit -m ' *)",
       "Bash(git diff *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(lsof -i :3000 -sTCP:LISTEN)",
+      "Bash(lsof -i :3001 -sTCP:LISTEN)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/products)",
+      "Bash(which chromium-cli *)",
+      "Read(//Users/nexus/.claude/**)",
+      "Bash(node -e \"console.log\\(require.resolve\\('playwright'\\)\\)\")",
+      "Bash(curl -s http://localhost:3000/api/products)",
+      "Bash(node /private/tmp/claude-501/-Users-nexus-Desktop-custom-software/26d7b40d-a61f-4556-8bd1-8e2e72111717/scratchpad/verify-stock-value.mjs)",
+      "Bash(node /Users/nexus/Desktop/custom-software/verify-stock-value.mjs.tmp)",
+      "Bash(node /Users/nexus/Desktop/custom-software/verify-stock-value-tmp.mjs)",
+      "Bash(node --env-file=.env.local /Users/nexus/Desktop/custom-software/verify-stock-value-tmp.mjs)",
+      "Bash(git fetch *)",
+      "Bash(node --env-file=.env.local /Users/nexus/Desktop/custom-software/verify-bill-1280-tmp.mjs)",
+      "Bash(ps -p 72677 -o pid,command)",
+      "Skill(code-review)",
+      "Skill(code-review:*)"
     ]
   }
 }

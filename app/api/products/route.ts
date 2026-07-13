@@ -118,6 +118,14 @@ export async function GET(req: NextRequest) {
           availablePcs: {
             $sum: { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
           },
+          stockValueINR: {
+            $sum: {
+              $multiply: [
+                { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
+                { $ifNull: ['$finalCost', 0] },
+              ],
+            },
+          },
         },
       },
     ]),
@@ -150,6 +158,7 @@ export async function GET(req: NextRequest) {
     const statsByProduct = Object.fromEntries(entryStats.map((e) => [String(e._id), e]))
     const statusByProduct = Object.fromEntries(statusStats.map((e) => [String(e._id), e]))
     const availablePcsByProduct = Object.fromEntries(availablePcsStats.map((e) => [String(e._id), e.availablePcs as number]))
+    const stockValueByProduct = Object.fromEntries(availablePcsStats.map((e) => [String(e._id), e.stockValueINR as number]))
 
     const enrichedProducts = products.map((p) => {
       const stats = statsByProduct[String(p._id)] ?? {
@@ -207,6 +216,7 @@ export async function GET(req: NextRequest) {
         inTransitCtn,
         availableCtn,
         availablePcs: availablePcsByProduct[String(p._id)] ?? 0,
+        stockValueINR: Number((stockValueByProduct[String(p._id)] ?? 0).toFixed(2)),
         soldCtn,
         chinaFactoryCtn,
         totalCbm,
@@ -261,16 +271,17 @@ export async function GET(req: NextRequest) {
     const paginatedProducts = filteredProducts.slice(start, start + limit)
 
     // Totals across all filtered products (not just current page)
-    const { totalCbm: sumCbm, totalWeight: sumWeight, remainingAmount: sumRemaining, lockedAmountRMB: sumLockedRMB, lockedAmountINR: sumLockedINR } = filteredProducts.reduce(
+    const { totalCbm: sumCbm, totalWeight: sumWeight, remainingAmount: sumRemaining, lockedAmountRMB: sumLockedRMB, lockedAmountINR: sumLockedINR, stockValueINR: sumStockValueINR } = filteredProducts.reduce(
       (acc, p) => {
         acc.totalCbm += p.totalCbm ?? 0
         acc.totalWeight += p.totalWeight ?? 0
         acc.remainingAmount += p.remainingAmount ?? 0
         acc.lockedAmountRMB += p.lockedAmountRMB ?? 0
         acc.lockedAmountINR += p.lockedAmountINR ?? 0
+        acc.stockValueINR += p.stockValueINR ?? 0
         return acc
       },
-      { totalCbm: 0, totalWeight: 0, remainingAmount: 0, lockedAmountRMB: 0, lockedAmountINR: 0 }
+      { totalCbm: 0, totalWeight: 0, remainingAmount: 0, lockedAmountRMB: 0, lockedAmountINR: 0, stockValueINR: 0 }
     )
 
     return NextResponse.json({
@@ -284,6 +295,7 @@ export async function GET(req: NextRequest) {
           remainingToPay: sumRemaining,
           lockedAmountRMB: sumLockedRMB,
           lockedAmountINR: sumLockedINR,
+          stockValueINR: sumStockValueINR,
         },
         pagination: { page, limit, total: totalFiltered, pages: totalPages },
       },

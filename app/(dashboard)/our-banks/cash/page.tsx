@@ -268,7 +268,19 @@ export default function CashHistoryPage() {
                     {format(new Date(tx.date), 'dd MMM yyyy')}
                   </td>
                   <td className="p-3">
-                    {tx.description}
+                    {(() => {
+                      const [mainLine, ...breakdown] = tx.description.split('\n')
+                      return (
+                        <>
+                          {mainLine}
+                          {breakdown.length > 0 && (
+                            <span className="text-muted-foreground block whitespace-pre-line text-[11px] leading-relaxed mt-0.5">
+                              {breakdown.join('\n')}
+                            </span>
+                          )}
+                        </>
+                      )
+                    })()}
                     {tx.isReversal && (
                       <span className="block text-xs text-muted-foreground">
                         (reversal)
