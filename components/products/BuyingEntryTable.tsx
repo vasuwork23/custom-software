@@ -478,13 +478,13 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Rate per piece</span>
-                                  <span className="font-semibold">¥{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(entry.rate)}</span>
+                                  <span className="font-semibold">¥{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 5 }).format(entry.rate)}</span>
                                 </div>
 
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Total Amount (RMB)</span>
                                   <span className="font-semibold">
-                                    <AmountDisplay amount={entry.totalAmount} currency="RMB" />
+                                    <AmountDisplay amount={entry.totalAmount} currency="RMB" decimals={5} />
                                   </span>
                                 </div>
                                 <div className="flex flex-col">
@@ -496,7 +496,7 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">RMB → INR Value</span>
                                   <span className="font-semibold">
-                                    <AmountDisplay amount={entry.rmbInrPurchase} />
+                                    <AmountDisplay amount={entry.rmbInrPurchase} decimals={5} />
                                   </span>
                                 </div>
                                 <div className="flex flex-col">
@@ -509,19 +509,19 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Total Carrying (₹)</span>
                                   <span className="font-semibold">
-                                    <AmountDisplay amount={entry.totalCarrying} />
+                                    <AmountDisplay amount={entry.totalCarrying} decimals={5} />
                                   </span>
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Shipping Cost per piece</span>
                                   <span className="font-semibold text-orange-600">
-                                    ₹{(entry.totalQty > 0 ? entry.totalCarrying / entry.totalQty : 0).toFixed(2)}
+                                    ₹{(entry.totalQty > 0 ? entry.totalCarrying / entry.totalQty : 0).toFixed(5)}
                                   </span>
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Total Expense INR</span>
                                   <span className="font-semibold text-blue-600">
-                                    <AmountDisplay amount={entry.totalExpenseINR} />
+                                    <AmountDisplay amount={entry.totalExpenseINR} decimals={5} />
                                   </span>
                                 </div>
                                 <div className="flex flex-col">
