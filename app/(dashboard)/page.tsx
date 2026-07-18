@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { format, formatDistanceToNow } from 'date-fns'
-import { ArrowDownRight, ArrowUpRight, AlertTriangle } from 'lucide-react'
+import { format } from 'date-fns'
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
-import { TableSkeleton } from '@/components/ui/TableSkeleton'
+import { Input } from '@/components/ui/input'
 import { apiGet } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -124,6 +124,7 @@ interface DashboardOutstandingAging {
 
 interface DashboardDeadStockRow {
   productName: string
+  source: 'China' | 'India'
   availableCtn: number
   inventoryValue: number
   daysSinceLastSale: number
@@ -150,15 +151,6 @@ interface ExtendedDashboardStats extends DashboardStats {
   }
 }
 
-interface ActivityItem {
-  icon: string
-  type: string
-  description: string
-  amount?: number
-  createdAt: string | Date
-  link?: string
-}
-
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const [period, setPeriod] = useState<DashboardPeriod>('today')
@@ -167,8 +159,7 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true)
   const [pnl, setPnl] = useState<DashboardPnl | null>(null)
   const [stats, setStats] = useState<ExtendedDashboardStats | null>(null)
-  const [loadingActivity, setLoadingActivity] = useState(true)
-  const [activity, setActivity] = useState<ActivityItem[] | null>(null)
+  const [daysFilter, setDaysFilter] = useState('')
 
   const buildPnlParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -225,22 +216,6 @@ export default function DashboardPage() {
     }
   }, [buildStatsParams])
 
-  const fetchActivity = useCallback(async () => {
-    setLoadingActivity(true)
-    try {
-      const res = await apiGet<ActivityItem[]>('/api/dashboard/activity')
-      if (!res.success) {
-        toast.error(res.message)
-        return
-      }
-      setActivity(res.data)
-    } catch {
-      toast.error('Failed to load recent activity')
-    } finally {
-      setLoadingActivity(false)
-    }
-  }, [])
-
   useEffect(() => {
     fetchPnl()
   }, [fetchPnl])
@@ -248,10 +223,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
-
-  useEffect(() => {
-    fetchActivity()
-  }, [fetchActivity])
 
   const handlePeriodChange = (next: DashboardPeriod) => {
     setPeriod(next)
@@ -819,110 +790,6 @@ export default function DashboardPage() {
         ) : null}
       </section>
 
-      {/* Outstanding aging & top products */}
-      {stats && (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Outstanding Aging</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded border border-emerald-500/60 bg-emerald-50/40 p-2">
-                  <p className="text-[11px] text-emerald-700">0-30 days</p>
-                  <p className="text-sm font-semibold">
-                    <AmountDisplay amount={stats.outstandingAging.within30Days} />
-                  </p>
-                </div>
-                <div className="rounded border border-amber-500/60 bg-amber-50/40 p-2">
-                  <p className="text-[11px] text-amber-700">30-60 days</p>
-                  <p className="text-sm font-semibold">
-                    <AmountDisplay amount={stats.outstandingAging.days30to60} />
-                  </p>
-                </div>
-                <div className="rounded border border-red-500/60 bg-red-50/60 p-2">
-                  <p className="text-[11px] text-red-700">60+ days</p>
-                  <p className="text-sm font-semibold">
-                    <AmountDisplay amount={stats.outstandingAging.over60Days} />
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-2 text-left font-medium">Company</th>
-                      <th className="p-2 text-right font-medium">Outstanding</th>
-                      <th className="p-2 text-right font-medium">Days</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.outstandingAging.companies.map((c, idx) => (
-                      <tr key={idx} className="border-b last:border-0">
-                        <td className="p-2">{c.name}</td>
-                        <td className="p-2 text-right">
-                          <AmountDisplay amount={c.outstanding} />
-                        </td>
-                        <td
-                          className={cn(
-                            'p-2 text-right',
-                            c.daysPending > 60
-                              ? 'text-red-600'
-                              : c.daysPending > 30
-                              ? 'text-amber-600'
-                              : 'text-emerald-600'
-                          )}
-                        >
-                          {c.daysPending}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/companies">View All</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 5 Products (this period)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-2 text-left font-medium">Product</th>
-                      <th className="p-2 text-right font-medium">Units</th>
-                      <th className="p-2 text-right font-medium">Profit</th>
-                      <th className="p-2 text-right font-medium">Margin %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.topProducts.map((p, idx) => (
-                      <tr key={idx} className="border-b last:border-0">
-                        <td className="p-2">{p.name}</td>
-                        <td className="p-2 text-right">{p.unitsSold}</td>
-                        <td className="p-2 text-right">
-                          <AmountDisplay amount={p.profit} />
-                        </td>
-                        <td className="p-2 text-right">{p.margin.toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/reports">View Full Report</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
       {/* Monthly comparison table */}
       {stats && (
         <section>
@@ -988,234 +855,116 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Recent activity, Sophia balances, bank balances */}
-      <section className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-[260px] space-y-2 overflow-y-auto text-sm">
-            {loadingActivity ? (
-              <TableSkeleton rows={5} columns={2} />
-            ) : activity && activity.length > 0 ? (
-              activity.map((a, idx) => (
-                <div
-                  key={idx}
-                  className={cn(
-                    'flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted'
-                  )}
-                  onClick={() => a.link && (window.location.href = a.link)}
-                >
-                  <span className="mt-0.5">{a.icon}</span>
-                  <div className="flex-1">
-                    <p className="text-xs">{a.description}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
-                    </p>
-                  </div>
-                  {typeof a.amount === 'number' && (
-                    <span className="text-xs font-medium">
-                      <AmountDisplay amount={a.amount} />
-                    </span>
-                  )}
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-muted-foreground">No recent activity.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {stats && (
+      {/* Products not sold — in-stock aging with a day-count filter */}
+      {stats && (
+        <section>
           <Card>
-            <CardHeader>
-              <CardTitle>Sophia Balances</CardTitle>
-            </CardHeader>
-            <CardContent className="max-h-[260px] space-y-2 overflow-y-auto text-sm">
-              {stats.jackBalances.map((j) => (
-                    <div
-                      key={j.name}
-                      className="flex items-center justify-between rounded px-2 py-1 hover:bg-muted cursor-pointer"
-                      onClick={() =>
-                        (window.location.href = `/sophia/${encodeURIComponent(j.name)}`)
-                      }
-                >
-                  <div>
-                    <p className="text-xs font-medium">
-                      {j.name}
-                      {j.isDefault && ' (Default)'}
-                    </p>
-                  </div>
-                  <p
-                    className={cn(
-                      'text-xs font-semibold',
-                      j.balance < 0 && 'text-red-600'
-                    )}
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <CardTitle>Products Not Sold</CardTitle>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={daysFilter}
+                  onChange={(e) => setDaysFilter(e.target.value)}
+                  placeholder="Days e.g. 10"
+                  className="h-9 w-36"
+                />
+                {daysFilter.trim() !== '' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDaysFilter('')}
                   >
-                    ¥{j.balance.toLocaleString('en-IN')}
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {stats && (
-          <Card>
-            <CardHeader>
-              <CardTitle>All Bank Balances</CardTitle>
-            </CardHeader>
-            <CardContent className="max-h-[260px] space-y-2 overflow-y-auto text-sm">
-              {stats.bankBalances.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex items-center justify-between rounded px-2 py-1 hover:bg-muted cursor-pointer"
-                  onClick={() =>
-                    (window.location.href = `/banks/${encodeURIComponent(b.id)}`)
-                  }
-                >
-                  <div>
-                    <p className="text-xs font-medium">{b.accountName}</p>
-                    <p className="text-[11px] text-muted-foreground">{b.type}</p>
-                  </div>
-                  <p
-                    className={cn(
-                      'text-xs font-semibold',
-                      b.balance < 0 && 'text-red-600'
-                    )}
-                  >
-                    <AmountDisplay amount={b.balance} />
-                  </p>
-                </div>
-              ))}
-              <div className="mt-2 border-t pt-2 text-xs flex justify-between">
-                <span>Total</span>
-                <span className="font-semibold">
-                  <AmountDisplay
-                    amount={stats.bankBalances.reduce(
-                      (sum, b) => sum + b.balance,
-                      0
-                    )}
-                  />
-                </span>
+                    Clear
+                  </Button>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      {/* Recent bills + dead stock */}
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Recent Sale Bills</CardTitle>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/sale-bills">View All</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {loadingPnl ? (
-              <TableSkeleton rows={5} columns={4} />
-            ) : pnl && pnl.recentBills.length > 0 ? (
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-2 text-left font-medium">Bill No</th>
-                      <th className="p-2 text-left font-medium">Company</th>
-                      <th className="p-2 text-right font-medium">Amount</th>
-                      <th className="p-2 text-right font-medium">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pnl.recentBills.map((b) => (
-                      <tr
-                        key={b.id}
-                        className="border-b hover:bg-muted/40 cursor-pointer"
-                        onClick={() => (window.location.href = `/sale-bills/${b.id}`)}
-                      >
-                        <td className="p-2">{b.billNumber}</td>
-                        <td className="p-2">{b.company}</td>
-                        <td className="p-2 text-right">
-                          <AmountDisplay amount={b.amount} />
-                        </td>
-                        <td className="p-2 text-right text-xs text-muted-foreground">
-                          {format(new Date(b.date), 'dd MMM yyyy')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No bills in this period.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Dead Stock Alert — hidden for now
-        {stats && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Dead Stock Alert</CardTitle>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/reports">View Stock Report</Link>
-              </Button>
             </CardHeader>
             <CardContent className="space-y-2">
-              {stats.deadStock.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No dead stock detected in India warehouse.
-                </p>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="p-2 text-left font-medium">Product</th>
-                        <th className="p-2 text-right font-medium">Available CTN</th>
-                        <th className="p-2 text-right font-medium">Value</th>
-                        <th className="p-2 text-right font-medium">Days</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stats.deadStock.map((d, idx) => (
-                        <tr
-                          key={idx}
-                          className={cn(
-                            'border-b last:border-0',
-                            d.daysSinceLastSale > 60
-                              ? 'bg-red-50/60'
-                              : d.daysSinceLastSale > 30
-                              ? 'bg-amber-50/60'
-                              : ''
-                          )}
-                        >
-                          <td className="p-2">{d.productName}</td>
-                          <td className="p-2 text-right">{d.availableCtn}</td>
-                          <td className="p-2 text-right">
-                            <AmountDisplay
-                              amount={
-                                Number.isFinite(d.inventoryValue)
-                                  ? d.inventoryValue
-                                  : 0
-                              }
-                            />
-                          </td>
-                          <td className="p-2 text-right">{d.daysSinceLastSale}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              {(() => {
+                const threshold = daysFilter.trim() === '' ? 0 : Number(daysFilter)
+                const minDays = Number.isFinite(threshold) && threshold > 0 ? threshold : 0
+                const rows = (stats.deadStock ?? [])
+                  .filter((d) => d.daysSinceLastSale >= minDays)
+                  .sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
+                return (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {minDays > 0
+                        ? `${rows.length} product${rows.length === 1 ? '' : 's'} in stock not sold in ${minDays}+ days`
+                        : `${rows.length} product${rows.length === 1 ? '' : 's'} in stock`}
+                    </p>
+                    {rows.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">
+                        No products match this filter.
+                      </p>
+                    ) : (
+                      <div className="max-h-[420px] overflow-y-auto rounded-md border">
+                        <table className="w-full text-xs">
+                          <thead className="sticky top-0">
+                            <tr className="border-b bg-muted/50">
+                              <th className="p-2 text-left font-medium">Product</th>
+                              <th className="p-2 text-left font-medium">Warehouse</th>
+                              <th className="p-2 text-right font-medium">Available CTN</th>
+                              <th className="p-2 text-right font-medium">Stock Value</th>
+                              <th className="p-2 text-right font-medium">Days Not Sold</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((d, idx) => (
+                              <tr
+                                key={idx}
+                                className={cn(
+                                  'border-b last:border-0',
+                                  d.daysSinceLastSale > 60
+                                    ? 'bg-red-50/60'
+                                    : d.daysSinceLastSale > 30
+                                    ? 'bg-amber-50/60'
+                                    : ''
+                                )}
+                              >
+                                <td className="p-2">{d.productName}</td>
+                                <td className="p-2 text-muted-foreground">{d.source}</td>
+                                <td className="p-2 text-right">{d.availableCtn}</td>
+                                <td className="p-2 text-right">
+                                  <AmountDisplay
+                                    amount={
+                                      Number.isFinite(d.inventoryValue)
+                                        ? d.inventoryValue
+                                        : 0
+                                    }
+                                  />
+                                </td>
+                                <td
+                                  className={cn(
+                                    'p-2 text-right font-medium',
+                                    d.daysSinceLastSale > 60
+                                      ? 'text-red-600'
+                                      : d.daysSinceLastSale > 30
+                                      ? 'text-amber-600'
+                                      : 'text-emerald-600'
+                                  )}
+                                >
+                                  {d.daysSinceLastSale >= 999
+                                    ? 'Never sold'
+                                    : d.daysSinceLastSale}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </CardContent>
           </Card>
-        )}
-        */}
-      </section>
+        </section>
+      )}
     </div>
   )
 }

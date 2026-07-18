@@ -407,14 +407,6 @@ export async function GET(req: NextRequest) {
           },
         },
       ]),
-      PaymentReceipt.aggregate([
-        {
-          $group: {
-            _id: '$company',
-            totalReceived: { $sum: '$amount' },
-          },
-        },
-      ]),
       // Oldest bill per company
       SellBill.aggregate([
         {
@@ -424,72 +416,107 @@ export async function GET(req: NextRequest) {
           },
         },
       ]),
-      // Dead stock (China entries in India warehouse, no sales in 30+ days)
+      // In-stock products (China + India warehouses) with days since their last sale
       (async () => {
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        const salesAgg = await SellBillItem.aggregate([
-          {
-            $lookup: {
-              from: 'sellbills',
-              localField: 'sellBill',
-              foreignField: '_id',
-              as: 'bill',
-            },
-          },
-          { $unwind: '$bill' },
-          { $match: { 'bill.billDate': { $lte: now } } },
-          { $unwind: '$fifoBreakdown' },
-          {
-            $group: {
-              _id: '$fifoBreakdown.buyingEntry',
-              lastSaleDate: { $max: '$bill.billDate' },
-            },
-          },
+        // Most recent sale date per buying-entry batch, for both warehouses.
+        // China batches key off fifoBreakdown.buyingEntry; India off indiaBuyingEntry.
+        const [chinaSalesAgg, indiaSalesAgg] = await Promise.all([
+          SellBillItem.aggregate([
+            { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
+            { $unwind: '$bill' },
+            { $match: { 'bill.billDate': { $lte: now } } },
+            { $unwind: '$fifoBreakdown' },
+            { $group: { _id: '$fifoBreakdown.buyingEntry', lastSaleDate: { $max: '$bill.billDate' } } },
+          ]),
+          SellBillItem.aggregate([
+            { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
+            { $unwind: '$bill' },
+            { $match: { 'bill.billDate': { $lte: now } } },
+            { $unwind: '$fifoBreakdown' },
+            { $group: { _id: '$fifoBreakdown.indiaBuyingEntry', lastSaleDate: { $max: '$bill.billDate' } } },
+          ]),
         ])
-        const lastSaleMap = new Map<string, Date>()
-        for (const s of salesAgg) {
-          if (s._id) lastSaleMap.set(String(s._id), s.lastSaleDate as Date)
+        const chinaLastSaleMap = new Map<string, Date>()
+        for (const s of chinaSalesAgg) {
+          if (s._id) chinaLastSaleMap.set(String(s._id), s.lastSaleDate as Date)
         }
-        const candidates = await BuyingEntry.find({
-          chinaWarehouseReceived: 'yes',
-          availableCtn: { $gt: 0 },
-        })
-          .populate('product', 'productName')
-          .lean()
+        const indiaLastSaleMap = new Map<string, Date>()
+        for (const s of indiaSalesAgg) {
+          if (s._id) indiaLastSaleMap.set(String(s._id), s.lastSaleDate as Date)
+        }
 
-        const dead: {
-          productName: string
-          availableCtn: number
-          inventoryValue: number
-          daysSinceLastSale: number
-        }[] = []
-        for (const entry of candidates as any[]) {
-          const lastSale = lastSaleMap.get(String(entry._id))
-          if (!lastSale || lastSale < thirtyDaysAgo) {
-            const days = lastSale
-              ? Math.floor(
-                  (now.getTime() - lastSale.getTime()) /
-                    (24 * 60 * 60 * 1000)
-                )
-              : 999
+        const [chinaCandidates, indiaCandidates] = await Promise.all([
+          BuyingEntry.find({ chinaWarehouseReceived: 'yes', availableCtn: { $gt: 0 } })
+            .populate('product', 'productName')
+            .lean(),
+          IndiaBuyingEntry.find({ availableCtn: { $gt: 0 } })
+            .populate('product', 'productName')
+            .lean(),
+        ])
+
+        // Aggregate per product: sum stock/value across batches,
+        // and take the most recent sale of any of its batches.
+        const byProduct = new Map<
+          string,
+          {
+            productName: string
+            source: 'China' | 'India'
+            availableCtn: number
+            inventoryValue: number
+            lastSale: Date | null
+          }
+        >()
+        const collect = (
+          entries: any[],
+          source: 'China' | 'India',
+          saleMap: Map<string, Date>
+        ) => {
+          for (const entry of entries) {
+            const productId = String(
+              (entry.product as { _id?: unknown })?._id ?? entry.product ?? entry._id
+            )
+            const key = `${source}:${productId}`
+            const productName =
+              (entry.product as { productName?: string })?.productName ?? '—'
+            const lastSale = saleMap.get(String(entry._id)) ?? null
             const rawValue =
-              (entry.availableCtn ?? 0) *
-              (entry.qty ?? 0) *
-              (entry.finalCost ?? 0)
+              (entry.availableCtn ?? 0) * (entry.qty ?? 0) * (entry.finalCost ?? 0)
             const value =
               Number.isFinite(rawValue) && !Number.isNaN(rawValue) ? rawValue : 0
-            dead.push({
-              productName:
-                (entry.product as { productName?: string })?.productName ??
-                '—',
-              availableCtn: entry.availableCtn ?? 0,
-              inventoryValue: value,
-              daysSinceLastSale: days,
-            })
+            const existing = byProduct.get(key)
+            if (existing) {
+              existing.availableCtn += entry.availableCtn ?? 0
+              existing.inventoryValue += value
+              if (lastSale && (!existing.lastSale || lastSale > existing.lastSale)) {
+                existing.lastSale = lastSale
+              }
+            } else {
+              byProduct.set(key, {
+                productName,
+                source,
+                availableCtn: entry.availableCtn ?? 0,
+                inventoryValue: value,
+                lastSale,
+              })
+            }
           }
         }
-        dead.sort((a, b) => b.inventoryValue - a.inventoryValue)
-        return dead.slice(0, 10)
+        collect(chinaCandidates as any[], 'China', chinaLastSaleMap)
+        collect(indiaCandidates as any[], 'India', indiaLastSaleMap)
+
+        const dead = Array.from(byProduct.values()).map((p) => ({
+          productName: p.productName,
+          source: p.source,
+          availableCtn: p.availableCtn,
+          inventoryValue: p.inventoryValue,
+          daysSinceLastSale: p.lastSale
+            ? Math.floor(
+                (now.getTime() - p.lastSale.getTime()) / (24 * 60 * 60 * 1000)
+              )
+            : 999,
+        }))
+        dead.sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
+        return dead
       })(),
       SellBill.countDocuments({ whatsappSent: false }),
       BuyingEntry.countDocuments({
@@ -794,6 +821,7 @@ export async function GET(req: NextRequest) {
 
     const deadStock = deadStockAgg as {
       productName: string
+      source: 'China' | 'India'
       availableCtn: number
       inventoryValue: number
       daysSinceLastSale: number

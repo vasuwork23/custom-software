@@ -28,7 +28,19 @@
       "Bash(node --env-file=.env.local /Users/nexus/Desktop/custom-software/verify-bill-1280-tmp.mjs)",
       "Bash(ps -p 72677 -o pid,command)",
       "Skill(code-review)",
-      "Skill(code-review:*)"
+      "Skill(code-review:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs ps -o command= -p)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 8 http://localhost:3000/)",
+      "Bash(lsof -nP -iTCP:3000 -sTCP:LISTEN)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 15 http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"root: HTTP %{http_code}\\\\n\" --max-time 20 http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"stats API: HTTP %{http_code}\\\\n\" --max-time 20 \"http://localhost:3000/api/dashboard/stats?period=today\")",
+      "Bash(command -v mongosh)",
+      "Bash(command -v mongo)",
+      "Bash(mongosh *)",
+      "Bash(node *)"
     ]
   }
 }
