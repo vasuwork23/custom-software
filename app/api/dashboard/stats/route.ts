@@ -14,6 +14,7 @@ import ChinaPerson from '@/models/ChinaPerson'
 import Expense from '@/models/Expense'
 import Company from '@/models/Company'
 import Product from '@/models/Product'
+import IndiaProduct from '@/models/IndiaProduct'
 import Container from '@/models/Container'
 import Liability from '@/models/Liability'
 import Investment from '@/models/Investment'
@@ -84,6 +85,7 @@ export async function GET(req: NextRequest) {
     await connectDB()
     // Ensure referenced models are registered for populate calls
     void Product
+    void IndiaProduct
     void Company
 
     const now = new Date()
