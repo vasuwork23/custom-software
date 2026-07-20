@@ -420,22 +420,24 @@ export async function GET(req: NextRequest) {
       ]),
       // In-stock products (China + India warehouses) with days since their last sale
       (async () => {
-        // Most recent sale date per buying-entry batch, for both warehouses.
-        // China batches key off fifoBreakdown.buyingEntry; India off indiaBuyingEntry.
+        // Most recent sale date per PRODUCT across ALL bills (not just the
+        // currently in-stock batch). A product counts as sold even if the batch
+        // still on hand was never itself sold from. China sales carry `product`
+        // (ref Product); India sales carry `indiaProduct` (ref IndiaProduct).
         const [chinaSalesAgg, indiaSalesAgg] = await Promise.all([
           SellBillItem.aggregate([
+            { $match: { productSource: 'china', product: { $ne: null } } },
             { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
             { $unwind: '$bill' },
             { $match: { 'bill.billDate': { $lte: now } } },
-            { $unwind: '$fifoBreakdown' },
-            { $group: { _id: '$fifoBreakdown.buyingEntry', lastSaleDate: { $max: '$bill.billDate' } } },
+            { $group: { _id: '$product', lastSaleDate: { $max: '$bill.billDate' } } },
           ]),
           SellBillItem.aggregate([
+            { $match: { productSource: 'india', indiaProduct: { $ne: null } } },
             { $lookup: { from: 'sellbills', localField: 'sellBill', foreignField: '_id', as: 'bill' } },
             { $unwind: '$bill' },
             { $match: { 'bill.billDate': { $lte: now } } },
-            { $unwind: '$fifoBreakdown' },
-            { $group: { _id: '$fifoBreakdown.indiaBuyingEntry', lastSaleDate: { $max: '$bill.billDate' } } },
+            { $group: { _id: '$indiaProduct', lastSaleDate: { $max: '$bill.billDate' } } },
           ]),
         ])
         const chinaLastSaleMap = new Map<string, Date>()
@@ -456,8 +458,8 @@ export async function GET(req: NextRequest) {
             .lean(),
         ])
 
-        // Aggregate per product: sum stock/value across batches,
-        // and take the most recent sale of any of its batches.
+        // Aggregate per product: sum stock/value across batches; last sale is
+        // looked up by product id (below), so it reflects the whole product.
         const byProduct = new Map<
           string,
           {
@@ -480,7 +482,7 @@ export async function GET(req: NextRequest) {
             const key = `${source}:${productId}`
             const productName =
               (entry.product as { productName?: string })?.productName ?? '—'
-            const lastSale = saleMap.get(String(entry._id)) ?? null
+            const lastSale = saleMap.get(productId) ?? null
             const rawValue =
               (entry.availableCtn ?? 0) * (entry.qty ?? 0) * (entry.finalCost ?? 0)
             const value =
