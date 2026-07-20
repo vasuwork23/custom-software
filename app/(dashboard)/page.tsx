@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, ChevronDown } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { apiGet } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -160,6 +161,7 @@ export default function DashboardPage() {
   const [pnl, setPnl] = useState<DashboardPnl | null>(null)
   const [stats, setStats] = useState<ExtendedDashboardStats | null>(null)
   const [daysFilter, setDaysFilter] = useState('')
+  const [statsOpen, setStatsOpen] = useState(false)
 
   const buildPnlParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -253,6 +255,77 @@ export default function DashboardPage() {
   const margin = pnl?.summary.margin ?? 0
   const marginColor =
     margin > 20 ? 'text-emerald-600' : margin >= 10 ? 'text-amber-600' : 'text-red-600'
+
+  const renderProductsTable = (
+    rows: DashboardDeadStockRow[],
+    showDays: boolean
+  ) => {
+    if (rows.length === 0) {
+      return (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No products to show.
+        </p>
+      )
+    }
+    return (
+      <div className="max-h-[420px] overflow-y-auto rounded-md border">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0">
+            <tr className="border-b bg-muted/50">
+              <th className="p-2 text-left font-medium">Product</th>
+              <th className="p-2 text-left font-medium">Warehouse</th>
+              <th className="p-2 text-right font-medium">Available CTN</th>
+              <th className="p-2 text-right font-medium">Stock Value</th>
+              {showDays && (
+                <th className="p-2 text-right font-medium">Days Not Sold</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((d, idx) => (
+              <tr
+                key={idx}
+                className={cn(
+                  'border-b last:border-0',
+                  showDays &&
+                    (d.daysSinceLastSale > 60
+                      ? 'bg-red-50/60'
+                      : d.daysSinceLastSale > 30
+                      ? 'bg-amber-50/60'
+                      : '')
+                )}
+              >
+                <td className="p-2">{d.productName}</td>
+                <td className="p-2 text-muted-foreground">{d.source}</td>
+                <td className="p-2 text-right">{d.availableCtn}</td>
+                <td className="p-2 text-right">
+                  <AmountDisplay
+                    amount={
+                      Number.isFinite(d.inventoryValue) ? d.inventoryValue : 0
+                    }
+                  />
+                </td>
+                {showDays && (
+                  <td
+                    className={cn(
+                      'p-2 text-right font-medium',
+                      d.daysSinceLastSale > 60
+                        ? 'text-red-600'
+                        : d.daysSinceLastSale > 30
+                        ? 'text-amber-600'
+                        : 'text-emerald-600'
+                    )}
+                  >
+                    {d.daysSinceLastSale}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -468,8 +541,24 @@ export default function DashboardPage() {
       </section>
       */}
 
-      {/* Quick stats row */}
-      <section>
+      {/* Quick stats row (collapsible, closed by default) */}
+      <section className="overflow-hidden rounded-lg border">
+        <button
+          type="button"
+          onClick={() => setStatsOpen((o) => !o)}
+          aria-expanded={statsOpen}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/40"
+        >
+          <span className="text-sm font-semibold">Balances &amp; Financial Summary</span>
+          <ChevronDown
+            className={cn(
+              'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+              statsOpen && 'rotate-180'
+            )}
+          />
+        </button>
+        {statsOpen && (
+          <div className="space-y-3 border-t p-4">
         {loadingStats ? (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -788,6 +877,8 @@ export default function DashboardPage() {
           })()}
           </>
         ) : null}
+          </div>
+        )}
       </section>
 
       {/* Monthly comparison table */}
@@ -855,116 +946,78 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Products not sold — in-stock aging with a day-count filter */}
-      {stats && (
-        <section>
-          <Card>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-              <CardTitle>Products Not Sold</CardTitle>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  value={daysFilter}
-                  onChange={(e) => setDaysFilter(e.target.value)}
-                  placeholder="Days e.g. 10"
-                  className="h-9 w-36"
-                />
-                {daysFilter.trim() !== '' && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDaysFilter('')}
-                  >
-                    Clear
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {(() => {
-                const threshold = daysFilter.trim() === '' ? 0 : Number(daysFilter)
-                const minDays = Number.isFinite(threshold) && threshold > 0 ? threshold : 0
-                const rows = (stats.deadStock ?? [])
-                  .filter((d) => d.daysSinceLastSale >= minDays)
-                  .sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
-                return (
-                  <>
-                    <p className="text-xs text-muted-foreground">
-                      {minDays > 0
-                        ? `${rows.length} product${rows.length === 1 ? '' : 's'} in stock not sold in ${minDays}+ days`
-                        : `${rows.length} product${rows.length === 1 ? '' : 's'} in stock`}
-                    </p>
-                    {rows.length === 0 ? (
-                      <p className="py-6 text-center text-sm text-muted-foreground">
-                        No products match this filter.
+      {/* Products not sold — Never Sold vs aging-by-days */}
+      {stats && (() => {
+        const all = stats.deadStock ?? []
+        const neverSold = all
+          .filter((d) => d.daysSinceLastSale >= 999)
+          .sort((a, b) => a.productName.localeCompare(b.productName))
+        const soldAll = all.filter((d) => d.daysSinceLastSale < 999)
+        const threshold = daysFilter.trim() === '' ? 0 : Number(daysFilter)
+        const minDays =
+          Number.isFinite(threshold) && threshold > 0 ? threshold : 0
+        const soldFiltered = soldAll
+          .filter((d) => d.daysSinceLastSale >= minDays)
+          .sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
+        return (
+          <section>
+            <Card>
+              <CardHeader>
+                <CardTitle>Products Not Sold</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="byDays">
+                  <TabsList>
+                    <TabsTrigger value="byDays">
+                      By Days ({soldAll.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="never">
+                      Never Sold ({neverSold.length})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="byDays" className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        value={daysFilter}
+                        onChange={(e) => setDaysFilter(e.target.value)}
+                        placeholder="Enter days e.g. 10"
+                        className="h-9 w-40"
+                      />
+                      {daysFilter.trim() !== '' && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDaysFilter('')}
+                        >
+                          Clear
+                        </Button>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {minDays > 0
+                          ? `${soldFiltered.length} product${soldFiltered.length === 1 ? '' : 's'} in stock not sold in the last ${minDays} days`
+                          : `${soldFiltered.length} previously-sold product${soldFiltered.length === 1 ? '' : 's'} still in stock`}
                       </p>
-                    ) : (
-                      <div className="max-h-[420px] overflow-y-auto rounded-md border">
-                        <table className="w-full text-xs">
-                          <thead className="sticky top-0">
-                            <tr className="border-b bg-muted/50">
-                              <th className="p-2 text-left font-medium">Product</th>
-                              <th className="p-2 text-left font-medium">Warehouse</th>
-                              <th className="p-2 text-right font-medium">Available CTN</th>
-                              <th className="p-2 text-right font-medium">Stock Value</th>
-                              <th className="p-2 text-right font-medium">Days Not Sold</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rows.map((d, idx) => (
-                              <tr
-                                key={idx}
-                                className={cn(
-                                  'border-b last:border-0',
-                                  d.daysSinceLastSale > 60
-                                    ? 'bg-red-50/60'
-                                    : d.daysSinceLastSale > 30
-                                    ? 'bg-amber-50/60'
-                                    : ''
-                                )}
-                              >
-                                <td className="p-2">{d.productName}</td>
-                                <td className="p-2 text-muted-foreground">{d.source}</td>
-                                <td className="p-2 text-right">{d.availableCtn}</td>
-                                <td className="p-2 text-right">
-                                  <AmountDisplay
-                                    amount={
-                                      Number.isFinite(d.inventoryValue)
-                                        ? d.inventoryValue
-                                        : 0
-                                    }
-                                  />
-                                </td>
-                                <td
-                                  className={cn(
-                                    'p-2 text-right font-medium',
-                                    d.daysSinceLastSale > 60
-                                      ? 'text-red-600'
-                                      : d.daysSinceLastSale > 30
-                                      ? 'text-amber-600'
-                                      : 'text-emerald-600'
-                                  )}
-                                >
-                                  {d.daysSinceLastSale >= 999
-                                    ? 'Never sold'
-                                    : d.daysSinceLastSale}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-            </CardContent>
-          </Card>
-        </section>
-      )}
+                    </div>
+                    {renderProductsTable(soldFiltered, true)}
+                  </TabsContent>
+
+                  <TabsContent value="never" className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      {neverSold.length} product{neverSold.length === 1 ? '' : 's'} in stock that have never been sold
+                    </p>
+                    {renderProductsTable(neverSold, false)}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </section>
+        )
+      })()}
     </div>
   )
 }

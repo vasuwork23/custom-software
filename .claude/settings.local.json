@@ -40,7 +40,10 @@
       "Bash(command -v mongosh)",
       "Bash(command -v mongo)",
       "Bash(mongosh *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(xargs -I{} echo \"IndiaProduct occurrences in origin/dev route.ts: {}\")",
+      "Bash(curl -s -o /dev/null -w \"root HTTP %{http_code}\\\\n\" --max-time 20 http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 30 http://localhost:3000/)"
     ]
   }
 }
