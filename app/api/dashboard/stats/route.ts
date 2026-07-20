@@ -466,6 +466,7 @@ export async function GET(req: NextRequest) {
             productName: string
             source: 'China' | 'India'
             availableCtn: number
+            availablePcs: number
             inventoryValue: number
             lastSale: Date | null
           }
@@ -483,13 +484,19 @@ export async function GET(req: NextRequest) {
             const productName =
               (entry.product as { productName?: string })?.productName ?? '—'
             const lastSale = saleMap.get(productId) ?? null
-            const rawValue =
-              (entry.availableCtn ?? 0) * (entry.qty ?? 0) * (entry.finalCost ?? 0)
+            // Round PCS to an integer per batch (matches stock report / india
+            // products list), then value = pcs * cost. This snaps away FIFO
+            // float residue like availableCtn = 0.00001 -> 0 pcs -> ₹0.
+            const ctn = entry.availableCtn ?? 0
+            const pcs = Math.round(ctn * (entry.qty ?? 0))
+            const cost = entry.finalCost ?? entry.rate ?? 0
+            const rawValue = pcs * cost
             const value =
               Number.isFinite(rawValue) && !Number.isNaN(rawValue) ? rawValue : 0
             const existing = byProduct.get(key)
             if (existing) {
-              existing.availableCtn += entry.availableCtn ?? 0
+              existing.availableCtn += ctn
+              existing.availablePcs += pcs
               existing.inventoryValue += value
               if (lastSale && (!existing.lastSale || lastSale > existing.lastSale)) {
                 existing.lastSale = lastSale
@@ -498,7 +505,8 @@ export async function GET(req: NextRequest) {
               byProduct.set(key, {
                 productName,
                 source,
-                availableCtn: entry.availableCtn ?? 0,
+                availableCtn: ctn,
+                availablePcs: pcs,
                 inventoryValue: value,
                 lastSale,
               })
@@ -508,17 +516,25 @@ export async function GET(req: NextRequest) {
         collect(chinaCandidates as any[], 'China', chinaLastSaleMap)
         collect(indiaCandidates as any[], 'India', indiaLastSaleMap)
 
-        const dead = Array.from(byProduct.values()).map((p) => ({
-          productName: p.productName,
-          source: p.source,
-          availableCtn: p.availableCtn,
-          inventoryValue: p.inventoryValue,
-          daysSinceLastSale: p.lastSale
-            ? Math.floor(
-                (now.getTime() - p.lastSale.getTime()) / (24 * 60 * 60 * 1000)
-              )
-            : 999,
-        }))
+        const dead = Array.from(byProduct.values())
+          // Drop products that are effectively sold out (only FIFO float
+          // residue left, e.g. availableCtn 0.00001 -> 0 pcs).
+          .filter((p) => p.availablePcs > 0)
+          .map((p) => ({
+            productName: p.productName,
+            source: p.source,
+            // Snap tiny float residuals to 0, else round to 2 dp (matches
+            // india products list availableCtn display).
+            availableCtn:
+              p.availableCtn < 0.001 ? 0 : Math.round(p.availableCtn * 100) / 100,
+            availablePcs: p.availablePcs,
+            inventoryValue: p.inventoryValue,
+            daysSinceLastSale: p.lastSale
+              ? Math.floor(
+                  (now.getTime() - p.lastSale.getTime()) / (24 * 60 * 60 * 1000)
+                )
+              : 999,
+          }))
         dead.sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
         return dead
       })(),
@@ -827,6 +843,7 @@ export async function GET(req: NextRequest) {
       productName: string
       source: 'China' | 'India'
       availableCtn: number
+      availablePcs: number
       inventoryValue: number
       daysSinceLastSale: number
     }[]
