@@ -127,6 +127,7 @@ interface DashboardDeadStockRow {
   productName: string
   source: 'China' | 'India'
   availableCtn: number
+  availablePcs: number
   inventoryValue: number
   daysSinceLastSale: number
 }
@@ -162,6 +163,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<ExtendedDashboardStats | null>(null)
   const [daysFilter, setDaysFilter] = useState('')
   const [statsOpen, setStatsOpen] = useState(false)
+  const [productsTab, setProductsTab] = useState<'byDays' | 'never'>('byDays')
 
   const buildPnlParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -275,6 +277,7 @@ export default function DashboardPage() {
               <th className="p-2 text-left font-medium">Product</th>
               <th className="p-2 text-left font-medium">Warehouse</th>
               <th className="p-2 text-right font-medium">Available CTN</th>
+              <th className="p-2 text-right font-medium">Available Pcs</th>
               <th className="p-2 text-right font-medium">Stock Value</th>
               {showDays && (
                 <th className="p-2 text-right font-medium">Days Not Sold</th>
@@ -298,6 +301,9 @@ export default function DashboardPage() {
                 <td className="p-2">{d.productName}</td>
                 <td className="p-2 text-muted-foreground">{d.source}</td>
                 <td className="p-2 text-right">{d.availableCtn}</td>
+                <td className="p-2 text-right">
+                  {d.availablePcs.toLocaleString('en-IN')}
+                </td>
                 <td className="p-2 text-right">
                   <AmountDisplay
                     amount={
@@ -966,47 +972,54 @@ export default function DashboardPage() {
                 <CardTitle>Products Not Sold</CardTitle>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="byDays">
-                  <TabsList>
-                    <TabsTrigger value="byDays">
-                      By Days ({soldAll.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="never">
-                      Never Sold ({neverSold.length})
-                    </TabsTrigger>
-                  </TabsList>
+                <Tabs
+                  value={productsTab}
+                  onValueChange={(v) => setProductsTab(v as 'byDays' | 'never')}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <TabsList>
+                      <TabsTrigger value="byDays">
+                        By Days ({soldAll.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="never">
+                        Never Sold ({neverSold.length})
+                      </TabsTrigger>
+                    </TabsList>
+                    {productsTab === 'byDays' && (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          inputMode="numeric"
+                          value={daysFilter}
+                          onChange={(e) => setDaysFilter(e.target.value)}
+                          placeholder="Enter days e.g. 10"
+                          className="h-9 w-40"
+                        />
+                        {daysFilter.trim() !== '' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDaysFilter('')}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-                  <TabsContent value="byDays" className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Input
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        value={daysFilter}
-                        onChange={(e) => setDaysFilter(e.target.value)}
-                        placeholder="Enter days e.g. 10"
-                        className="h-9 w-40"
-                      />
-                      {daysFilter.trim() !== '' && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDaysFilter('')}
-                        >
-                          Clear
-                        </Button>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {minDays > 0
-                          ? `${soldFiltered.length} product${soldFiltered.length === 1 ? '' : 's'} in stock not sold in the last ${minDays} days`
-                          : `${soldFiltered.length} previously-sold product${soldFiltered.length === 1 ? '' : 's'} still in stock`}
-                      </p>
-                    </div>
+                  <TabsContent value="byDays" className="mt-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {minDays > 0
+                        ? `${soldFiltered.length} product${soldFiltered.length === 1 ? '' : 's'} in stock not sold in the last ${minDays} days`
+                        : `${soldFiltered.length} previously-sold product${soldFiltered.length === 1 ? '' : 's'} still in stock`}
+                    </p>
                     {renderProductsTable(soldFiltered, true)}
                   </TabsContent>
 
-                  <TabsContent value="never" className="space-y-3">
+                  <TabsContent value="never" className="mt-3 space-y-2">
                     <p className="text-xs text-muted-foreground">
                       {neverSold.length} product{neverSold.length === 1 ? '' : 's'} in stock that have never been sold
                     </p>
