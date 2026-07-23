@@ -129,7 +129,8 @@ interface DashboardDeadStockRow {
   availableCtn: number
   availablePcs: number
   inventoryValue: number
-  daysSinceLastSale: number
+  daysNotSold: number
+  neverSold: boolean
 }
 
 interface ExtendedDashboardStats extends DashboardStats {
@@ -260,7 +261,7 @@ export default function DashboardPage() {
 
   const renderProductsTable = (
     rows: DashboardDeadStockRow[],
-    showDays: boolean
+    daysLabel: string
   ) => {
     if (rows.length === 0) {
       return (
@@ -279,9 +280,7 @@ export default function DashboardPage() {
               <th className="p-2 text-right font-medium">Available CTN</th>
               <th className="p-2 text-right font-medium">Available Pcs</th>
               <th className="p-2 text-right font-medium">Stock Value</th>
-              {showDays && (
-                <th className="p-2 text-right font-medium">Days Not Sold</th>
-              )}
+              <th className="p-2 text-right font-medium">{daysLabel}</th>
             </tr>
           </thead>
           <tbody>
@@ -290,12 +289,11 @@ export default function DashboardPage() {
                 key={idx}
                 className={cn(
                   'border-b last:border-0',
-                  showDays &&
-                    (d.daysSinceLastSale > 60
-                      ? 'bg-red-50/60'
-                      : d.daysSinceLastSale > 30
-                      ? 'bg-amber-50/60'
-                      : '')
+                  d.daysNotSold > 60
+                    ? 'bg-red-50/60'
+                    : d.daysNotSold > 30
+                    ? 'bg-amber-50/60'
+                    : ''
                 )}
               >
                 <td className="p-2">{d.productName}</td>
@@ -311,20 +309,18 @@ export default function DashboardPage() {
                     }
                   />
                 </td>
-                {showDays && (
-                  <td
-                    className={cn(
-                      'p-2 text-right font-medium',
-                      d.daysSinceLastSale > 60
-                        ? 'text-red-600'
-                        : d.daysSinceLastSale > 30
-                        ? 'text-amber-600'
-                        : 'text-emerald-600'
-                    )}
-                  >
-                    {d.daysSinceLastSale}
-                  </td>
-                )}
+                <td
+                  className={cn(
+                    'p-2 text-right font-medium',
+                    d.daysNotSold > 60
+                      ? 'text-red-600'
+                      : d.daysNotSold > 30
+                      ? 'text-amber-600'
+                      : 'text-emerald-600'
+                  )}
+                >
+                  {d.daysNotSold}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -956,15 +952,15 @@ export default function DashboardPage() {
       {stats && (() => {
         const all = stats.deadStock ?? []
         const neverSold = all
-          .filter((d) => d.daysSinceLastSale >= 999)
-          .sort((a, b) => a.productName.localeCompare(b.productName))
-        const soldAll = all.filter((d) => d.daysSinceLastSale < 999)
+          .filter((d) => d.neverSold)
+          .sort((a, b) => b.daysNotSold - a.daysNotSold)
+        const soldAll = all.filter((d) => !d.neverSold)
         const threshold = daysFilter.trim() === '' ? 0 : Number(daysFilter)
         const minDays =
           Number.isFinite(threshold) && threshold > 0 ? threshold : 0
         const soldFiltered = soldAll
-          .filter((d) => d.daysSinceLastSale >= minDays)
-          .sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
+          .filter((d) => d.daysNotSold >= minDays)
+          .sort((a, b) => b.daysNotSold - a.daysNotSold)
         return (
           <section>
             <Card>
@@ -1013,17 +1009,17 @@ export default function DashboardPage() {
                   <TabsContent value="byDays" className="mt-3 space-y-2">
                     <p className="text-xs text-muted-foreground">
                       {minDays > 0
-                        ? `${soldFiltered.length} product${soldFiltered.length === 1 ? '' : 's'} in stock not sold in the last ${minDays} days`
-                        : `${soldFiltered.length} previously-sold product${soldFiltered.length === 1 ? '' : 's'} still in stock`}
+                        ? `${soldFiltered.length} product${soldFiltered.length === 1 ? '' : 's'} with stock sitting unsold for ${minDays}+ days`
+                        : `${soldFiltered.length} previously-sold product${soldFiltered.length === 1 ? '' : 's'} still in stock — days their current stock has sat unsold`}
                     </p>
-                    {renderProductsTable(soldFiltered, true)}
+                    {renderProductsTable(soldFiltered, 'Days Not Sold')}
                   </TabsContent>
 
                   <TabsContent value="never" className="mt-3 space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      {neverSold.length} product{neverSold.length === 1 ? '' : 's'} in stock that have never been sold
+                      {neverSold.length} product{neverSold.length === 1 ? '' : 's'} in stock that have never been sold — days their stock has been available
                     </p>
-                    {renderProductsTable(neverSold, false)}
+                    {renderProductsTable(neverSold, 'Days in Stock')}
                   </TabsContent>
                 </Tabs>
               </CardContent>
