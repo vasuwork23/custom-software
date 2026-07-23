@@ -469,6 +469,9 @@ export async function GET(req: NextRequest) {
             availablePcs: number
             inventoryValue: number
             lastSale: Date | null
+            // Earliest entryDate among the currently in-stock batches — i.e.
+            // when the oldest stock still on hand became available.
+            availableSince: Date | null
           }
         >()
         const collect = (
@@ -484,6 +487,18 @@ export async function GET(req: NextRequest) {
             const productName =
               (entry.product as { productName?: string })?.productName ?? '—'
             const lastSale = saleMap.get(productId) ?? null
+            // When this batch's stock became available. China stock is finalized
+            // when the entry is LOCKED, so use lockedAt (fall back to entryDate
+            // if an available entry isn't locked yet). India has no lock step, so
+            // its buying entryDate is when the stock is available.
+            const entryDateRaw = (entry.entryDate as Date | undefined)
+              ? new Date(entry.entryDate as Date)
+              : null
+            const lockedAt = (entry.lockedAt as Date | undefined)
+              ? new Date(entry.lockedAt as Date)
+              : null
+            const availableFrom =
+              source === 'China' ? lockedAt ?? entryDateRaw : entryDateRaw
             // Round PCS to an integer per batch (matches stock report / india
             // products list), then value = pcs * cost. This snaps away FIFO
             // float residue like availableCtn = 0.00001 -> 0 pcs -> ₹0.
@@ -501,6 +516,12 @@ export async function GET(req: NextRequest) {
               if (lastSale && (!existing.lastSale || lastSale > existing.lastSale)) {
                 existing.lastSale = lastSale
               }
+              if (
+                availableFrom &&
+                (!existing.availableSince || availableFrom < existing.availableSince)
+              ) {
+                existing.availableSince = availableFrom
+              }
             } else {
               byProduct.set(key, {
                 productName,
@@ -509,6 +530,7 @@ export async function GET(req: NextRequest) {
                 availablePcs: pcs,
                 inventoryValue: value,
                 lastSale,
+                availableSince: availableFrom,
               })
             }
           }
@@ -520,22 +542,35 @@ export async function GET(req: NextRequest) {
           // Drop products that are effectively sold out (only FIFO float
           // residue left, e.g. availableCtn 0.00001 -> 0 pcs).
           .filter((p) => p.availablePcs > 0)
-          .map((p) => ({
-            productName: p.productName,
-            source: p.source,
-            // Snap tiny float residuals to 0, else round to 2 dp (matches
-            // india products list availableCtn display).
-            availableCtn:
-              p.availableCtn < 0.001 ? 0 : Math.round(p.availableCtn * 100) / 100,
-            availablePcs: p.availablePcs,
-            inventoryValue: p.inventoryValue,
-            daysSinceLastSale: p.lastSale
-              ? Math.floor(
-                  (now.getTime() - p.lastSale.getTime()) / (24 * 60 * 60 * 1000)
+          .map((p) => {
+            // How long the CURRENT stock has been sitting unsold: measured from
+            // the later of (last sale, when this stock became available). If the
+            // product sold out and was restocked, the clock restarts at the new
+            // stock's arrival instead of the old sale date.
+            const anchorMs = Math.max(
+              p.lastSale ? p.lastSale.getTime() : 0,
+              p.availableSince ? p.availableSince.getTime() : 0
+            )
+            const daysNotSold = anchorMs
+              ? Math.max(
+                  0,
+                  Math.floor((now.getTime() - anchorMs) / (24 * 60 * 60 * 1000))
                 )
-              : 999,
-          }))
-        dead.sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale)
+              : 0
+            return {
+              productName: p.productName,
+              source: p.source,
+              // Snap tiny float residuals to 0, else round to 2 dp (matches
+              // india products list availableCtn display).
+              availableCtn:
+                p.availableCtn < 0.001 ? 0 : Math.round(p.availableCtn * 100) / 100,
+              availablePcs: p.availablePcs,
+              inventoryValue: p.inventoryValue,
+              daysNotSold,
+              neverSold: !p.lastSale,
+            }
+          })
+        dead.sort((a, b) => b.daysNotSold - a.daysNotSold)
         return dead
       })(),
       SellBill.countDocuments({ whatsappSent: false }),
@@ -845,7 +880,8 @@ export async function GET(req: NextRequest) {
       availableCtn: number
       availablePcs: number
       inventoryValue: number
-      daysSinceLastSale: number
+      daysNotSold: number
+      neverSold: boolean
     }[]
 
     return NextResponse.json({
