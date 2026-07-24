@@ -18,8 +18,11 @@ import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Pagination } from '@/components/ui/Pagination'
 import type { BuyingEntryRow } from '@/components/products/BuyingEntryTable'
 import { cn } from '@/lib/utils'
+
+const SELLING_HISTORY_PAGE_SIZE = 20
 
 interface SellingHistoryRow {
   _id: string
@@ -96,6 +99,7 @@ export default function ProductDetailPage() {
   const [entrySheetOpen, setEntrySheetOpen] = useState(false)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<BuyingEntryRow | null>(null)
+  const [sellingPage, setSellingPage] = useState(1)
 
   const fetchProduct = useCallback(async () => {
     if (!id) return
@@ -150,6 +154,14 @@ export default function ProductDetailPage() {
       </div>
     )
   }
+
+  const sellingHistory = product.sellingHistory ?? []
+  const sellingTotalPages = Math.max(1, Math.ceil(sellingHistory.length / SELLING_HISTORY_PAGE_SIZE))
+  const currentSellingPage = Math.min(sellingPage, sellingTotalPages)
+  const pagedSellingHistory = sellingHistory.slice(
+    (currentSellingPage - 1) * SELLING_HISTORY_PAGE_SIZE,
+    currentSellingPage * SELLING_HISTORY_PAGE_SIZE
+  )
 
   return (
     <div className="space-y-6">
@@ -246,11 +258,12 @@ export default function ProductDetailPage() {
           </div>
         </TabsContent>
         <TabsContent value="selling" className="mt-4">
-          {!product.sellingHistory?.length ? (
+          {!sellingHistory.length ? (
             <div className="rounded-md border py-12 text-center text-muted-foreground">
               No sales yet for this product.
             </div>
           ) : (
+            <div className="space-y-4">
             <div className="w-full overflow-hidden rounded-md border">
               <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -270,7 +283,7 @@ export default function ProductDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {product.sellingHistory.map((row) => (
+                  {pagedSellingHistory.map((row) => (
                     <tr key={row._id} className="border-b last:border-0">
                       <td className="p-3">
                         <Link href={`/sale-bills/${row.sellBillId}`} className="text-primary hover:underline font-medium">
@@ -340,6 +353,14 @@ export default function ProductDetailPage() {
                 </tbody>
               </table>
               </div>
+            </div>
+            <Pagination
+              page={currentSellingPage}
+              totalPages={sellingTotalPages}
+              total={sellingHistory.length}
+              pageSize={SELLING_HISTORY_PAGE_SIZE}
+              onPageChange={setSellingPage}
+            />
             </div>
           )}
         </TabsContent>
