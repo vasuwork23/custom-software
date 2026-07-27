@@ -19,8 +19,11 @@ import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Pagination } from '@/components/ui/Pagination'
 import type { IndiaBuyingEntryRow } from '@/components/products/IndiaBuyingEntryTable'
 import { cn } from '@/lib/utils'
+
+const SELLING_HISTORY_PAGE_SIZE = 20
 
 interface SellingHistoryRow {
   _id: string
@@ -64,6 +67,7 @@ export default function IndiaProductDetailPage() {
   const [entrySheetOpen, setEntrySheetOpen] = useState(false)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<IndiaBuyingEntryRow | null>(null)
+  const [sellingPage, setSellingPage] = useState(1)
 
   const fetchProduct = useCallback(async () => {
     if (!id) return
@@ -118,6 +122,14 @@ export default function IndiaProductDetailPage() {
       </div>
     )
   }
+
+  const sellingHistory = product.sellingHistory ?? []
+  const sellingTotalPages = Math.max(1, Math.ceil(sellingHistory.length / SELLING_HISTORY_PAGE_SIZE))
+  const currentSellingPage = Math.min(sellingPage, sellingTotalPages)
+  const pagedSellingHistory = sellingHistory.slice(
+    (currentSellingPage - 1) * SELLING_HISTORY_PAGE_SIZE,
+    currentSellingPage * SELLING_HISTORY_PAGE_SIZE
+  )
 
   return (
     <div className="space-y-6">
@@ -222,9 +234,10 @@ export default function IndiaProductDetailPage() {
           />
         </TabsContent>
         <TabsContent value="selling" className="mt-4">
-          {!product.sellingHistory?.length ? (
+          {!sellingHistory.length ? (
             <div className="rounded-md border py-12 text-center text-muted-foreground">No sales yet for this product.</div>
           ) : (
+            <div className="space-y-4">
             <div className="rounded-md border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -240,7 +253,7 @@ export default function IndiaProductDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {product.sellingHistory.map((row) => (
+                  {pagedSellingHistory.map((row) => (
                     <tr key={row._id} className="border-b last:border-0">
                       <td className="p-3">
                         <Link href={`/sale-bills/${row.sellBillId}`} className="text-primary hover:underline font-medium">
@@ -283,6 +296,14 @@ export default function IndiaProductDetailPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <Pagination
+              page={currentSellingPage}
+              totalPages={sellingTotalPages}
+              total={sellingHistory.length}
+              pageSize={SELLING_HISTORY_PAGE_SIZE}
+              onPageChange={setSellingPage}
+            />
             </div>
           )}
         </TabsContent>

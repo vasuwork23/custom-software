@@ -236,7 +236,12 @@ export async function GET(req: NextRequest) {
         adjustedProfitStage,
         {
           $group: {
-            _id: { company: '$bill.company', bankAccount: '$bill.bankAccount' },
+            // Normalize missing vs explicit-null so bills predating the
+            // bankAccount field don't split into a separate group (dup rows).
+            _id: {
+              company: { $ifNull: ['$bill.company', null] },
+              bankAccount: { $ifNull: ['$bill.bankAccount', null] },
+            },
             companyName: {
               $first: {
                 $cond: [
