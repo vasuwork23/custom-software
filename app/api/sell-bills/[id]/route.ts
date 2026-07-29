@@ -119,6 +119,27 @@ export async function GET(
         })
         ;(bill as Record<string, unknown>).totalAmount = Math.round(subtotal * 100) / 100
         ;(bill as Record<string, unknown>).grandTotal = grandTotal
+
+        // The interrupted save also means the original ledger credit was never written.
+        // Backfill it now so the reversal-on-delete has something real to reference.
+        if ((bill as { isCashbook?: boolean }).isCashbook && grandTotal > 0) {
+          const existingCredit = await CashTransaction.findOne({
+            referenceId: bill._id,
+            referenceType: 'SellBill',
+            isReversal: { $ne: true },
+          }).lean()
+          if (!existingCredit) {
+            await createCashTransaction({
+              type: 'credit',
+              amount: grandTotal,
+              description: `Cashbook sale — Bill #${(bill as { billNumber?: number }).billNumber}\n(recovered from interrupted save)`,
+              date: (bill as { billDate?: Date }).billDate ? new Date((bill as { billDate?: Date }).billDate as Date) : new Date(),
+              category: 'cashbook_sale',
+              referenceId: bill._id as mongoose.Types.ObjectId,
+              referenceType: 'SellBill',
+            })
+          }
+        }
       }
     }
 
@@ -575,19 +596,27 @@ export async function DELETE(
         })
           .sort({ createdAt: 1 })
           .lean()
-        const originalDate = originalCashTx ? (originalCashTx as { date?: Date }).date : (bill as { billDate?: Date }).billDate
-        await createCashTransaction({
-          type: 'debit',
-          amount: amountToReverse,
-          description: `Reversal — Cashbook bill deleted #${(bill as { billNumber?: number }).billNumber ?? id}`,
-          date: originalDate ? new Date(originalDate) : new Date(),
-          category: 'reversal',
-          referenceId: billIdObj,
-          referenceType: 'SellBill',
-          isReversal: true,
-          reversalOf: originalCashTx?._id ?? null,
-          sortOrder: 1,
-        })
+        if (!originalCashTx) {
+          // No original credit was ever recorded for this bill (e.g. creation was interrupted
+          // before the ledger entry was written). There is nothing to reverse — writing a debit
+          // here would create an orphaned entry with no matching credit.
+          console.warn(
+            `Skipped cashbook reversal for deleted bill #${(bill as { billNumber?: number }).billNumber ?? id}: no original CashTransaction found for referenceId=${id}`
+          )
+        } else {
+          await createCashTransaction({
+            type: 'debit',
+            amount: amountToReverse,
+            description: `Reversal — Cashbook bill deleted #${(bill as { billNumber?: number }).billNumber ?? id}`,
+            date: (originalCashTx as { date?: Date }).date ? new Date((originalCashTx as { date?: Date }).date as Date) : new Date(),
+            category: 'reversal',
+            referenceId: billIdObj,
+            referenceType: 'SellBill',
+            isReversal: true,
+            reversalOf: originalCashTx._id,
+            sortOrder: 1,
+          })
+        }
       }
     } else if (isBankSale && deleteBankAccountId && amountToReverse > 0) {
       const bankAcc = await BankAccount.findById(deleteBankAccountId)
