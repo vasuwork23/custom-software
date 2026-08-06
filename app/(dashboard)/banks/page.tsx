@@ -57,6 +57,7 @@ export default function BanksPage() {
   const [accounts, setAccounts] = useState<BankAccountRow[]>([])
   const [investments, setInvestments] = useState<InvestmentRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [showAllBanks, setShowAllBanks] = useState(false)
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<BankAccountRow | null>(null)
@@ -117,6 +118,11 @@ export default function BanksPage() {
 
   const cashAccount = accounts.find((a) => a.type === 'cash')
   const onlineAccounts = accounts.filter((a) => a.type === 'online')
+  // Hide zero-balance bank accounts by default; the toggle reveals them.
+  const visibleOnlineAccounts = showAllBanks
+    ? onlineAccounts
+    : onlineAccounts.filter((a) => (a.currentBalance ?? 0) !== 0)
+  const hiddenBankCount = onlineAccounts.length - visibleOnlineAccounts.length
 
   const cashBalance = cashAccount?.currentBalance ?? 0
   const bankBalance = onlineAccounts.reduce(
@@ -564,7 +570,36 @@ export default function BanksPage() {
           )}
 
       <section className="space-y-4">
-        <h2 className="text-sm font-medium text-muted-foreground">Bank Accounts</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium text-muted-foreground">Bank Accounts</h2>
+          {onlineAccounts.length > 0 && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                Show all
+                {hiddenBankCount > 0 && !showAllBanks
+                  ? ` (${hiddenBankCount} hidden)`
+                  : ''}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showAllBanks}
+                onClick={() => setShowAllBanks((v) => !v)}
+                className={cn(
+                  'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+                  showAllBanks ? 'bg-primary' : 'bg-input'
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                    showAllBanks ? 'translate-x-4' : 'translate-x-0.5'
+                  )}
+                />
+              </button>
+            </label>
+          )}
+        </div>
         {onlineAccounts.length === 0 ? (
           <EmptyState
             icon={Banknote}
@@ -576,9 +611,19 @@ export default function BanksPage() {
               Add New Account
             </Button>
           </EmptyState>
+        ) : visibleOnlineAccounts.length === 0 ? (
+          <EmptyState
+            icon={Banknote}
+            title="All bank accounts have ₹0 balance"
+            description="Zero-balance accounts are hidden. Turn on “Show all” to view them."
+          >
+            <Button variant="outline" onClick={() => setShowAllBanks(true)}>
+              Show all accounts
+            </Button>
+          </EmptyState>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {onlineAccounts.map((acc) => (
+            {visibleOnlineAccounts.map((acc) => (
               <Card key={acc._id} className="overflow-hidden">
                 <Link href={`/banks/${acc._id}`} className="block">
                   <CardHeader className="pb-2">
