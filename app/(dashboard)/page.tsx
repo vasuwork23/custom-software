@@ -948,7 +948,7 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Products Not Sold — temporarily hidden
+      {/* Products not sold — Never Sold vs aging-by-days */}
       {stats && (() => {
         const all = stats.deadStock ?? []
         const neverSold = all
@@ -1027,7 +1027,6 @@ export default function DashboardPage() {
           </section>
         )
       })()}
-      */}
     </div>
   )
 }

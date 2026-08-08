@@ -36,17 +36,20 @@ export async function GET(req: NextRequest) {
     await connectDB()
 
     const filter: Record<string, unknown> = { product: new mongoose.Types.ObjectId(productId) }
-    if (status) filter.currentStatus = status
+    // "outstanding" returns every unpaid + partially-paid entry (used by the Make Payment
+    // dropdown) with no pagination cap, so old dues are never hidden past the limit window.
+    const outstanding = status === 'outstanding'
+    if (outstanding) filter.currentStatus = { $in: ['unpaid', 'partiallypaid'] }
+    else if (status) filter.currentStatus = status
 
     const skip = (page - 1) * limit
+    const entriesQuery = BuyingEntry.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('product', 'productName')
+      .populate('containerId', 'containerId containerName status')
+    if (!outstanding) entriesQuery.skip(skip).limit(limit)
     const [rawEntries, total] = await Promise.all([
-      BuyingEntry.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .populate('product', 'productName')
-        .populate('containerId', 'containerId containerName status'),
+      entriesQuery.lean(),
       BuyingEntry.countDocuments(filter),
     ])
 
@@ -88,7 +91,9 @@ export async function GET(req: NextRequest) {
       success: true,
       data: {
         entries,
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        pagination: outstanding
+          ? { page: 1, limit: total, total, pages: 1 }
+          : { page, limit, total, pages: Math.ceil(total / limit) },
       },
     })
   } catch (error) {
