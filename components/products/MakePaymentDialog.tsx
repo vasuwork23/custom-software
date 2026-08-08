@@ -89,7 +89,7 @@ export function MakePaymentDialog({
   useEffect(() => {
     if (open && productId) {
       apiGet<{ entries: { _id: string; entryDate: string; totalCtn: number; remainingAmount: number; currentStatus?: string }[] }>(
-        `/api/buying-entries?productId=${productId}&limit=100`
+        `/api/buying-entries?productId=${productId}&status=outstanding`
       ).then((r) => {
         const list = r.success ? r.data.entries ?? [] : []
         setEntries(list.filter((e) => (e.currentStatus === 'unpaid' || e.currentStatus === 'partiallypaid') && (e.remainingAmount ?? 0) > 0))

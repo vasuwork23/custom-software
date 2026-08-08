@@ -108,7 +108,7 @@ export function MakeIndiaPaymentDialog({
   useEffect(() => {
     if (open && productId) {
       apiGet<{ entries: { _id: string; entryDate: string; totalCtn: number; remainingAmount: number }[] }>(
-        `/api/india-buying-entries?productId=${productId}&limit=100`
+        `/api/india-buying-entries?productId=${productId}&status=outstanding`
       ).then((r) => {
         if (r.success) setEntries((r.data.entries ?? []).filter((e) => (e.remainingAmount ?? 0) > 0))
         else setEntries([])
