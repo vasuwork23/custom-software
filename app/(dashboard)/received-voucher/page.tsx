@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -116,10 +116,18 @@ export default function ReceivedVoucherPage() {
         title="Receive Voucher"
         description="Record and manage received vouchers from companies."
         action={
-          <Button onClick={openAdd}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Voucher
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/received-voucher/quick">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Quick Voucher from Message
+              </Link>
+            </Button>
+            <Button onClick={openAdd}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Voucher
+            </Button>
+          </div>
         }
       />
 
