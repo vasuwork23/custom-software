@@ -4,23 +4,15 @@ import { connectDB } from '@/lib/mongodb'
 import SellBill from '@/models/SellBill'
 import SellBillItem from '@/models/SellBillItem'
 import Company from '@/models/Company'
-import Product from '@/models/Product'
-import IndiaProduct from '@/models/IndiaProduct'
-import { getNextBillNumber } from '@/models/Counter'
-import { createCashTransaction } from '@/lib/cash-transaction-helper'
-import { createBankSaleTransaction } from '@/lib/bank-sale-transaction-helper'
-import BankAccount from '@/models/BankAccount'
-import { calcGrandTotal } from '@/lib/utils'
-import { processFIFO } from '@/lib/fifo'
-import { processIndiaFIFO } from '@/lib/india-fifo'
+import {
+  createSellBill,
+  validateSellBillInput,
+  formatCtnPcs,
+  type CreateSellBillInput,
+} from '@/lib/create-sell-bill'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
-
-const formatCtnPcs = (ctn: number, pcs: number): string => {
-  const isWhole = Number.isInteger(ctn)
-  return isWhole ? `${ctn} CTN (${pcs} pcs)` : `${ctn.toFixed(2)} CTN (${pcs} pcs)`
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -157,13 +149,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-const itemSchema = {
-  productSource: (v: unknown) => v === 'china' || v === 'india',
-  productId: (v: unknown) => v != null && typeof v === 'string' && mongoose.Types.ObjectId.isValid(v),
-  pcs: (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v > 0,
-  ratePerPcs: (v: unknown) => typeof v === 'number' && v >= 0,
-}
-
 export async function POST(req: NextRequest) {
   try {
     const user = await getUserFromRequest(req)
@@ -174,165 +159,31 @@ export async function POST(req: NextRequest) {
       )
     }
     const body = await req.json()
-    const companyId = body.companyId
-    const billDate = body.billDate
-    const items: { productSource: 'china' | 'india'; productId: string; pcs: number; ratePerPcs: number }[] = Array.isArray(body.items) ? body.items : []
-    const notes = body.notes
-    const extraCharges = Number(body.extraCharges) || 0
-    const extraChargesNote = body.extraChargesNote != null ? String(body.extraChargesNote).trim() : ''
-    const discount = Number(body.discount) || 0
-    const discountNote = body.discountNote != null ? String(body.discountNote).trim() : ''
-    const bankAccountId = body.bankAccountId != null ? String(body.bankAccountId).trim() : ''
+    const input: CreateSellBillInput = {
+      companyId: body.companyId,
+      bankAccountId: body.bankAccountId,
+      billDate: body.billDate,
+      items: Array.isArray(body.items) ? body.items : [],
+      notes: body.notes,
+      extraCharges: body.extraCharges,
+      extraChargesNote: body.extraChargesNote,
+      discount: body.discount,
+      discountNote: body.discountNote,
+    }
 
-    const isCashbook = companyId === 'cashbook'
-    const isBankSale = companyId === 'bankaccount'
-    if (!companyId) {
+    const validationError = validateSellBillInput(input)
+    if (validationError) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Select company or Cashbook' },
-        { status: 400 }
-      )
-    }
-    if (isBankSale && !mongoose.Types.ObjectId.isValid(bankAccountId)) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Select a bank account' },
-        { status: 400 }
-      )
-    }
-    if (!isCashbook && !isBankSale && !mongoose.Types.ObjectId.isValid(companyId)) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Valid company is required' },
-        { status: 400 }
-      )
-    }
-    if (!billDate) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Bill date is required' },
-        { status: 400 }
-      )
-    }
-    if (!items.length || items.some((i: { productSource?: unknown; productId?: unknown; pcs?: unknown; ratePerPcs?: unknown }) => !itemSchema.productSource(i.productSource) || !itemSchema.productId(i.productId) || !itemSchema.pcs(i.pcs) || !itemSchema.ratePerPcs(i.ratePerPcs))) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'At least one valid line item (source, product, PCS > 0, rate) is required' },
+        { success: false, error: 'Validation failed', message: validationError },
         { status: 400 }
       )
     }
 
     await connectDB()
     const createdBy = await resolveCreatedBy(user.id)
+    const { billId } = await createSellBill(input, createdBy)
 
-    const bankAccDoc = isBankSale
-      ? await BankAccount.findById(bankAccountId).lean<{ accountName?: string }>()
-      : null
-
-    const billNumber = await getNextBillNumber()
-
-    const bill = await SellBill.create({
-      billNumber,
-      company: (isCashbook || isBankSale) ? null : new mongoose.Types.ObjectId(companyId),
-      isCashbook: !!isCashbook,
-      isBankSale: !!isBankSale,
-      bankAccount: isBankSale ? new mongoose.Types.ObjectId(bankAccountId) : null,
-      companyName: isCashbook ? 'Cashbook' : isBankSale ? (bankAccDoc?.accountName ?? 'Bank Account') : null,
-      billDate: new Date(billDate),
-      items: [],
-      totalAmount: 0,
-      extraCharges,
-      extraChargesNote: extraChargesNote || undefined,
-      discount,
-      discountNote: discountNote || undefined,
-      grandTotal: 0,
-      notes: notes != null && String(notes).trim() !== '' ? String(notes).trim() : undefined,
-      whatsappSent: false,
-      createdBy,
-      updatedBy: createdBy,
-    })
-
-    const chinaProductIds = Array.from(new Set(items.filter((i) => i.productSource !== 'india').map((i) => i.productId)))
-    const indiaProductIds = Array.from(new Set(items.filter((i) => i.productSource === 'india').map((i) => i.productId)))
-    const [chinaProducts, indiaProducts] = await Promise.all([
-      chinaProductIds.length ? Product.find({ _id: { $in: chinaProductIds } }).select('productName').lean() : [],
-      indiaProductIds.length ? IndiaProduct.find({ _id: { $in: indiaProductIds } }).select('productName').lean() : [],
-    ])
-    const productNameById = new Map<string, string>()
-    for (const p of [...chinaProducts, ...indiaProducts]) productNameById.set(String(p._id), p.productName)
-
-    const createdItems: mongoose.Types.ObjectId[] = []
-    let totalAmount = 0
-    const summaryLines: string[] = []
-
-    for (const row of items) {
-      const productId = new mongoose.Types.ObjectId(row.productId)
-      const isIndia = row.productSource === 'india'
-      const { fifoBreakdown, fifoNote, totalProfit, pcsSold } = isIndia
-        ? await processIndiaFIFO(productId, row.pcs, row.ratePerPcs)
-        : await processFIFO(productId, row.pcs, row.ratePerPcs)
-      const ctnSold = fifoBreakdown.reduce((s, b) => s + b.ctnConsumed, 0)
-      const lineTotal = pcsSold * row.ratePerPcs
-      totalAmount += lineTotal
-
-      const item = await SellBillItem.create({
-        sellBill: bill._id,
-        productSource: row.productSource,
-        product: isIndia ? undefined : productId,
-        indiaProduct: isIndia ? productId : undefined,
-        ctnSold: parseFloat(ctnSold.toFixed(4)),
-        pcsSold,
-        ratePerPcs: row.ratePerPcs,
-        totalAmount: lineTotal,
-        fifoBreakdown,
-        fifoNote,
-        totalProfit,
-        createdBy,
-        updatedBy: createdBy,
-      })
-      createdItems.push(item._id as mongoose.Types.ObjectId)
-
-      const productName = productNameById.get(row.productId) ?? '—'
-      summaryLines.push(`${productName}: ${formatCtnPcs(ctnSold, pcsSold)} @₹${row.ratePerPcs}`)
-    }
-    const trimmedNotes = notes != null && String(notes).trim() !== '' ? String(notes).trim() : ''
-    const productsSummary = [summaryLines.join('\n'), trimmedNotes ? `Note: ${trimmedNotes}` : '']
-      .filter(Boolean)
-      .join('\n')
-
-    const subtotal = Math.round(totalAmount * 100) / 100
-    const grandTotal = calcGrandTotal(subtotal, extraCharges, discount)
-    await SellBill.findByIdAndUpdate(bill._id, {
-      items: createdItems,
-      totalAmount: subtotal,
-      extraCharges,
-      extraChargesNote: extraChargesNote || undefined,
-      discount,
-      discountNote: discountNote || undefined,
-      grandTotal,
-    })
-
-    if (isCashbook) {
-      await createCashTransaction({
-        type: 'credit',
-        amount: grandTotal,
-        description: `Cashbook sale — Bill #${bill.billNumber}\n${productsSummary}`,
-        date: new Date(billDate),
-        category: 'cashbook_sale',
-        referenceId: bill._id as mongoose.Types.ObjectId,
-        referenceType: 'SellBill',
-      })
-    } else if (isBankSale) {
-      await createBankSaleTransaction({
-        bankAccountId: new mongoose.Types.ObjectId(bankAccountId),
-        amount: grandTotal,
-        description: `Bank sale — Bill #${bill.billNumber}${bankAccDoc ? ` (${bankAccDoc.accountName})` : ''}\n${productsSummary}`,
-        date: new Date(billDate),
-        referenceId: bill._id as mongoose.Types.ObjectId,
-        createdBy,
-      })
-    } else {
-      await Company.findByIdAndUpdate(companyId, {
-        $inc: { outstanding: grandTotal },
-      })
-    }
-
-    const populated = await SellBill.findById(bill._id)
+    const populated = await SellBill.findById(billId)
       .lean()
       .populate('company', 'companyName ownerName contact1Mobile contact2Mobile')
       .populate({ path: 'items', populate: { path: 'product', select: 'productName' } })
@@ -340,13 +191,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: populated })
   } catch (error) {
     console.error('Sell bill create API Error:', error)
+    const isStockError = error instanceof Error && error.message.includes('Insufficient stock')
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error && error.message.includes('Insufficient stock') ? 'Validation failed' : 'Internal server error',
+        error: isStockError ? 'Validation failed' : 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
       },
-      { status: error instanceof Error && error.message.includes('Insufficient stock') ? 400 : 500 }
+      { status: isStockError ? 400 : 500 }
     )
   }
 }

@@ -47,7 +47,13 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 25 http://localhost:3000/)",
       "Bash(curl -s -o /dev/null -w \"server: HTTP %{http_code}\\\\n\" --max-time 8 http://localhost:3000/)",
       "Bash(gh pr create --base main --head dev --title 'fix\\(reports\\): dedupe By Company rows for ranges spanning bankAccount rollout' --body ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(grep -rn \"cloud-backup\\\\|normal-backup\" --include=\"*.tsx\" app components | head -20; echo \"=== restore.sh head ===\"; head -40 restore.sh; echo \"=== env.local keys ===\"; sed 's/=.*/=<redacted>/' .env.local)",
+      "Bash(grep -rn \"\\\\.find\\({}\\)\\\\|find\\({}）\\\\|\\\\.find\\(\\)\\\\s*$\" --include=\"*.ts\" app lib)"
+    ],
+    "additionalDirectories": [
+      "/Users/nexus/Desktop/custom-software"
     ]
   }
 }

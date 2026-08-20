@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
-import Product from '@/models/Product'
-import IndiaProduct from '@/models/IndiaProduct'
-import BuyingEntry from '@/models/BuyingEntry'
-import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
+import { getSellableProducts } from '@/lib/product-catalog'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,72 +24,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search')?.trim() ?? ''
 
     await connectDB()
-
-    const nameFilter = search ? { productName: new RegExp(search, 'i') } : {}
-
-    const [chinaStock, indiaStock, chinaProducts, indiaProducts] = await Promise.all([
-      BuyingEntry.aggregate([
-        { $match: { chinaWarehouseReceived: 'yes', isLocked: true, availableCtn: { $gt: 0 } } },
-        { $sort: { createdAt: -1 } },
-        {
-          $group: {
-            _id: '$product',
-            availableCtn: { $sum: '$availableCtn' },
-            availablePcs: { $sum: { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] } },
-            qtyPerCtn: { $first: '$qty' },
-          },
-        },
-      ]),
-      IndiaBuyingEntry.aggregate([
-        { $match: { availableCtn: { $gt: 0 } } },
-        { $sort: { createdAt: 1 } },
-        {
-          $group: {
-            _id: '$product',
-            availableCtn: { $sum: '$availableCtn' },
-            availablePcs: { $sum: { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] } },
-            qtyPerCtn: { $first: '$qty' },
-          },
-        },
-      ]),
-      Product.find(nameFilter).select('productName').sort({ productName: 1 }).lean(),
-      IndiaProduct.find(nameFilter).select('productName').sort({ productName: 1 }).lean(),
-    ])
-
-    const chinaStockMap = new Map(chinaStock.map((s) => [String(s._id), s]))
-    const indiaStockMap = new Map(indiaStock.map((s) => [String(s._id), s]))
-
-    const products: Array<{
-      value: string
-      label: string
-      availableCtn: number
-      availablePcs: number
-      qtyPerCtn: number
-    }> = []
-
-    for (const p of chinaProducts) {
-      const stock = chinaStockMap.get(String(p._id))
-      if (!stock) continue
-      products.push({
-        value: `china:${p._id}`,
-        label: `${p.productName} 🇨🇳 China`,
-        availableCtn: stock.availableCtn,
-        availablePcs: stock.availablePcs,
-        qtyPerCtn: stock.qtyPerCtn ?? 0,
-      })
-    }
-
-    for (const p of indiaProducts) {
-      const stock = indiaStockMap.get(String(p._id))
-      if (!stock) continue
-      products.push({
-        value: `india:${p._id}`,
-        label: `${p.productName} 🇮🇳 India`,
-        availableCtn: stock.availableCtn,
-        availablePcs: stock.availablePcs,
-        qtyPerCtn: stock.qtyPerCtn ?? 0,
-      })
-    }
+    const products = await getSellableProducts(search)
 
     return NextResponse.json({ success: true, data: { products } })
   } catch (error) {
