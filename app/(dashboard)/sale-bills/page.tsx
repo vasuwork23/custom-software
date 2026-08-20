@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FileText, Plus, Pencil, Trash2, Download } from 'lucide-react'
+import { FileText, Plus, Pencil, Trash2, Download, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -115,12 +115,20 @@ export default function SellBillsPage() {
         title="Sale Bills"
         description="Create and manage sale bills."
         action={
-          <Button asChild>
-            <Link href="/sale-bills/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Bill
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/sale-bills/quick">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Quick Bill from Message
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/sale-bills/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Bill
+              </Link>
+            </Button>
+          </div>
         }
       />
 

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
+import {
+  createPaymentReceipt,
+  validatePaymentReceiptInput,
+  ReceiptError,
+  type CreatePaymentReceiptInput,
+} from '@/lib/create-payment-receipt'
 import Company from '@/models/Company'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
@@ -151,147 +157,36 @@ export async function POST(req: NextRequest) {
       )
     }
     const body = await req.json()
-    const companyId = body.companyId?.trim()
-    const amount = Number(body.amount)
-    const paymentMode = body.paymentMode as 'cash' | 'online' | undefined
-    const bankAccountId = body.bankAccountId?.trim()
-    const paymentDateRaw = body.paymentDate
-    const remark = body.remark != null && String(body.remark).trim() ? String(body.remark).trim() : undefined
-    const companyNote = body.companyNote != null && String(body.companyNote).trim() ? String(body.companyNote).trim() : undefined
-
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Valid company is required' },
-        { status: 400 }
-      )
-    }
-    if (!Number.isFinite(amount) || amount === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Amount must be a non-zero number' },
-        { status: 400 }
-      )
-    }
-    if (paymentMode !== 'cash' && paymentMode !== 'online') {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Payment mode must be cash or online' },
-        { status: 400 }
-      )
-    }
-    if (paymentMode === 'online') {
-      if (!bankAccountId || !mongoose.Types.ObjectId.isValid(bankAccountId)) {
-        return NextResponse.json(
-          { success: false, error: 'Validation failed', message: 'Valid bank account is required for online payments' },
-          { status: 400 }
-        )
-      }
+    const input: CreatePaymentReceiptInput = {
+      companyId: body.companyId?.trim(),
+      amount: Number(body.amount),
+      paymentMode: body.paymentMode,
+      bankAccountId: body.bankAccountId?.trim(),
+      paymentDate: body.paymentDate,
+      remark: body.remark,
+      companyNote: body.companyNote,
     }
 
-    const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date()
-    if (Number.isNaN(paymentDate.getTime())) {
+    const validationError = validatePaymentReceiptInput(input)
+    if (validationError) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', message: 'Invalid payment date' },
+        { success: false, error: 'Validation failed', message: validationError },
         { status: 400 }
       )
     }
 
     await connectDB()
     const createdBy = await resolveCreatedBy(user.id)
+    const { receiptId } = await createPaymentReceipt(input, createdBy)
 
-    const company = await Company.findById(companyId).lean()
-    if (!company) {
-      return NextResponse.json(
-        { success: false, error: 'Not found', message: 'Company not found' },
-        { status: 404 }
-      )
-    }
-
-    let bankAccount: { _id: mongoose.Types.ObjectId; accountName: string } | null = null
-    if (paymentMode === 'cash') {
-      const cash = await BankAccount.findOne({ type: 'cash', isDefault: true }).lean()
-      if (!cash) {
-        return NextResponse.json(
-          { success: false, error: 'Configuration', message: 'Cash bank account not found' },
-          { status: 500 }
-        )
-      }
-      bankAccount = { _id: cash._id as mongoose.Types.ObjectId, accountName: cash.accountName }
-    } else if (paymentMode === 'online') {
-      const account = await BankAccount.findOne({ _id: bankAccountId, type: 'online' }).lean()
-      if (!account) {
-        return NextResponse.json(
-          { success: false, error: 'Validation failed', message: 'Selected bank account not found' },
-          { status: 400 }
-        )
-      }
-      bankAccount = { _id: account._id as mongoose.Types.ObjectId, accountName: account.accountName }
-    }
-
-    if (!bankAccount) {
-      return NextResponse.json(
-        { success: false, error: 'Configuration', message: 'Bank account could not be resolved' },
-        { status: 500 }
-      )
-    }
-
-    const payment = await PaymentReceipt.create({
-      company: new mongoose.Types.ObjectId(companyId),
-      amount,
-      paymentMode,
-      bankAccount: paymentMode === 'online' ? bankAccount._id : undefined,
-      paymentDate,
-      remark,
-      companyNote,
-      createdBy,
-      updatedBy: createdBy,
-    })
-
-    const txType = amount > 0 ? 'credit' : 'debit'
-    const absAmount = Math.abs(amount)
-    const companyName = (company as { companyName?: string }).companyName
-    const txDescription = amount > 0
-      ? `Payment received from ${companyName}`
-      : `Payment made to ${companyName}`
-
-    if (paymentMode === 'cash') {
-      const { createCashTransaction } = await import('@/lib/cash-transaction-helper')
-      await createCashTransaction({
-        type: txType,
-        amount: absAmount,
-        description: txDescription,
-        date: paymentDate,
-        category: 'payment_received',
-        referenceId: payment._id as mongoose.Types.ObjectId,
-        referenceType: 'PaymentReceipt',
-      })
-    } else {
-      const lastTx = await BankTransaction.findOne({ bankAccount: bankAccount!._id })
-        .sort({ transactionDate: -1, createdAt: -1 })
-        .select('balanceAfter')
-        .lean()
-      const lastBalance = lastTx?.balanceAfter ?? 0
-      const newBalance = lastBalance + amount
-      await BankTransaction.create({
-        bankAccount: bankAccount!._id,
-        type: txType,
-        amount: absAmount,
-        balanceAfter: newBalance,
-        source: 'payment_receipt',
-        sourceRef: payment._id,
-        sourceLabel: txDescription,
-        transactionDate: paymentDate,
-        notes: remark,
-        createdBy,
-      })
-      await BankAccount.findByIdAndUpdate(bankAccount!._id, { currentBalance: newBalance })
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        _id: payment._id,
-      },
-    })
+    return NextResponse.json({ success: true, data: { _id: receiptId } })
   } catch (error) {
+    if (error instanceof ReceiptError) {
+      return NextResponse.json(
+        { success: false, error: error.label, message: error.message },
+        { status: error.status }
+      )
+    }
     console.error('Received voucher create API Error:', error)
     return NextResponse.json(
       {
