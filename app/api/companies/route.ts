@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
+    const basic = searchParams.get('basic') === 'true'
     const search = searchParams.get('search')?.trim() ?? ''
     const outstandingFilterParam = searchParams.get('outstandingFilter')?.trim() ?? 'all'
     const outstandingFilter = ['all', 'positive', 'negative', 'clear'].includes(outstandingFilterParam)
@@ -55,6 +56,41 @@ export async function GET(req: NextRequest) {
         { contact2Mobile: new RegExp(search, 'i') },
         { primaryMobile: new RegExp(search, 'i') },
       ]
+    }
+
+    // Lightweight mode for selector dropdowns: return ALL matching companies
+    // (no pagination cap) with just id + name + outstanding. Skips the heavy
+    // per-company profit/sales/alert aggregation used by the companies list page.
+    if (basic) {
+      const companies = await Company.find(filter)
+        .select('companyName openingBalance')
+        .sort({ companyName: 1 })
+        .lean()
+
+      const ids = companies.map((c) => c._id)
+      const [billedAgg, receivedAgg] = await Promise.all([
+        SellBill.aggregate([
+          { $match: { company: { $in: ids } } },
+          { $group: { _id: '$company', total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
+        ]),
+        PaymentReceipt.aggregate([
+          { $match: { company: { $in: ids } } },
+          { $group: { _id: '$company', total: { $sum: '$amount' } } },
+        ]),
+      ])
+      const billedByCompany = Object.fromEntries(billedAgg.map((r) => [String(r._id), r.total]))
+      const receivedByCompany = Object.fromEntries(receivedAgg.map((r) => [String(r._id), r.total]))
+
+      const list = companies.map((c) => ({
+        _id: c._id,
+        companyName: c.companyName,
+        outstandingBalance:
+          (billedByCompany[String(c._id)] ?? 0) -
+          (receivedByCompany[String(c._id)] ?? 0) +
+          (c.openingBalance || 0),
+      }))
+
+      return NextResponse.json({ success: true, data: { companies: list } })
     }
 
     const skip = (page - 1) * limit

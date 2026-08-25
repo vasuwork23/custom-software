@@ -138,7 +138,7 @@ export default function NewSellBillPage() {
   const [addCompanyName, setAddCompanyName] = useState<string | null>(null)
 
   const fetchCompanies = useCallback(async () => {
-    const res = await apiGet<{ companies: CompanyOption[] }>('/api/companies?limit=200')
+    const res = await apiGet<{ companies: CompanyOption[] }>('/api/companies?basic=true')
     if (res.success) setCompanyOptions(res.data.companies)
   }, [])
 

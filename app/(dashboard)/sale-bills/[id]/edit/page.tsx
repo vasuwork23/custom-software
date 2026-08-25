@@ -280,7 +280,7 @@ export default function EditSellBillPage() {
   }, [id])
 
   const fetchCompanies = useCallback(async () => {
-    const res = await apiGet<{ companies: { _id: string; companyName: string }[] }>('/api/companies?limit=200')
+    const res = await apiGet<{ companies: { _id: string; companyName: string }[] }>('/api/companies?basic=true')
     if (res.success) setCompanyOptions(res.data.companies.map((c) => ({ value: c._id, label: c.companyName })))
   }, [])
 

@@ -50,7 +50,8 @@
       "Bash(node -e ' *)",
       "Bash(echo \"--- exit: $? ---\")",
       "Bash(grep -rn \"cloud-backup\\\\|normal-backup\" --include=\"*.tsx\" app components | head -20; echo \"=== restore.sh head ===\"; head -40 restore.sh; echo \"=== env.local keys ===\"; sed 's/=.*/=<redacted>/' .env.local)",
-      "Bash(grep -rn \"\\\\.find\\({}\\)\\\\|find\\({}）\\\\|\\\\.find\\(\\)\\\\s*$\" --include=\"*.ts\" app lib)"
+      "Bash(grep -rn \"\\\\.find\\({}\\)\\\\|find\\({}）\\\\|\\\\.find\\(\\)\\\\s*$\" --include=\"*.ts\" app lib)",
+      "Bash(npx next *)"
     ],
     "additionalDirectories": [
       "/Users/nexus/Desktop/custom-software"
