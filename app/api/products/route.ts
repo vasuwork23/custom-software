@@ -126,6 +126,31 @@ export async function GET(req: NextRequest) {
               ],
             },
           },
+          // Weighted avg final cost/pcs across available entries: only entries
+          // that actually carry a finalCost, so uncosted ones don't drag it down
+          costedPcs: {
+            $sum: {
+              $cond: [
+                { $gt: [{ $ifNull: ['$finalCost', 0] }, 0] },
+                { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
+                0,
+              ],
+            },
+          },
+          costedValue: {
+            $sum: {
+              $cond: [
+                { $gt: [{ $ifNull: ['$finalCost', 0] }, 0] },
+                {
+                  $multiply: [
+                    { $round: [{ $multiply: ['$availableCtn', '$qty'] }, 0] },
+                    { $ifNull: ['$finalCost', 0] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
         },
       },
     ]),
@@ -159,6 +184,13 @@ export async function GET(req: NextRequest) {
     const statusByProduct = Object.fromEntries(statusStats.map((e) => [String(e._id), e]))
     const availablePcsByProduct = Object.fromEntries(availablePcsStats.map((e) => [String(e._id), e.availablePcs as number]))
     const stockValueByProduct = Object.fromEntries(availablePcsStats.map((e) => [String(e._id), e.stockValueINR as number]))
+    const avgCostByProduct = Object.fromEntries(
+      availablePcsStats.map((e) => {
+        const pcs = (e.costedPcs as number) ?? 0
+        const value = (e.costedValue as number) ?? 0
+        return [String(e._id), pcs > 0 ? value / pcs : 0]
+      })
+    )
 
     const enrichedProducts = products.map((p) => {
       const stats = statsByProduct[String(p._id)] ?? {
@@ -217,6 +249,7 @@ export async function GET(req: NextRequest) {
         availableCtn,
         availablePcs: availablePcsByProduct[String(p._id)] ?? 0,
         stockValueINR: Number((stockValueByProduct[String(p._id)] ?? 0).toFixed(2)),
+        avgFinalCostPerPcs: Number((avgCostByProduct[String(p._id)] ?? 0).toFixed(2)),
         soldCtn,
         chinaFactoryCtn,
         totalCbm,

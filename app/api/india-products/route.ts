@@ -73,14 +73,19 @@ export async function GET(req: NextRequest) {
       // to avoid rounding discrepancies (pcs = round(avail * qty), then val = sum(pcs * rate))
       let productAvailableValue = 0
       let productAvailablePcs = 0
+      // Weighted avg final cost/pcs across available entries: only entries that
+      // actually carry a cost, so uncosted ones don't drag the average down
+      let costedPcs = 0
       for (const e of pEntries) {
         const pcs = Math.round((e.availableCtn || 0) * (e.qty || 0))
         productAvailablePcs += pcs
         const cost = e.finalCost ?? e.rate ?? 0
         if (cost > 0) {
           productAvailableValue += pcs * cost
+          costedPcs += pcs
         }
       }
+      const avgFinalCostPerPcs = costedPcs > 0 ? productAvailableValue / costedPcs : 0
 
       // Snap tiny float residuals (< 0.001 CTN) from FIFO division to zero
       const rawAvailableCtn = stats.availableCtn as number ?? 0
@@ -95,6 +100,7 @@ export async function GET(req: NextRequest) {
         availableCtn,
         availablePcs: productAvailablePcs,
         availableValue: Number(productAvailableValue.toFixed(2)),
+        avgFinalCostPerPcs: Number(avgFinalCostPerPcs.toFixed(2)),
         hasUnpaidEntries: (stats.hasUnpaid as number) > 0,
       }
     })

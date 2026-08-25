@@ -34,6 +34,8 @@ interface ProductCardProps {
   lockedAmountRMB?: number
   /** Sum of lockedAmount (₹) — finalCost × qty × lockedCtn, stored at lock time */
   lockedAmountINR?: number
+  /** Weighted avg final cost per pcs (₹) across entries that still have stock */
+  avgFinalCostPerPcs?: number
 }
 
 export function ProductCard({
@@ -59,6 +61,7 @@ export function ProductCard({
   availablePcs,
   lockedAmountRMB,
   lockedAmountINR,
+  avgFinalCostPerPcs,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
   return (
@@ -200,6 +203,14 @@ export function ProductCard({
                 <span className="text-emerald-600 font-medium">A Value</span>
                 <span className="font-bold text-emerald-700 dark:text-emerald-400">
                   ₹{availableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+            {avgFinalCostPerPcs != null && avgFinalCostPerPcs > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-600 font-medium">Cost / PCS</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                  ₹{avgFinalCostPerPcs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             )}
