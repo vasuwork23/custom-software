@@ -28,6 +28,7 @@ interface ProductItem {
   availableCtn: number
   availablePcs: number
   stockValueINR: number
+  avgFinalCostPerPcs: number
   chinaWarehouseCtn: number
   chinaFactoryCtn: number
   inTransitCtn: number
@@ -53,6 +54,7 @@ interface IndiaProductItem {
   availableCtn: number
   availablePcs: number
   availableValue: number
+  avgFinalCostPerPcs: number
   hasUnpaidEntries: boolean
 }
 
@@ -523,6 +525,7 @@ export default function ProductsPage() {
                     availableCtn={p.availableCtn}
                     availablePcs={p.availablePcs}
                     availableValue={p.stockValueINR}
+                    avgFinalCostPerPcs={p.avgFinalCostPerPcs}
                     chinaFactoryCtn={p.chinaFactoryCtn}
                     chinaWarehouseCtn={p.chinaWarehouseCtn}
                     inTransitCtn={p.inTransitCtn}
@@ -758,6 +761,7 @@ export default function ProductsPage() {
                       availableCtn={p.availableCtn}
                       availablePcs={p.availablePcs}
                       availableValue={p.availableValue}
+                      avgFinalCostPerPcs={p.avgFinalCostPerPcs}
                       hasUnpaidEntries={p.hasUnpaidEntries}
                       detailHref={`/products/india/${p._id}`}
                     />
