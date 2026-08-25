@@ -170,7 +170,7 @@ export default function QuickBillPage() {
   const [addCompanyFor, setAddCompanyFor] = useState<{ key: string; name: string } | null>(null)
 
   const fetchCompanies = useCallback(async () => {
-    const res = await apiGet<{ companies: CompanyOption[] }>('/api/companies?limit=500')
+    const res = await apiGet<{ companies: CompanyOption[] }>('/api/companies?basic=true')
     if (res.success) setCompanyOptions(res.data.companies)
   }, [])
 

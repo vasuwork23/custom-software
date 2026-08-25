@@ -117,7 +117,7 @@ export function MakeIndiaPaymentDialog({
         if (r.success) setAccounts(r.data.accounts ?? [])
         else setAccounts([])
       })
-      apiGet<{ companies: { _id: string; companyName: string; outstandingBalance: number }[] }>('/api/companies?limit=500').then((r) => {
+      apiGet<{ companies: { _id: string; companyName: string; outstandingBalance: number }[] }>('/api/companies?basic=true').then((r) => {
         if (r.success) setCompanies(r.data.companies ?? [])
         else setCompanies([])
       })

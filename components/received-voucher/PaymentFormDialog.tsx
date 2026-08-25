@@ -67,7 +67,7 @@ export function PaymentFormDialog({
     new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)
 
   const fetchCompanies = useCallback(async () => {
-    const res = await apiGet<{ companies: { _id: string; companyName: string }[] }>('/api/companies?limit=500')
+    const res = await apiGet<{ companies: { _id: string; companyName: string }[] }>('/api/companies?basic=true')
     if (res.success) setCompanyOptions(res.data.companies.map((c) => ({ value: c._id, label: c.companyName })))
   }, [])
   const fetchBanks = useCallback(async () => {
