@@ -64,6 +64,11 @@ export function ProductCard({
   avgFinalCostPerPcs,
 }: ProductCardProps) {
   const href = detailHref ?? `/products/${_id}`
+  // Avg available pieces per available carton — only meaningful when stock remains
+  const avgPcsPerCtn =
+    availablePcs != null && availablePcs > 0 && availableCtn > 0
+      ? availablePcs / availableCtn
+      : null
   return (
     <Link href={href}>
       <Card className="transition-shadow hover:shadow-md">
@@ -92,10 +97,6 @@ export function ProductCard({
         </CardHeader>
         <CardContent className="p-4 pt-1">
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Total CTN</span>
-              <span className="font-semibold">{totalCtn} CTN</span>
-            </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Available</span>
               <span
@@ -219,6 +220,14 @@ export function ProductCard({
                 <span className="text-muted-foreground">Remaining to pay</span>
                 <span className="font-semibold text-amber-600 dark:text-amber-400">
                   ¥{(remainingAmount ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            )}
+            {avgPcsPerCtn != null && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Avg PCS / CTN</span>
+                <span className="font-semibold">
+                  {avgPcsPerCtn.toLocaleString('en-IN', { maximumFractionDigits: 2 })} PCS
                 </span>
               </div>
             )}
