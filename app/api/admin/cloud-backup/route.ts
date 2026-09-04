@@ -162,10 +162,15 @@ export async function POST(req: NextRequest) {
       const atlasCol = atlasDb.collection(name)
 
       const docs = await localCol.find({}).toArray()
-      if (docs.length === 0) continue
 
+      // Clear the target first, always. Skipping empty collections used to leave
+      // stale rows in the cloud — and after a year-end reset several collections
+      // are legitimately empty, so the old year would have survived up there
+      // while STEP 3 dropped it locally.
       await atlasCol.deleteMany({})
-      await atlasCol.insertMany(docs)
+      if (docs.length > 0) {
+        await atlasCol.insertMany(docs)
+      }
     }
 
     // ============================================

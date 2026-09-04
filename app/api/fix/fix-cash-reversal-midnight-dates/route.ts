@@ -25,6 +25,12 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       )
     }
+    if (user.role !== 'owner') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: 'Only Owner can run maintenance fixes' },
+        { status: 403 }
+      )
+    }
 
     await connectDB()
 

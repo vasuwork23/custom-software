@@ -12,6 +12,15 @@ export async function recalculateBankAccountLedger(
   options?: { session?: mongoose.ClientSession; updatedBy?: mongoose.Types.ObjectId }
 ): Promise<number> {
   const session = options?.session
+
+  // Cash accounts keep their authoritative balance in Cash.balance and their
+  // movements in CashTransaction. Their BankTransaction ledger is incomplete, so
+  // recomputing from it would destroy the real balance.
+  const account = await BankAccount.findById(accountId).select('type currentBalance').lean()
+  if ((account as { type?: string } | null)?.type === 'cash') {
+    return (account as { currentBalance?: number }).currentBalance ?? 0
+  }
+
   let txQuery = BankTransaction.find({ bankAccount: accountId }).sort({ createdAt: 1 })
   if (session) txQuery = txQuery.session(session)
   const txs = await txQuery.lean()

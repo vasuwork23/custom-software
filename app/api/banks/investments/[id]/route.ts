@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/mongodb'
 import '@/lib/register-models'
 import Investment from '@/models/Investment'
 import InvestmentTransaction from '@/models/InvestmentTransaction'
+import { ensureCanDelete, ensureNotViewer } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,14 @@ export async function PUT(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
@@ -90,6 +99,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {

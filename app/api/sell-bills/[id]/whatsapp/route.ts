@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/mongodb'
 import SellBill from '@/models/SellBill'
 import { sendBillOnWhatsApp } from '@/lib/whatsapp'
 import mongoose from 'mongoose'
+import { ensureNotViewer } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,14 @@ export async function POST(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

@@ -14,6 +14,12 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       )
     }
+    if (user.role !== 'owner') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: 'Only Owner can view debug data' },
+        { status: 403 }
+      )
+    }
 
     await connectDB()
 
