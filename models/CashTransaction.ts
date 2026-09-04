@@ -24,6 +24,8 @@ export interface ICashTransaction {
   isReversal?: boolean
   reversalOf?: mongoose.Types.ObjectId | null
   sortOrder?: number
+  /** Opening-balance row written by a year-end reset. Carries the balance forward; never deletable. */
+  isOpening?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -54,6 +56,7 @@ const CashTransactionSchema = new Schema<ICashTransaction>(
     isReversal: { type: Boolean, default: false },
     reversalOf: { type: Schema.Types.ObjectId, default: null },
     sortOrder: { type: Number, default: 0 },
+    isOpening: { type: Boolean, default: false },
   },
   { timestamps: true }
 )

@@ -8,6 +8,8 @@ export interface IInvestmentTransaction {
   balanceAfter: number
   transactionDate: Date
   note?: string
+  /** Opening-balance row written by a year-end reset. Carries the balance forward; never deletable. */
+  isOpening?: boolean
   createdBy: mongoose.Types.ObjectId
   createdAt: Date
   updatedAt: Date
@@ -21,6 +23,7 @@ const InvestmentTransactionSchema = new Schema<IInvestmentTransaction>(
     balanceAfter: { type: Number, required: true },
     transactionDate: { type: Date, required: true },
     note: { type: String },
+    isOpening: { type: Boolean, default: false },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }

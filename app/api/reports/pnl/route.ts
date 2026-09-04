@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
-import SellBillItem from '@/models/SellBillItem'
-import SellBill from '@/models/SellBill'
-import Company from '@/models/Company'
-import Expense from '@/models/Expense'
-import PaymentReceipt from '@/models/PaymentReceipt'
+import { reportModels } from '@/lib/year-reset/archive'
 import { getReportDateRange, getPeriodFormat } from '@/lib/report-utils'
 import mongoose from 'mongoose'
 import { grossProfitPct } from '@/lib/calculations'
@@ -86,6 +82,8 @@ export async function GET(req: NextRequest) {
 
     const { start, end } = getReportDateRange(period, startDate, endDate)
     await connectDB()
+    // No archive parameter means the live database, exactly as before.
+    const { SellBillItem, SellBill, Company, Expense, PaymentReceipt } = reportModels(searchParams.get('archive'))
 
     const periodFormat = getPeriodFormat(period)
     const dateMatch = { 'bill.billDate': { $gte: start, $lte: end } }

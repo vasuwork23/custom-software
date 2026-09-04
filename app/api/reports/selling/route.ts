@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
-import SellBill from '@/models/SellBill'
-import SellBillItem from '@/models/SellBillItem'
+import { reportModels } from '@/lib/year-reset/archive'
 import { getReportDateRange } from '@/lib/report-utils'
 
 export const dynamic = 'force-dynamic'
@@ -23,6 +22,8 @@ export async function GET(req: NextRequest) {
 
     const { start, end } = getReportDateRange(period, startDate, endDate)
     await connectDB()
+    // No archive parameter means the live database, exactly as before.
+    const { SellBill, SellBillItem } = reportModels(searchParams.get('archive'))
 
     const summaryAgg = await SellBill.aggregate([
       { $match: { billDate: { $gte: start, $lte: end } } },

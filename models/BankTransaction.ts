@@ -26,6 +26,8 @@ export interface IBankTransaction {
   notes?: string
   /** 0 = normal, 1 = reversal (sorts after original on same date) */
   sortOrder?: number
+  /** Opening-balance row written by a year-end reset. Carries the balance forward; never deletable. */
+  isOpening?: boolean
   createdBy: mongoose.Types.ObjectId
   createdAt: Date
   updatedAt: Date
@@ -62,6 +64,7 @@ const BankTransactionSchema = new Schema<IBankTransaction>(
     transactionDate: { type: Date, required: true },
     notes: { type: String },
     sortOrder: { type: Number, default: 0 },
+    isOpening: { type: Boolean, default: false },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }

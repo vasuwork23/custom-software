@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
-import BuyingEntry from '@/models/BuyingEntry'
-import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
+import { reportModels } from '@/lib/year-reset/archive'
 import mongoose from 'mongoose'
 import { round, roundQty } from '@/lib/round'
 
@@ -18,6 +17,10 @@ export async function GET(req: NextRequest) {
       )
     }
     await connectDB()
+    // No archive parameter means the live database, exactly as before.
+    const { BuyingEntry, IndiaBuyingEntry } = reportModels(
+      new URL(req.url).searchParams.get('archive')
+    )
 
     const [byProduct, totals, indiaByProduct, indiaTotals] = await Promise.all([
       BuyingEntry.aggregate([

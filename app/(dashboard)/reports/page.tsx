@@ -32,6 +32,8 @@ export default function ReportsPage() {
   const [withExpenses, setWithExpenses] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showAvailableOnly, setShowAvailableOnly] = useState(true)
+  const [archive, setArchive] = useState('')
+  const [archives, setArchives] = useState<{ name: string; resetDate: string; sellBills: number }[]>([])
   const [pnl, setPnl] = useState<{
     summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number; ctnSold: number }
     chart: { period: string; revenue: number; cost: number; grossProfit: number; netProfit: number }[]
@@ -93,8 +95,10 @@ export default function ReportsPage() {
       params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
       if (dateRange.to) params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     }
+    // Empty means the live database; a name points every query at a frozen year.
+    if (archive) params.set('archive', archive)
     return params
-  }, [period, dateRange])
+  }, [period, dateRange, archive])
 
   const handleExport = useCallback(
     async (reportType: 'pnl' | 'stock' | 'selling' | 'buying', formatType: 'pdf' | 'excel') => {
@@ -133,7 +137,7 @@ export default function ReportsPage() {
     try {
       const [pnlRes, stockRes, sellingRes, buyingRes] = await Promise.all([
         apiGet<typeof pnl>(`/api/reports/pnl?${pnlParams}`),
-        apiGet<typeof stock>('/api/reports/stock'),
+        apiGet<typeof stock>(`/api/reports/stock${archive ? `?archive=${encodeURIComponent(archive)}` : ''}`),
         apiGet<typeof selling>(`/api/reports/selling?${base}`),
         apiGet<typeof buying>(`/api/reports/buying?${base}`),
       ])
@@ -148,11 +152,17 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
-  }, [buildParams, withExpenses])
+  }, [buildParams, withExpenses, archive])
 
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  useEffect(() => {
+    apiGet<{ archives: { name: string; resetDate: string; sellBills: number }[] }>(
+      '/api/reports/archives'
+    ).then((r) => { if (r.success) setArchives(r.data.archives) })
+  }, [])
 
   const displayRows = showAvailableOnly
     ? (stock?.rows ?? []).filter((r) => r.availableCtn > 0)
@@ -199,8 +209,34 @@ export default function ReportsPage() {
               placeholder="Select date range"
             />
           )}
+
+          {archives.length > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Showing</span>
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={archive}
+                onChange={(e) => setArchive(e.target.value)}
+              >
+                <option value="">This year (live)</option>
+                {archives.map((a) => (
+                  <option key={a.name} value={a.name}>
+                    Up to {a.resetDate} ({a.sellBills} bills)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {archive && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-3 text-sm">
+            Reading a past year, frozen at the reset on {archive.slice(-10)}. Nothing here can be edited.
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <div className="space-y-6">

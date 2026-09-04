@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  CalendarClock,
   LayoutDashboard,
   Landmark,
   Package,
@@ -28,7 +29,7 @@ type NavItem = {
   href: string
   label: string
   icon: typeof LayoutDashboard
-  roles?: readonly ['owner', 'admin']
+  roles?: readonly ('owner' | 'admin')[]
 }
 
 const navItems: NavItem[] = [
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
   { href: '/sophia', label: 'Sophia', icon: Flag },
   { href: '/liabilities', label: 'Liabilities', icon: ShieldAlert },
   { href: '/users', label: 'Users', icon: Users, roles: ['owner', 'admin'] },
+  { href: '/year-end-reset', label: 'Year-End Reset', icon: CalendarClock, roles: ['owner'] },
 ]
 
 type DotState = 'idle' | 'running' | 'success' | 'error'

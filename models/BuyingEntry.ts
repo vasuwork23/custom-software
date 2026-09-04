@@ -9,7 +9,9 @@ export interface IBuyingEntry {
   rate: number // RMB ¥ per piece
   cbm: number
   weight: number
-  givenAmount: number // RMB ¥ — auto: advanceAmount + sum(BuyingPayments)
+  givenAmount: number // RMB ¥ — auto: openingGivenAmount + advanceAmount + sum(BuyingPayments)
+  /** Payments made before a year-end reset, once their BuyingPayment rows were cleared. */
+  openingGivenAmount: number // RMB ¥
   hasAdvancePayment: boolean
   advanceAmount?: number // RMB ¥
   advanceChinaPerson?: mongoose.Types.ObjectId // ref: ChinaPerson (for advance)
@@ -56,6 +58,7 @@ const BuyingEntrySchema = new Schema<IBuyingEntry>(
     cbm: { type: Number, required: true },
     weight: { type: Number, required: true },
     givenAmount: { type: Number, default: 0 },
+    openingGivenAmount: { type: Number, default: 0 },
     hasAdvancePayment: { type: Boolean, default: false },
     advanceAmount: { type: Number },
     advanceChinaPerson: { type: Schema.Types.ObjectId, ref: 'ChinaPerson' },

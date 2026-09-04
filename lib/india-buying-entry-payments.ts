@@ -7,8 +7,8 @@ function round2(n: number) {
 }
 
 /**
- * Recalculate givenAmount = advanceAmount + sum(IndiaBuyingPayments) for an India entry,
- * then remainingAmount and currentStatus. Saves the entry.
+ * Recalculate givenAmount = openingGivenAmount + advanceAmount + sum(IndiaBuyingPayments)
+ * for an India entry, then remainingAmount and currentStatus. Saves the entry.
  */
 export async function recalcIndiaBuyingEntryGivenAndStatus(
   entryId: mongoose.Types.ObjectId
@@ -21,7 +21,9 @@ export async function recalcIndiaBuyingEntryGivenAndStatus(
   ])
   const sumPayments = paymentsSum[0]?.total ?? 0
   const advance = entry.hasAdvancePayment ? (entry.advanceAmount ?? 0) : 0
-  entry.givenAmount = round2(advance + sumPayments)
+  // See buying-entry-payments.ts — carries pre-reset payments whose rows are gone.
+  const opening = entry.openingGivenAmount ?? 0
+  entry.givenAmount = round2(opening + advance + sumPayments)
   entry.remainingAmount = round2(entry.totalAmount - entry.givenAmount)
   if (entry.totalAmount === 0) entry.currentStatus = 'paid'
   else if (entry.remainingAmount <= 0) entry.currentStatus = 'paid'

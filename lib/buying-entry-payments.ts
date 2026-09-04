@@ -7,8 +7,8 @@ function round2(n: number) {
 }
 
 /**
- * Recalculate givenAmount = advanceAmount + sum(BuyingPayments) for an entry,
- * then remainingAmount and currentStatus. Saves the entry.
+ * Recalculate givenAmount = openingGivenAmount + advanceAmount + sum(BuyingPayments)
+ * for an entry, then remainingAmount and currentStatus. Saves the entry.
  */
 export async function recalcBuyingEntryGivenAndStatus(
   entryId: mongoose.Types.ObjectId
@@ -21,7 +21,11 @@ export async function recalcBuyingEntryGivenAndStatus(
   ])
   const sumPayments = paymentsSum[0]?.total ?? 0
   const advance = entry.hasAdvancePayment ? (entry.advanceAmount ?? 0) : 0
-  entry.givenAmount = round2(advance + sumPayments)
+  // openingGivenAmount carries payments made before a year-end reset, whose
+  // BuyingPayment rows no longer exist. Without it a reset would silently flip
+  // paid entries back to unpaid on the next edit.
+  const opening = entry.openingGivenAmount ?? 0
+  entry.givenAmount = round2(opening + advance + sumPayments)
   entry.remainingAmount = round2(entry.totalAmount - entry.givenAmount)
   if (entry.totalAmount === 0) entry.currentStatus = 'unpaid'
   else if (entry.remainingAmount <= 0) entry.currentStatus = 'paid'
