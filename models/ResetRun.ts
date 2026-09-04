@@ -20,6 +20,13 @@ export interface IResetRun {
   countsBefore?: Record<string, number>
   /** Locked value written off as spent when trimmed entries lost their sold cartons. */
   sunkLockedAmount?: number
+  /**
+   * Total lockedAmount still carried by surviving entries at the moment of the
+   * reset. The China Bank ledger collapses to one opening row, so its debits no
+   * longer account for locked stock; this is the baseline that keeps the
+   * "locked value equals China Bank debits" check meaningful afterwards.
+   */
+  carriedLockedAmount?: number
   notes?: string
   error?: string
   createdBy: mongoose.Types.ObjectId
@@ -40,6 +47,7 @@ const ResetRunSchema = new Schema<IResetRun>(
     archiveDbName: { type: String },
     countsBefore: { type: Schema.Types.Mixed },
     sunkLockedAmount: { type: Number },
+    carriedLockedAmount: { type: Number },
     notes: { type: String },
     error: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },

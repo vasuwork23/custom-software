@@ -20,6 +20,8 @@ export interface ExecuteResult {
   documentsBefore: number
   documentsAfter: number
   swapped: boolean
+  /** Locked value surviving entries carry once the reset is applied. */
+  carriedLockedAmount: number
 }
 
 /**
@@ -59,12 +61,16 @@ export async function executePlan(plan: ResetPlan, ownerId: string): Promise<Exe
     if (!verify.passed) {
       // Nothing was touched in live. Drop the copy and report why.
       await staging.dropDatabase().catch(() => undefined)
-      return { ok: false, verify, stagingDb, documentsBefore, documentsAfter: 0, swapped: false }
+      return { ok: false, verify, stagingDb, documentsBefore, documentsAfter: 0, swapped: false, carriedLockedAmount: 0 }
     }
 
     // ── 3. swap ────────────────────────────────────────────────────────
     // deleteMany + insertMany rather than dropping collections, so the unique
     // indexes (bill number, product name, email) survive the swap.
+    const lockedRows = await staging.collection('buyingentries').find({ isLocked: true }).toArray()
+    const carriedLockedAmount =
+      Math.round(lockedRows.reduce((n, e) => n + (Number(e.lockedAmount) || 0), 0) * 100) / 100
+
     const stagingCollections = await staging.listCollections().toArray()
     const stagingNames = new Set(stagingCollections.map((c) => c.name))
     let documentsAfter = 0
@@ -86,7 +92,7 @@ export async function executePlan(plan: ResetPlan, ownerId: string): Promise<Exe
 
     await staging.dropDatabase().catch(() => undefined)
 
-    return { ok: true, verify, stagingDb, documentsBefore, documentsAfter, swapped: true }
+    return { ok: true, verify, stagingDb, documentsBefore, documentsAfter, swapped: true, carriedLockedAmount }
   } finally {
     await client.close()
   }

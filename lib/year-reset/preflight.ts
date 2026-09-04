@@ -11,6 +11,7 @@ import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
 import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
 import Investment from '@/models/Investment'
 import InvestmentTransaction from '@/models/InvestmentTransaction'
+import ResetRun from '@/models/ResetRun'
 import SellBillItem from '@/models/SellBillItem'
 
 /**
@@ -230,12 +231,26 @@ export async function runPreflight(): Promise<PreflightReport> {
   const debits = cbTxs.filter((t) => t.type === 'debit').reduce((a, t) => a + (t.amount ?? 0), 0)
   const reversals = cbTxs.filter((t) => t.type === 'reversal').reduce((a, t) => a + (t.amount ?? 0), 0)
   const netDebits = debits - reversals
+  // A reset collapses the ledger to one opening row, so its debits stop
+  // accounting for stock locked before that point. The last run records what was
+  // carried; without that baseline this check would break permanently after the
+  // first reset — and it is the one tying the money ledger to the stock records.
+  const lastRun = await ResetRun.findOne({ status: 'executed' })
+    .sort({ createdAt: -1 })
+    .select('carriedLockedAmount')
+    .lean()
+  const baseline = lastRun?.carriedLockedAmount ?? 0
+  const expectedLocked = baseline + netDebits
   checks.push(
     check('lock-invariant', 'Locked stock value matches China Bank debits', 'blocker',
-      Math.abs(lockedSum - netDebits) > TOL
-        ? [`locked ₹${r2(lockedSum)} vs debits−reversals ₹${r2(netDebits)} — gap ₹${r2(lockedSum - netDebits)}`]
+      Math.abs(lockedSum - expectedLocked) > TOL
+        ? [`locked ₹${r2(lockedSum)} vs expected ₹${r2(expectedLocked)}` +
+           (baseline ? ` (₹${r2(baseline)} carried at the last reset + ₹${r2(netDebits)} since)` : '') +
+           ` — gap ₹${r2(lockedSum - expectedLocked)}`]
         : [],
-      `₹${r2(lockedSum)} locked, matching the ledger`,
+      baseline
+        ? `₹${r2(lockedSum)} locked, matching ₹${r2(baseline)} carried plus ₹${r2(netDebits)} since`
+        : `₹${r2(lockedSum)} locked, matching the ledger`,
       () => 'the locked stock value and the China Bank debits disagree')
   )
 

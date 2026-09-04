@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
     await ResetRun.findByIdAndUpdate(run._id, {
       status: 'executed',
       completedAt: new Date(),
+      carriedLockedAmount: result.carriedLockedAmount,
       notes: `${result.verify.checked} checks passed · ${result.documentsBefore} → ${result.documentsAfter} documents`,
     })
 
