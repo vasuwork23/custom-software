@@ -21,7 +21,9 @@ export async function recalculateBankAccountLedger(
     return (account as { currentBalance?: number }).currentBalance ?? 0
   }
 
-  let txQuery = BankTransaction.find({ bankAccount: accountId }).sort({ createdAt: 1 })
+  // Must match how the ledger is displayed (transactions route sorts the same way),
+  // or the running-balance column stops agreeing with the stored balanceAfter.
+  let txQuery = BankTransaction.find({ bankAccount: accountId }).sort({ transactionDate: 1, createdAt: 1 })
   if (session) txQuery = txQuery.session(session)
   const txs = await txQuery.lean()
 
