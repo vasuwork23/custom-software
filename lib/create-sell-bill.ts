@@ -187,8 +187,10 @@ export async function createSellBill(
 
   if (isCashbook) {
     await createCashTransaction({
-      type: 'credit',
-      amount: grandTotal,
+      // A discount larger than the line items makes the bill negative: it leaves the
+      // cashbook instead of entering it, so it posts as a debit.
+      type: grandTotal < 0 ? 'debit' : 'credit',
+      amount: Math.abs(grandTotal),
       description: `Cashbook sale — Bill #${bill.billNumber}\n${productsSummary}`,
       date: new Date(billDate),
       category: 'cashbook_sale',

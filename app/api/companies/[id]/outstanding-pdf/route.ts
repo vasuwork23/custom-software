@@ -85,15 +85,23 @@ export async function GET(
             pcsSold: item.pcsSold ?? 0,
             ratePerPcs: item.ratePerPcs ?? 0,
           }))
+        // A bill discounted below zero owes money back to the buyer, so it belongs
+        // in the credit column — same treatment as a payment made out to them.
+        const billAmount: number = bAny.grandTotal ?? b.totalAmount
         return {
           date: b.billDate,
           createdAt: b.createdAt,
           description: `INV-${b.billNumber}${
             (b as { notes?: string }).notes ? ` — ${(b as { notes?: string }).notes}` : ''
           }`,
-          debit: bAny.grandTotal ?? b.totalAmount,
-          credit: null as number | null,
+          debit: billAmount < 0 ? null : billAmount,
+          credit: billAmount < 0 ? Math.abs(billAmount) : null,
           items,
+          subtotal: b.totalAmount,
+          extraCharges: (bAny.extraCharges as number | undefined) ?? 0,
+          extraChargesNote: (bAny.extraChargesNote as string | undefined) ?? '',
+          discount: (bAny.discount as number | undefined) ?? 0,
+          discountNote: (bAny.discountNote as string | undefined) ?? '',
         }
       }),
       ...payments.map((p) => {
@@ -117,6 +125,11 @@ export async function GET(
         }
         return {
           items: [] as { productName: string; ctnSold: number; pcsSold: number; ratePerPcs: number }[],
+          subtotal: null as number | null,
+          extraCharges: 0,
+          extraChargesNote: '',
+          discount: 0,
+          discountNote: '',
           date: (pAny.paymentDate || pAny.date || new Date()) as Date,
           createdAt: p.createdAt,
           description,
@@ -147,6 +160,11 @@ export async function GET(
         credit: tx.credit,
         balance,
         items: tx.items,
+        subtotal: tx.subtotal,
+        extraCharges: tx.extraCharges,
+        extraChargesNote: tx.extraChargesNote,
+        discount: tx.discount,
+        discountNote: tx.discountNote,
       }
     })
 

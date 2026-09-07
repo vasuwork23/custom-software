@@ -15,14 +15,15 @@ export async function createBankSaleTransaction(params: {
   const account = await BankAccount.findById(bankAccountId)
   if (!account) throw new Error('Bank account not found')
 
+  // A bill discounted below zero takes money out of the account, so it posts as a debit.
   const balanceAfter = (account.currentBalance ?? 0) + amount
   account.currentBalance = balanceAfter
   await account.save()
 
   const tx = await BankTransaction.create({
     bankAccount: bankAccountId,
-    type: 'credit',
-    amount,
+    type: amount < 0 ? 'debit' : 'credit',
+    amount: Math.abs(amount),
     balanceAfter,
     source: 'bankaccount_sale',
     sourceRef: referenceId,
