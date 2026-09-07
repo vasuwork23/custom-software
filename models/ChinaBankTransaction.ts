@@ -11,6 +11,8 @@ export interface IChinaBankTransaction {
   transactionDate: Date
   /** 0 = normal, 1 = reversal (sorts after original on same date) */
   sortOrder?: number
+  /** Opening-balance row written by a year-end reset. Carries the balance forward; never deletable. */
+  isOpening?: boolean
   payFrom?: 'cash' | 'bank' | null
   sourceBankAccountId?: mongoose.Types.ObjectId | null
   payTo?: 'cash' | 'bank' | null
@@ -30,6 +32,7 @@ const ChinaBankTransactionSchema = new Schema<IChinaBankTransaction>(
     notes: { type: String },
     transactionDate: { type: Date, required: true },
     sortOrder: { type: Number, default: 0 },
+    isOpening: { type: Boolean, default: false },
     payFrom: { type: String, enum: ['cash', 'bank'], default: null },
     sourceBankAccountId: { type: Schema.Types.ObjectId, default: null },
     payTo: { type: String, enum: ['cash', 'bank'], default: null },

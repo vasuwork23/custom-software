@@ -7,6 +7,7 @@ import BuyingEntry from '@/models/BuyingEntry'
 import BuyingPayment from '@/models/BuyingPayment'
 import { recalcBuyingEntryGivenAndStatus } from '@/lib/buying-entry-payments'
 import mongoose from 'mongoose'
+import { ensureCanDelete } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -39,6 +48,20 @@ export async function DELETE(
         { status: 404 }
       )
     }
+    // Opening-balance rows carry the balance forward from a year-end reset.
+    // Deleting one would silently destroy that balance.
+    if ((tx as { isOpening?: boolean }).isOpening === true) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden',
+          message:
+            'Opening balance entries cannot be deleted. They carry the balance forward from a year-end reset.',
+        },
+        { status: 403 }
+      )
+    }
+
     const isReversalFlag = (tx as { isReversal?: boolean }).isReversal === true
     const sourceLabel = (tx as { sourceLabel?: string }).sourceLabel ?? ''
     const notes = (tx as { notes?: string }).notes ?? ''

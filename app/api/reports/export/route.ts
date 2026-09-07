@@ -35,8 +35,10 @@ export async function GET(req: NextRequest) {
     const withExpenses = searchParams.get('withExpenses') === 'true'
     const availableOnly = searchParams.get('availableOnly') === 'true'
 
+    const archive = searchParams.get('archive')?.trim() ?? ''
     const params = new URLSearchParams()
     params.set('period', period)
+    if (archive) params.set('archive', archive)
     if (startDate) params.set('startDate', startDate)
     if (endDate) params.set('endDate', endDate)
     if (reportType === 'pnl') params.set('withExpenses', String(withExpenses))

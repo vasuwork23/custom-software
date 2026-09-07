@@ -42,6 +42,7 @@ const pathTitles: Record<string, string> = {
   '/expenses': 'Expenses',
   '/sophia': 'Sophia',
   '/users': 'Users',
+  '/year-end-reset': 'Year-End Reset',
 }
 
 function getPageTitle(pathname: string): string {

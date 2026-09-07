@@ -15,6 +15,7 @@ import { processIndiaFIFO, reverseIndiaFIFO, applyIndiaFIFO } from '@/lib/india-
 import { round } from '@/lib/round'
 import { calcGrandTotal } from '@/lib/utils'
 import mongoose from 'mongoose'
+import { ensureCanDelete, ensureNotViewer } from '@/lib/permissions'
 
 /** Reuse existing line's FIFO breakdown when stock wasn't restored (rate-only edit). Re-apply consumption and create item. */
 async function reuseExistingBreakdown(
@@ -122,16 +123,16 @@ export async function GET(
 
         // The interrupted save also means the original ledger credit was never written.
         // Backfill it now so the reversal-on-delete has something real to reference.
-        if ((bill as { isCashbook?: boolean }).isCashbook && grandTotal > 0) {
-          const existingCredit = await CashTransaction.findOne({
+        if ((bill as { isCashbook?: boolean }).isCashbook && grandTotal !== 0) {
+          const existingEntry = await CashTransaction.findOne({
             referenceId: bill._id,
             referenceType: 'SellBill',
             isReversal: { $ne: true },
           }).lean()
-          if (!existingCredit) {
+          if (!existingEntry) {
             await createCashTransaction({
-              type: 'credit',
-              amount: grandTotal,
+              type: grandTotal < 0 ? 'debit' : 'credit',
+              amount: Math.abs(grandTotal),
               description: `Cashbook sale — Bill #${(bill as { billNumber?: number }).billNumber}\n(recovered from interrupted save)`,
               date: (bill as { billDate?: Date }).billDate ? new Date((bill as { billDate?: Date }).billDate as Date) : new Date(),
               category: 'cashbook_sale',
@@ -197,6 +198,14 @@ export async function PUT(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -554,6 +563,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -587,7 +604,7 @@ export async function DELETE(
       (bill as { totalAmount?: number }).totalAmount ??
       0
     if (isCashbook) {
-      if (amountToReverse > 0) {
+      if (amountToReverse !== 0) {
         const billIdObj = new mongoose.Types.ObjectId(id)
         const originalCashTx = await CashTransaction.findOne({
           referenceId: billIdObj,
@@ -605,8 +622,9 @@ export async function DELETE(
           )
         } else {
           await createCashTransaction({
-            type: 'debit',
-            amount: amountToReverse,
+            // Mirror image of the original entry: a negative bill was a debit, so undoing it credits back.
+            type: amountToReverse > 0 ? 'debit' : 'credit',
+            amount: Math.abs(amountToReverse),
             description: `Reversal — Cashbook bill deleted #${(bill as { billNumber?: number }).billNumber ?? id}`,
             date: (originalCashTx as { date?: Date }).date ? new Date((originalCashTx as { date?: Date }).date as Date) : new Date(),
             category: 'reversal',
@@ -618,15 +636,15 @@ export async function DELETE(
           })
         }
       }
-    } else if (isBankSale && deleteBankAccountId && amountToReverse > 0) {
+    } else if (isBankSale && deleteBankAccountId && amountToReverse !== 0) {
       const bankAcc = await BankAccount.findById(deleteBankAccountId)
       if (bankAcc) {
         bankAcc.currentBalance = (bankAcc.currentBalance ?? 0) - amountToReverse
         await bankAcc.save()
         await BankTransaction.create({
           bankAccount: deleteBankAccountId,
-          type: 'debit',
-          amount: amountToReverse,
+          type: amountToReverse > 0 ? 'debit' : 'credit',
+          amount: Math.abs(amountToReverse),
           balanceAfter: bankAcc.currentBalance,
           source: 'bankaccount_sale',
           sourceRef: new mongoose.Types.ObjectId(id),
@@ -638,7 +656,7 @@ export async function DELETE(
       }
     } else {
       const companyId = (bill as { company?: mongoose.Types.ObjectId }).company
-      if (companyId && amountToReverse > 0) {
+      if (companyId && amountToReverse !== 0) {
         await Company.findByIdAndUpdate(companyId, {
           $inc: { outstanding: -amountToReverse },
         })

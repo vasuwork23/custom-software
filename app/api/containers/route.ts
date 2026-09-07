@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
+import { ensureNotViewer } from '@/lib/permissions'
 import Container from '@/models/Container'
 import BuyingEntry from '@/models/BuyingEntry'
 import Product from '@/models/Product'
@@ -135,6 +136,14 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const body = await req.json()
     const containerId = typeof body.containerId === 'string' ? body.containerId.trim() : ''
     const containerName = typeof body.containerName === 'string' ? body.containerName.trim() : ''

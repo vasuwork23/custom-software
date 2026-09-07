@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    /*
     const user = await getUserFromRequest(req)
     if (!user) {
       return NextResponse.json(
@@ -22,11 +21,13 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       )
     }
-    */
 
     await connectDB()
 
-    const accounts = await BankAccount.find({}).lean()
+    // Cash accounts are excluded: their authoritative balance is Cash.balance,
+    // not this ledger, which only ever received a few legacy rows. Recomputing
+    // them from BankTransaction would wipe the real cash balance.
+    const accounts = await BankAccount.find({ type: { $ne: 'cash' } }).lean()
     for (const account of accounts) {
       const accountId = account._id
       const txs = await BankTransaction.find({ bankAccount: accountId })

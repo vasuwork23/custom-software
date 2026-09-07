@@ -5,6 +5,7 @@ import '@/lib/register-models'
 import Liability from '@/models/Liability'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
+import { ensureNotViewer } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,14 @@ export async function PUT(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     await connectDB()
     const createdBy = await resolveCreatedBy(user.id)

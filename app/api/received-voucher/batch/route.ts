@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import mongoose from 'mongoose'
 import { getUserFromRequest, resolveCreatedBy } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
+import { ensureNotViewer } from '@/lib/permissions'
 import MatchAlias from '@/models/MatchAlias'
 import { normalize } from '@/lib/fuzzy-match'
 import {
@@ -80,6 +81,14 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     const body = await req.json()
     const receipts: CreatePaymentReceiptInput[] = Array.isArray(body?.receipts) ? body.receipts : []

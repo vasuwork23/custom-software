@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import CarryingBill from '@/models/CarryingBill'
+import { ensureCanDelete } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     const id = params.id
     if (!mongoose.Types.ObjectId.isValid(id)) {

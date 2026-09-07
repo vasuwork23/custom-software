@@ -7,6 +7,7 @@ import Product from '@/models/Product'
 import SellBillItem from '@/models/SellBillItem'
 import mongoose from 'mongoose'
 import { recalculateProfitForEntry } from '@/lib/recalculate-entry-profit'
+import { ensureNotViewer } from '@/lib/permissions'
 
 /** Recompute actual soldCtn from FIFO so we don't skip China Bank debit when DB is stale */
 function getActualSoldCtn(
@@ -46,6 +47,14 @@ export async function POST(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

@@ -6,6 +6,7 @@ import '@/lib/register-models'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import mongoose from 'mongoose'
+import { ensureNotViewer } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,14 @@ export async function POST(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {

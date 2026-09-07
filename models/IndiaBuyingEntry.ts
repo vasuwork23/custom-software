@@ -11,6 +11,8 @@ export interface IIndiaBuyingEntry {
   totalAmount: number // totalQty * rate (INR)
   finalCost: number // same as rate, per piece INR
   givenAmount: number
+  /** Payments made before a year-end reset, once their IndiaBuyingPayment rows were cleared. */
+  openingGivenAmount: number
   remainingAmount: number
   currentStatus: 'paid' | 'unpaid' | 'partiallypaid'
   hasAdvancePayment: boolean
@@ -36,6 +38,7 @@ const IndiaBuyingEntrySchema = new Schema<IIndiaBuyingEntry>(
     totalAmount: { type: Number, required: true },
     finalCost: { type: Number, required: true },
     givenAmount: { type: Number, default: 0 },
+    openingGivenAmount: { type: Number, default: 0 },
     remainingAmount: { type: Number, required: true },
     currentStatus: {
       type: String,

@@ -11,6 +11,7 @@ import SellBillItem from '@/models/SellBillItem'
 import mongoose from 'mongoose'
 import { format } from 'date-fns'
 import { recalcIndiaBuyingEntryGivenAndStatus } from '@/lib/india-buying-entry-payments'
+import { ensureCanDelete, ensureNotViewer } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,14 @@ export async function PUT(
         { status: 401 }
       )
     }
+    const perm = ensureNotViewer(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -149,11 +158,19 @@ export async function PUT(
       body.hasAdvancePayment !== undefined
         ? !!body.hasAdvancePayment
         : !!entry.hasAdvancePayment
-    const newAdvance = newHasAdvance ? Number(body.advanceAmount ?? 0) : 0
+    // A field that is absent means "leave it alone"; an explicit null or '' means
+    // "clear it". Treating absent as 0 wiped the advance on any partial update.
+    const newAdvance = newHasAdvance
+      ? body.advanceAmount === undefined
+        ? Number(entry.advanceAmount ?? 0)
+        : Number(body.advanceAmount ?? 0)
+      : 0
     const newBankRaw =
-      body.advanceBankAccount == null || body.advanceBankAccount === ''
-        ? undefined
-        : String(body.advanceBankAccount ?? oldBank)
+      body.advanceBankAccount === undefined
+        ? oldBank
+        : body.advanceBankAccount == null || body.advanceBankAccount === ''
+          ? undefined
+          : String(body.advanceBankAccount)
     const bankChanged =
       (oldBank ?? undefined) !== (newBankRaw ?? undefined)
     const product = await IndiaProduct.findById(entry.product)
@@ -352,6 +369,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

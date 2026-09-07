@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
-import BuyingEntry from '@/models/BuyingEntry'
+import { reportModels } from '@/lib/year-reset/archive'
 import { getReportDateRange, getPeriodFormat } from '@/lib/report-utils'
 
 export const dynamic = 'force-dynamic'
@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
 
     const { start, end } = getReportDateRange(period, startDate, endDate)
     await connectDB()
+    // No archive parameter means the live database, exactly as before.
+    const { BuyingEntry } = reportModels(searchParams.get('archive'))
 
     const periodFormat = getPeriodFormat(period)
 

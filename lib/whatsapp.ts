@@ -363,17 +363,26 @@ export async function sendOutstandingOnWhatsApp(
   ])
 
   const allTx = [
-    ...allBills.map((b) => ({
-      date: b.billDate,
-      createdAt: b.createdAt,
-      description: `INV-${b.billNumber}${
-        (b as { notes?: string }).notes
-          ? ` — ${(b as { notes?: string }).notes}`
-          : ''
-      }`,
-      debit: (b as { grandTotal?: number }).grandTotal ?? b.totalAmount,
-      credit: null as number | null,
-    })),
+    ...allBills.map((b) => {
+      // A bill discounted below zero owes money back to the buyer: credit, not debit.
+      const billAmount: number = (b as { grandTotal?: number }).grandTotal ?? b.totalAmount
+      return {
+        date: b.billDate,
+        createdAt: b.createdAt,
+        description: `INV-${b.billNumber}${
+          (b as { notes?: string }).notes
+            ? ` — ${(b as { notes?: string }).notes}`
+            : ''
+        }`,
+        debit: billAmount < 0 ? null : billAmount,
+        credit: billAmount < 0 ? Math.abs(billAmount) : null,
+        subtotal: b.totalAmount as number | null,
+        extraCharges: (b as { extraCharges?: number }).extraCharges ?? 0,
+        extraChargesNote: (b as { extraChargesNote?: string }).extraChargesNote ?? '',
+        discount: (b as { discount?: number }).discount ?? 0,
+        discountNote: (b as { discountNote?: string }).discountNote ?? '',
+      }
+    }),
     ...payments.map((p) => {
       const pAny = p as { paymentDate?: Date; date?: Date; companyNote?: string; remark?: string; paymentMode?: string }
       const isSetOff = pAny.paymentMode === 'set_off'
@@ -396,6 +405,11 @@ export async function sendOutstandingOnWhatsApp(
         description,
         debit: null as number | null,
         credit: p.amount,
+        subtotal: null as number | null,
+        extraCharges: 0,
+        extraChargesNote: '',
+        discount: 0,
+        discountNote: '',
       }
     }),
   ].sort((a, b) => {
@@ -417,6 +431,11 @@ export async function sendOutstandingOnWhatsApp(
       debit: tx.debit,
       credit: tx.credit,
       balance: running,
+      subtotal: tx.subtotal,
+      extraCharges: tx.extraCharges,
+      extraChargesNote: tx.extraChargesNote,
+      discount: tx.discount,
+      discountNote: tx.discountNote,
     }
   })
 

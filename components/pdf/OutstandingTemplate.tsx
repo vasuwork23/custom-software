@@ -82,6 +82,12 @@ export interface OutstandingTemplateProps {
       pcsSold: number
       ratePerPcs: number
     }[]
+    /** Line-items total before bill-level adjustments — only sent when there are adjustments. */
+    subtotal?: number | null
+    extraCharges?: number | null
+    extraChargesNote?: string | null
+    discount?: number | null
+    discountNote?: string | null
   }[]
   generatedDate: Date | string
   yourCompanyName?: string
@@ -94,6 +100,39 @@ const FIRST_PAGE_BUDGET = 580  // less due to title + info header + opening bala
 const PAGE_BUDGET = 700        // continued pages (includes table header + contd header)
 const MAIN_ROW_H = 24          // paddingVertical:6*2 + ~10pt font + 2pt wrapper margin
 const ITEM_ROW_H = 15          // paddingVertical:3*2 + ~8pt font + 1pt border
+
+type AdjustmentRow = { label: string; amount: number; kind: 'subtotal' | 'charge' | 'discount' }
+
+/**
+ * Bill-level extra charges and discounts, spelled out under the bill so the debit
+ * column reconciles against the item lines above it. Empty for payments and for
+ * bills that carry no adjustment.
+ */
+function adjustmentRows(tx: OutstandingTemplateProps['transactions'][0]): AdjustmentRow[] {
+  const extraCharges = Number(tx.extraCharges) || 0
+  const discount = Number(tx.discount) || 0
+  if (extraCharges === 0 && discount === 0) return []
+
+  const rows: AdjustmentRow[] = []
+  if (tx.subtotal != null) {
+    rows.push({ label: 'Items Total', amount: Number(tx.subtotal) || 0, kind: 'subtotal' })
+  }
+  if (extraCharges !== 0) {
+    rows.push({
+      label: `Extra Charges${tx.extraChargesNote ? ` — ${tx.extraChargesNote}` : ''}`,
+      amount: extraCharges,
+      kind: 'charge',
+    })
+  }
+  if (discount !== 0) {
+    rows.push({
+      label: `Discount${tx.discountNote ? ` — ${tx.discountNote}` : ''}`,
+      amount: discount,
+      kind: 'discount',
+    })
+  }
+  return rows
+}
 
 function TableHeader() {
   return (
@@ -149,6 +188,36 @@ function TransactionRow({ tx, i }: { tx: OutstandingTemplateProps['transactions'
           <Text style={{ width: '15%', fontSize: 8, color: '#9ca3af', textAlign: 'right' }}>{''}</Text>
         </View>
       ))}
+      {adjustmentRows(tx).map((row, j) => (
+        <View
+          key={`adj-${j}`}
+          style={{
+            flexDirection: 'row',
+            paddingVertical: 3,
+            paddingHorizontal: 8,
+            paddingLeft: 20,
+            backgroundColor: '#f9fafb',
+            borderBottomWidth: 1,
+            borderBottomColor: '#f3f4f6',
+          }}
+        >
+          <Text style={{ width: '15%', fontSize: 8, color: '#9ca3af' }}>{''}</Text>
+          <Text style={{ width: '40%', fontSize: 8, color: '#374151' }}>{row.label}</Text>
+          <Text
+            style={{
+              width: '15%',
+              fontSize: 8,
+              textAlign: 'right',
+              color: row.kind === 'discount' ? '#16a34a' : row.kind === 'charge' ? '#dc2626' : '#374151',
+            }}
+          >
+            {row.kind === 'discount' ? '- ' : row.kind === 'charge' ? '+ ' : ''}
+            {formatINR(Math.abs(row.amount))}
+          </Text>
+          <Text style={{ width: '15%', fontSize: 8 }}>{''}</Text>
+          <Text style={{ width: '15%', fontSize: 8 }}>{''}</Text>
+        </View>
+      ))}
     </View>
   )
 }
@@ -179,7 +248,7 @@ export function OutstandingTemplate({
 
   for (const tx of transactions) {
     const budget = firstPage ? FIRST_PAGE_BUDGET : PAGE_BUDGET
-    const txH = MAIN_ROW_H + (tx.items?.length || 0) * ITEM_ROW_H
+    const txH = MAIN_ROW_H + ((tx.items?.length || 0) + adjustmentRows(tx).length) * ITEM_ROW_H
     if (currentHeight + txH > budget && currentChunk.length > 0) {
       chunks.push(currentChunk)
       currentChunk = []

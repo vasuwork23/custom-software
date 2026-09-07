@@ -579,6 +579,12 @@ export default function EditSellBillPage() {
               <span>Grand Total</span>
               <AmountDisplay amount={Math.round(grandTotal * 100) / 100} />
             </div>
+            {grandTotal < 0 && (
+              <p className="text-xs text-destructive">
+                Discount is more than the items — ₹{Math.abs(Math.round(grandTotal * 100) / 100).toLocaleString('en-IN')} will be
+                deducted from the selected company / cashbook / bank.
+              </p>
+            )}
           </div>
         </div>
 

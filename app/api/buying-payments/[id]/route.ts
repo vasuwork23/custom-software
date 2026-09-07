@@ -8,6 +8,7 @@ import ChinaPersonTransaction from '@/models/ChinaPersonTransaction'
 import mongoose from 'mongoose'
 import { recalcBuyingEntryGivenAndStatus } from '@/lib/buying-entry-payments'
 import { format } from 'date-fns'
+import { ensureCanDelete } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

@@ -5,6 +5,7 @@ import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction, { type IBankTransaction } from '@/models/BankTransaction'
 import mongoose from 'mongoose'
+import { ensureCanDelete } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,14 @@ export async function DELETE(
         { status: 401 }
       )
     }
+    const perm = ensureCanDelete(user)
+    if (!perm.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden', message: perm.message },
+        { status: 403 }
+      )
+    }
+
 
     const { id, txId } = await params
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
@@ -48,6 +57,20 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: 'Not found', message: 'Transaction not found' },
         { status: 404 }
+      )
+    }
+
+    // Opening-balance rows carry the balance forward from a year-end reset.
+    // Deleting one would silently destroy that balance.
+    if ((tx as { isOpening?: boolean }).isOpening === true) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden',
+          message:
+            'Opening balance entries cannot be deleted. They carry the balance forward from a year-end reset.',
+        },
+        { status: 403 }
       )
     }
 

@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
-import SellBillItem from '@/models/SellBillItem'
-import SellBill from '@/models/SellBill'
-import Company from '@/models/Company'
-import Expense from '@/models/Expense'
-import PaymentReceipt from '@/models/PaymentReceipt'
-import { getReportDateRange, getPeriodFormat } from '@/lib/report-utils'
+import { reportModels } from '@/lib/year-reset/archive'
+import { getReportDateRange, resolveGranularity, buildTrendSeries } from '@/lib/report-utils'
 import mongoose from 'mongoose'
 import { grossProfitPct } from '@/lib/calculations'
 
@@ -85,9 +81,14 @@ export async function GET(req: NextRequest) {
     const withExpenses = searchParams.get('withExpenses') === 'true'
 
     const { start, end } = getReportDateRange(period, startDate, endDate)
+    // The trend chart buckets one step finer than the selected period, so a month
+    // breaks into its days instead of collapsing into a single bar.
+    const granularity = resolveGranularity(searchParams.get('granularity'), period, start, end)
     await connectDB()
+    // No archive parameter means the live database, exactly as before.
+    const { SellBillItem, SellBill, Company, Expense, PaymentReceipt } = reportModels(searchParams.get('archive'))
 
-    const periodFormat = getPeriodFormat(period)
+    const DAY_BUCKET = '%Y-%m-%d'
     const dateMatch = { 'bill.billDate': { $gte: start, $lte: end } }
 
     const [
@@ -131,7 +132,7 @@ export async function GET(req: NextRequest) {
             ...itemCostField,
             ...adjustedRevenueField,
             period: {
-              $dateToString: { format: periodFormat, date: '$bill.billDate' },
+              $dateToString: { format: DAY_BUCKET, date: '$bill.billDate' },
             },
           },
         },
@@ -159,7 +160,7 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: {
-              $dateToString: { format: periodFormat, date: '$expenseDate' },
+              $dateToString: { format: DAY_BUCKET, date: '$expenseDate' },
             },
             total: { $sum: '$amount' },
           },
@@ -349,9 +350,19 @@ export async function GET(req: NextRequest) {
       }
     )
 
-    const expenseByPeriodMap = Object.fromEntries(
-      (expensesByPeriod as { _id: string; total: number }[]).map((r) => [r._id, r.total])
-    )
+    const chart = buildTrendSeries({
+      start,
+      end,
+      granularity,
+      sales: new Map(
+        (chartResult as { _id: string; revenue: number; cost: number; grossProfit: number }[]).map(
+          (r) => [r._id, { revenue: r.revenue, cost: r.cost, grossProfit: r.grossProfit }]
+        )
+      ),
+      expenses: new Map(
+        (expensesByPeriod as { _id: string; total: number }[]).map((r) => [r._id, r.total])
+      ),
+    })
 
     return NextResponse.json({
       success: true,
@@ -366,15 +377,8 @@ export async function GET(req: NextRequest) {
           netMarginPct,
           ctnSold,
         },
-        chart: chartResult.map(
-          (r: { _id: string; revenue: number; cost: number; grossProfit: number }) => ({
-            period: r._id,
-            revenue: r.revenue,
-            cost: r.cost,
-            grossProfit: r.grossProfit,
-            netProfit: r.grossProfit - (expenseByPeriodMap[r._id] ?? 0),
-          })
-        ),
+        chart,
+        granularity,
         byProduct: productBreakdown,
         byCompany: companyBreakdown,
         dateRange: { start, end },

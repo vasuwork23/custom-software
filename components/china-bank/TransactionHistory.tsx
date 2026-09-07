@@ -24,6 +24,8 @@ interface Transaction {
   balanceAfter: number
   reference?: string
   buyingEntry?: string
+  /** Opening-balance row from a year-end reset — not deletable. */
+  isOpening?: boolean
   transactionDate: string
   notes?: string
   createdAt: string
@@ -235,7 +237,7 @@ export function TransactionHistory({
                       <AmountDisplay amount={tx.balanceAfter} />
                     </td>
                     <td className="p-4">
-                      {(tx.type === 'credit' || tx.type === 'debit') && !tx.buyingEntry ? (
+                      {(tx.type === 'credit' || tx.type === 'debit') && !tx.buyingEntry && !tx.isOpening ? (
                         <ConfirmDialog
                           title="Delete transaction"
                           description={
