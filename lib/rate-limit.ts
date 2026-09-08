@@ -11,30 +11,34 @@ const MAX_ATTEMPTS = 10
 
 const hits = new Map<string, HitEntry>()
 
-export function checkRateLimit(ip: string | null | undefined): {
+export function checkRateLimit(
+  ip: string | null | undefined,
+  options?: { scope?: string; max?: number }
+): {
   allowed: boolean
   remaining: number
 } {
-  const key = ip || 'unknown'
+  const maxAttempts = options?.max ?? MAX_ATTEMPTS
+  const key = `${options?.scope ?? 'default'}:${ip || 'unknown'}`
   const now = Date.now()
 
   const existing = hits.get(key)
   if (!existing) {
     hits.set(key, { count: 1, firstHitAt: now })
-    return { allowed: true, remaining: MAX_ATTEMPTS - 1 }
+    return { allowed: true, remaining: maxAttempts - 1 }
   }
 
   if (now - existing.firstHitAt > WINDOW_MS) {
     // Window expired – reset
     hits.set(key, { count: 1, firstHitAt: now })
-    return { allowed: true, remaining: MAX_ATTEMPTS - 1 }
+    return { allowed: true, remaining: maxAttempts - 1 }
   }
 
   const nextCount = existing.count + 1
   existing.count = nextCount
   hits.set(key, existing)
 
-  const remaining = Math.max(0, MAX_ATTEMPTS - nextCount)
-  return { allowed: nextCount <= MAX_ATTEMPTS, remaining }
+  const remaining = Math.max(0, maxAttempts - nextCount)
+  return { allowed: nextCount <= maxAttempts, remaining }
 }
 

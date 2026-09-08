@@ -13,17 +13,29 @@ export const dynamic = 'force-dynamic'
 const loginSchema = z.object({
   email: z.string().email('Invalid email').optional(),
   password: z.string().min(1, 'Password is required'),
+  // The login screen tries the password as it is typed, so a wrong guess is
+  // usually just an unfinished password. Probes get their own IP budget and
+  // never count toward the block, otherwise ordinary typing would lock the
+  // only account out for good.
+  probe: z.boolean().optional(),
 })
+
+const PROBE_MAX_ATTEMPTS = 30
 
 const USER_FIELDS = '+password failedLoginAttempts isBlocked'
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json()
+
     const ip =
       req.ip ??
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
       'unknown'
-    const { allowed, remaining } = checkRateLimit(ip)
+    const isProbe = body?.probe === true
+    const { allowed, remaining } = isProbe
+      ? checkRateLimit(ip, { scope: 'login-probe', max: PROBE_MAX_ATTEMPTS })
+      : checkRateLimit(ip)
     if (!allowed) {
       return NextResponse.json(
         {
@@ -35,7 +47,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const body = await req.json()
     const validated = loginSchema.safeParse(body)
 
     if (!validated.success) {
@@ -101,6 +112,18 @@ export async function POST(req: NextRequest) {
 
     const match = await bcrypt.compare(password, user.password)
     if (!match) {
+      // A probe is a half-typed password, not a failed login attempt.
+      if (isProbe) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid credentials',
+            message: 'Incorrect password',
+          },
+          { status: 401 }
+        )
+      }
+
       user.failedLoginAttempts = (user.failedLoginAttempts ?? 0) + 1
       if (user.failedLoginAttempts >= 10) {
         user.isBlocked = true
