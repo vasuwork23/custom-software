@@ -1,16 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+
+// The password is tried on its own once typing pauses, so phones need no
+// Enter key. Probes are deduped and never counted as failed logins server-side.
+const PROBE_DELAY_MS = 700
+const MIN_PROBE_LENGTH = 4
 
 export default function LoginPage() {
   const router = useRouter()
   const setAuth = useAuthStore((s) => s.setAuth)
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const inputRef = useRef<HTMLInputElement>(null)
+  const triedRef = useRef<Set<string>>(new Set())
   const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -33,44 +39,61 @@ export default function LoginPage() {
     }
   }, [router, clearAuth])
 
-  // The box is invisible, so keep it focused: any click or keypress types into it.
+  // The box is invisible, so keep it focused: a tap anywhere types into it and
+  // opens the on-screen keyboard on mobile.
   useEffect(() => {
     const focus = () => inputRef.current?.focus()
     focus()
     window.addEventListener('pointerdown', focus)
+    window.addEventListener('touchend', focus)
     window.addEventListener('keydown', focus)
     return () => {
       window.removeEventListener('pointerdown', focus)
+      window.removeEventListener('touchend', focus)
       window.removeEventListener('keydown', focus)
     }
   }, [])
 
-  async function submit() {
-    if (isSubmitting || !password) return
-    setIsSubmitting(true)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-      const json = await res.json()
+  const attempt = useCallback(
+    async (candidate: string, probe: boolean) => {
+      if (!candidate) return
+      if (probe && triedRef.current.has(candidate)) return
+      if (probe) triedRef.current.add(candidate)
 
-      // Nothing is shown on a failure: just clear the box so it can be retyped.
-      if (!json.success) {
-        setPassword('')
-        return
+      setBusy(true)
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: candidate, probe }),
+        })
+        const json = await res.json()
+
+        // Nothing is shown on a failure. A probe leaves the text alone so it
+        // can keep being typed; an explicit submit clears it for a retry.
+        if (!json.success) {
+          if (!probe) setPassword('')
+          return
+        }
+
+        setAuth(json.data.user, json.data.token)
+        router.push('/')
+        router.refresh()
+      } catch {
+        if (!probe) setPassword('')
+      } finally {
+        setBusy(false)
       }
+    },
+    [router, setAuth]
+  )
 
-      setAuth(json.data.user, json.data.token)
-      router.push('/')
-      router.refresh()
-    } catch {
-      setPassword('')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  useEffect(() => {
+    if (busy || password.length < MIN_PROBE_LENGTH) return
+    if (triedRef.current.has(password)) return
+    const timer = setTimeout(() => void attempt(password, true), PROBE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [password, busy, attempt])
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center bg-muted/30 p-4">
@@ -79,14 +102,14 @@ export default function LoginPage() {
         type="password"
         autoFocus
         autoComplete="current-password"
+        enterKeyHint="go"
         aria-label="Password"
         value={password}
-        readOnly={isSubmitting}
         onChange={(e) => setPassword(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
-            void submit()
+            void attempt(password, false)
           }
           if (e.key === 'Escape') {
             setPassword('')
