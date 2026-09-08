@@ -8,10 +8,14 @@ import User from '@/models/User'
 
 export const dynamic = 'force-dynamic'
 
+// The app is used by a single account, so the login screen sends only a
+// password. `email` stays optional for any caller that still supplies it.
 const loginSchema = z.object({
-  email: z.string().email('Invalid email'),
+  email: z.string().email('Invalid email').optional(),
   password: z.string().min(1, 'Password is required'),
 })
+
+const USER_FIELDS = '+password failedLoginAttempts isBlocked'
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,13 +53,36 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password failedLoginAttempts isBlocked')
+    let user = null
+    if (email) {
+      user = await User.findOne({ email: email.toLowerCase() }).select(USER_FIELDS)
+    } else {
+      // Password-only login: resolve the single account of this installation.
+      const users = await User.find({}).select(USER_FIELDS).limit(2)
+      if (users.length === 1) {
+        user = users[0]
+      } else if (users.length > 1) {
+        const owners = await User.find({ role: 'owner' }).select(USER_FIELDS).limit(2)
+        if (owners.length !== 1) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Validation failed',
+              message: 'This installation has multiple accounts. Email is required.',
+            },
+            { status: 400 }
+          )
+        }
+        user = owners[0]
+      }
+    }
+
     if (!user) {
       return NextResponse.json(
         {
           success: false,
           error: 'Invalid credentials',
-          message: 'Invalid email or password',
+          message: email ? 'Invalid email or password' : 'Incorrect password',
         },
         { status: 401 }
       )
@@ -97,7 +124,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: 'Invalid credentials',
-          message: `Invalid email or password.${warning}`,
+          message: `${email ? 'Invalid email or password' : 'Incorrect password'}.${warning}`,
         },
         { status: 401 }
       )
