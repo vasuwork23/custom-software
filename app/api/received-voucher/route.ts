@@ -9,8 +9,6 @@ import {
   type CreatePaymentReceiptInput,
 } from '@/lib/create-payment-receipt'
 import Company from '@/models/Company'
-import BankAccount from '@/models/BankAccount'
-import BankTransaction from '@/models/BankTransaction'
 import PaymentReceipt from '@/models/PaymentReceipt'
 import mongoose from 'mongoose'
 
@@ -23,20 +21,6 @@ function buildDateRange(date?: string | null): { $gte: Date; $lte: Date } | unde
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
   return { $gte: start, $lte: end }
-}
-
-async function recomputeBankAccountBalance(bankAccountId: mongoose.Types.ObjectId): Promise<void> {
-  const txs = await BankTransaction.find({ bankAccount: bankAccountId })
-    .sort({ transactionDate: 1, createdAt: 1 })
-    .lean()
-
-  let balance = 0
-  for (const tx of txs) {
-    balance += tx.type === 'credit' ? tx.amount : -tx.amount
-    await BankTransaction.updateOne({ _id: tx._id }, { $set: { balanceAfter: balance } })
-  }
-
-  await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: balance })
 }
 
 export async function GET(req: NextRequest) {

@@ -7,6 +7,7 @@ import BankTransaction from '@/models/BankTransaction'
 import PaymentReceipt from '@/models/PaymentReceipt'
 import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import { recalcIndiaBuyingEntryGivenAndStatus } from '@/lib/india-buying-entry-payments'
 import mongoose from 'mongoose'
 import { ensureCanDelete, ensureNotViewer } from '@/lib/permissions'
@@ -64,20 +65,6 @@ export async function GET(
       { status: 500 }
     )
   }
-}
-
-async function recomputeBankAccountBalance(bankAccountId: mongoose.Types.ObjectId): Promise<void> {
-  const txs = await BankTransaction.find({ bankAccount: bankAccountId })
-    .sort({ transactionDate: 1, createdAt: 1 })
-    .lean()
-
-  let balance = 0
-  for (const tx of txs) {
-    balance += tx.type === 'credit' ? tx.amount : -tx.amount
-    await BankTransaction.updateOne({ _id: tx._id }, { $set: { balanceAfter: balance } })
-  }
-
-  await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: balance })
 }
 
 export async function PUT(
@@ -207,7 +194,7 @@ export async function PUT(
         createdBy: updatedBy,
         sortOrder: 1,
       })
-      await recomputeBankAccountBalance(originalTx.bankAccount as mongoose.Types.ObjectId)
+      await recalculateBankAccountLedger(originalTx.bankAccount as mongoose.Types.ObjectId)
     }
 
     // Resolve new bank account for updated payment
@@ -267,17 +254,13 @@ export async function PUT(
         referenceType: 'PaymentReceipt',
       })
     } else {
-      const lastTx = await BankTransaction.findOne({ bankAccount: bankAccount!._id })
-        .sort({ transactionDate: -1, createdAt: -1 })
-        .select('balanceAfter')
-        .lean()
-      const lastBalance = lastTx?.balanceAfter ?? 0
-      const newBalance = lastBalance + amount
+      // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+      // createdAt order) fixes it below.
       await BankTransaction.create({
         bankAccount: bankAccount!._id,
         type: txType,
         amount: absAmount,
-        balanceAfter: newBalance,
+        balanceAfter: 0,
         source: 'payment_receipt',
         sourceRef: payment._id,
         sourceLabel: txDescription,
@@ -285,7 +268,7 @@ export async function PUT(
         notes: remark,
         createdBy: updatedBy,
       })
-      await recomputeBankAccountBalance(bankAccount!._id)
+      await recalculateBankAccountLedger(bankAccount!._id, { updatedBy })
     }
 
     return NextResponse.json({ success: true, data: { _id: payment._id } })
@@ -383,7 +366,7 @@ export async function DELETE(
           createdBy: tx.createdBy,
           sortOrder: 1,
         })
-        await recomputeBankAccountBalance(tx.bankAccount as mongoose.Types.ObjectId)
+        await recalculateBankAccountLedger(tx.bankAccount as mongoose.Types.ObjectId)
       }
     }
 

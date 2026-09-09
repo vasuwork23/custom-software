@@ -10,6 +10,7 @@ import CashTransaction from '@/models/CashTransaction'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import { processFIFO, reverseFIFO, applyFIFO } from '@/lib/fifo'
 import { processIndiaFIFO, reverseIndiaFIFO, applyIndiaFIFO } from '@/lib/india-fifo'
 import { round } from '@/lib/round'
@@ -491,15 +492,18 @@ export async function PUT(
           sortOrder: 1,
         })
       } else if (existingIsBankSale && existingBankAccountId) {
-        const bankAcc = await BankAccount.findById(existingBankAccountId)
+        const bankAcc = await BankAccount.findById(existingBankAccountId).select('_id').lean()
         if (bankAcc) {
-          bankAcc.currentBalance = (bankAcc.currentBalance ?? 0) + amountDiff
-          await bankAcc.save()
+          // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+          // createdAt order) fixes it below. This adjustment is stamped with the
+          // bill's original date, which can sit behind transactions already
+          // recorded after it; a currentBalance mutation here would silently
+          // corrupt the running balance the moment that happens.
           await BankTransaction.create({
             bankAccount: existingBankAccountId,
             type: amountDiff > 0 ? 'credit' : 'debit',
             amount: Math.abs(amountDiff),
-            balanceAfter: bankAcc.currentBalance,
+            balanceAfter: 0,
             source: 'bankaccount_sale',
             sourceRef: new mongoose.Types.ObjectId(id),
             sourceLabel: `Bank bill edited — adjustment for Bill #${(bill as { billNumber?: number }).billNumber ?? id}`,
@@ -507,6 +511,7 @@ export async function PUT(
             createdBy: updatedBy,
             sortOrder: 1,
           })
+          await recalculateBankAccountLedger(bankAcc._id as mongoose.Types.ObjectId, { updatedBy })
         }
       } else if (existingCompanyId) {
         await Company.findByIdAndUpdate(existingCompanyId, {
@@ -637,21 +642,26 @@ export async function DELETE(
         }
       }
     } else if (isBankSale && deleteBankAccountId && amountToReverse !== 0) {
-      const bankAcc = await BankAccount.findById(deleteBankAccountId)
+      const bankAcc = await BankAccount.findById(deleteBankAccountId).select('_id').lean()
       if (bankAcc) {
-        bankAcc.currentBalance = (bankAcc.currentBalance ?? 0) - amountToReverse
-        await bankAcc.save()
+        // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+        // createdAt order) fixes it below; see the edit-adjustment branch above.
+        const reversalCreatedBy =
+          (bill as { createdBy?: mongoose.Types.ObjectId }).createdBy ?? new mongoose.Types.ObjectId()
         await BankTransaction.create({
           bankAccount: deleteBankAccountId,
           type: amountToReverse > 0 ? 'debit' : 'credit',
           amount: Math.abs(amountToReverse),
-          balanceAfter: bankAcc.currentBalance,
+          balanceAfter: 0,
           source: 'bankaccount_sale',
           sourceRef: new mongoose.Types.ObjectId(id),
           sourceLabel: `Reversal — Bank bill deleted #${(bill as { billNumber?: number }).billNumber ?? id}`,
           transactionDate: (bill as { billDate?: Date }).billDate ?? new Date(),
-          createdBy: (bill as { createdBy?: mongoose.Types.ObjectId }).createdBy ?? new mongoose.Types.ObjectId(),
+          createdBy: reversalCreatedBy,
           sortOrder: 1,
+        })
+        await recalculateBankAccountLedger(bankAcc._id as mongoose.Types.ObjectId, {
+          updatedBy: reversalCreatedBy,
         })
       }
     } else {

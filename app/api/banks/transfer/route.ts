@@ -5,6 +5,7 @@ import { ensureNotViewer } from '@/lib/permissions'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
@@ -100,31 +101,16 @@ export async function POST(req: NextRequest) {
     const toId = new mongoose.Types.ObjectId(toAccountId)
     const transactionDate = new Date(date)
 
-    const [lastFrom, lastTo] = await Promise.all([
-      fromIsCash
-        ? Promise.resolve<{ balanceAfter: number } | null>(null)
-        : BankTransaction.findOne({ bankAccount: fromId })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean(),
-      toIsCash
-        ? Promise.resolve<{ balanceAfter: number } | null>(null)
-        : BankTransaction.findOne({ bankAccount: toId })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean(),
-    ])
-
-    const lastFromBalance = lastFrom?.balanceAfter ?? 0
-    const lastToBalance = lastTo?.balanceAfter ?? 0
-
     let newFromBalance: number | null = null
     let newToBalance: number | null = null
 
     let debitTx: mongoose.Document | null = null
     let creditTx: mongoose.Document | null = null
 
-    // From side
+    // From side. balanceAfter is a placeholder — recalculateBankAccountLedger
+    // (true createdAt order) fixes it below. Looking up "the last transaction by
+    // transactionDate" breaks the moment any transaction on this account is
+    // backdated or edited (e.g. a bill edit that stamps the original bill's date).
     if (fromIsCash) {
       // Cash side: use Cash/CashTransaction ledger only; do NOT create BankTransaction for cash.
       await createCashTransaction({
@@ -135,12 +121,11 @@ export async function POST(req: NextRequest) {
         category: 'bank_transfer',
       })
     } else {
-      newFromBalance = lastFromBalance - amount
       debitTx = await BankTransaction.create({
         bankAccount: fromId,
         type: 'debit',
         amount,
-        balanceAfter: newFromBalance,
+        balanceAfter: 0,
         source: 'transfer',
         sourceLabel: `Transfer to ${toAccount.accountName}`,
         transferTo: toId,
@@ -148,10 +133,7 @@ export async function POST(req: NextRequest) {
         notes,
         createdBy,
       })
-      await BankAccount.findByIdAndUpdate(fromId, {
-        currentBalance: newFromBalance,
-        updatedBy: createdBy,
-      })
+      newFromBalance = await recalculateBankAccountLedger(fromId, { updatedBy: createdBy })
     }
 
     // To side
@@ -164,12 +146,11 @@ export async function POST(req: NextRequest) {
         category: 'bank_transfer',
       })
     } else {
-      newToBalance = lastToBalance + amount
       creditTx = await BankTransaction.create({
         bankAccount: toId,
         type: 'credit',
         amount,
-        balanceAfter: newToBalance,
+        balanceAfter: 0,
         source: 'transfer',
         sourceLabel: `Transfer from ${fromAccount.accountName}`,
         transferTo: fromId,
@@ -177,10 +158,7 @@ export async function POST(req: NextRequest) {
         notes,
         createdBy,
       })
-      await BankAccount.findByIdAndUpdate(toId, {
-        currentBalance: newToBalance,
-        updatedBy: createdBy,
-      })
+      newToBalance = await recalculateBankAccountLedger(toId, { updatedBy: createdBy })
     }
 
     // Link bank-side transactions if both sides are bank accounts.

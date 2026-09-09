@@ -8,6 +8,7 @@ import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import ChinaBankTransaction, { type IChinaBankTransaction } from '@/models/ChinaBankTransaction'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,17 +102,15 @@ export async function POST(req: NextRequest) {
         category: 'china_bank_payment',
       })
     } else {
-      // Non-cash: debit this bank account once (balance + BankTransaction)
-      const newBankBalance = (bankAccount.currentBalance ?? 0) - inrAmount
-      bankAccount.currentBalance = newBankBalance
-      bankAccount.updatedBy = createdBy
-      await bankAccount.save()
-
+      // Non-cash: debit this bank account once (balance + BankTransaction).
+      // balanceAfter/currentBalance are placeholders — recalculateBankAccountLedger
+      // (true createdAt order) fixes them below. Trusting the cached
+      // bankAccount.currentBalance directly lets any prior drift compound forever.
       await BankTransaction.create({
         bankAccount: bankAccount._id,
         type: 'debit',
         amount: inrAmount,
-        balanceAfter: newBankBalance,
+        balanceAfter: 0,
         source: 'china_bank_payment',
         sourceRef: undefined,
         sourceLabel: `China Bank payment${note ? ' — ' + note : ''}`,
@@ -119,6 +118,7 @@ export async function POST(req: NextRequest) {
         notes: note ?? undefined,
         createdBy,
       })
+      await recalculateBankAccountLedger(bankAccount._id, { updatedBy: createdBy })
     }
 
     // Step 2: credit China Bank (balance tracked in INR)

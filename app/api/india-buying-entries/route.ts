@@ -6,6 +6,7 @@ import IndiaBuyingEntry from '@/models/IndiaBuyingEntry'
 import IndiaProduct from '@/models/IndiaProduct'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import mongoose from 'mongoose'
 import { format } from 'date-fns'
 import { recalcIndiaBuyingEntryGivenAndStatus } from '@/lib/india-buying-entry-payments'
@@ -182,18 +183,13 @@ export async function POST(req: NextRequest) {
           referenceType: 'india_buying_advance',
         })
       } else {
-        const lastTx = await BankTransaction.findOne({ bankAccount: advanceBankId })
-          .sort({ transactionDate: -1, createdAt: -1 })
-          .select('balanceAfter')
-          .lean()
-        const lastBalance = lastTx?.balanceAfter ?? 0
-        const newBalance = lastBalance - advanceAmt
-
+        // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+        // createdAt order) fixes it below.
         await BankTransaction.create({
           bankAccount: advanceBankId,
           type: 'debit',
           amount: advanceAmt,
-          balanceAfter: newBalance,
+          balanceAfter: 0,
           source: 'india_buying_advance',
           sourceRef: entry._id,
           sourceLabel,
@@ -201,7 +197,7 @@ export async function POST(req: NextRequest) {
           notes: entry.advanceNote,
           createdBy,
         })
-        await BankAccount.findByIdAndUpdate(advanceBankId, { currentBalance: newBalance })
+        await recalculateBankAccountLedger(advanceBankId, { updatedBy: createdBy })
       }
     }
 

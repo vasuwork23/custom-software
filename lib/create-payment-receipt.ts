@@ -3,6 +3,7 @@ import PaymentReceipt from '@/models/PaymentReceipt'
 import Company from '@/models/Company'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 
 export interface CreatePaymentReceiptInput {
   companyId: string
@@ -51,8 +52,9 @@ export function validatePaymentReceiptInput(input: CreatePaymentReceiptInput): s
 /**
  * Creates a payment receipt and its matching cash or bank transaction.
  * Throws ReceiptError for the cases the route surfaces with a specific status.
- * Callers creating receipts in bulk should catch per receipt and must run them
- * sequentially — the online path derives the new balance from the last one.
+ * The online path recomputes the bank account's balance from its full ledger
+ * (see recalculateBankAccountLedger), so callers creating receipts in bulk can
+ * catch per receipt without needing to run them sequentially.
  */
 export async function createPaymentReceipt(
   input: CreatePaymentReceiptInput,
@@ -113,17 +115,14 @@ export async function createPaymentReceipt(
       referenceType: 'PaymentReceipt',
     })
   } else {
-    const lastTx = await BankTransaction.findOne({ bankAccount: bankAccount._id })
-      .sort({ transactionDate: -1, createdAt: -1 })
-      .select('balanceAfter')
-      .lean()
-    const lastBalance = lastTx?.balanceAfter ?? 0
-    const newBalance = lastBalance + amount
+    // balanceAfter is a placeholder — recalculateBankAccountLedger (true createdAt
+    // order) fixes it below. Looking up "the last transaction by transactionDate"
+    // breaks the moment any transaction on this account is backdated or edited.
     await BankTransaction.create({
       bankAccount: bankAccount._id,
       type: txType,
       amount: absAmount,
-      balanceAfter: newBalance,
+      balanceAfter: 0,
       source: 'payment_receipt',
       sourceRef: payment._id,
       sourceLabel: txDescription,
@@ -131,7 +130,7 @@ export async function createPaymentReceipt(
       notes: remark,
       createdBy,
     })
-    await BankAccount.findByIdAndUpdate(bankAccount._id, { currentBalance: newBalance })
+    await recalculateBankAccountLedger(bankAccount._id, { updatedBy: createdBy })
   }
 
   return {
