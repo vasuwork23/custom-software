@@ -6,6 +6,7 @@ import IndiaBuyingPayment from '@/models/IndiaBuyingPayment'
 import PaymentReceipt from '@/models/PaymentReceipt'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import mongoose from 'mongoose'
 import { recalcIndiaBuyingEntryGivenAndStatus } from '@/lib/india-buying-entry-payments'
 import { format } from 'date-fns'
@@ -80,24 +81,19 @@ export async function DELETE(
           referenceType: 'india_buying_payment',
         })
       } else {
-        const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
-          .sort({ transactionDate: -1, createdAt: -1 })
-          .select('balanceAfter')
-          .lean()
-        const lastBalance = lastTx?.balanceAfter ?? 0
-        const newBalance = lastBalance + payment.amount
-
+        // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+        // createdAt order) fixes it below.
         await BankTransaction.create({
           bankAccount: bankId,
           type: 'credit',
           amount: payment.amount,
-          balanceAfter: newBalance,
+          balanceAfter: 0,
           source: 'manual',
           sourceLabel,
           transactionDate: new Date(),
           createdBy,
         })
-        await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+        await recalculateBankAccountLedger(bankId, { updatedBy: createdBy })
       }
     }
 

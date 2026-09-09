@@ -6,21 +6,10 @@ import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
 import Expense from '@/models/Expense'
 import { createCashTransaction } from '@/lib/cash-transaction-helper'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
-
-async function recomputeBankAccountBalance(bankAccountId: mongoose.Types.ObjectId): Promise<void> {
-  const txs = await BankTransaction.find({ bankAccount: bankAccountId })
-    .sort({ transactionDate: 1, createdAt: 1 })
-    .lean()
-  let balance = 0
-  for (const tx of txs) {
-    balance += tx.type === 'credit' ? tx.amount : -tx.amount
-    await BankTransaction.updateOne({ _id: tx._id }, { $set: { balanceAfter: balance } })
-  }
-  await BankAccount.findByIdAndUpdate(bankAccountId, { currentBalance: balance })
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -215,17 +204,15 @@ export async function POST(req: NextRequest) {
         referenceType: 'Expense',
       })
     } else {
-      const lastTx = await BankTransaction.findOne({ bankAccount: paidFromOid })
-        .sort({ transactionDate: -1, createdAt: -1 })
-        .select('balanceAfter')
-        .lean()
-      const lastBalance = lastTx?.balanceAfter ?? 0
-      const newBalance = lastBalance - amount
+      // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+      // createdAt order) fixes it below. Looking up "the last transaction by
+      // transactionDate" breaks the moment any transaction on this account is
+      // backdated or edited.
       await BankTransaction.create({
         bankAccount: paidFromOid,
         type: 'debit',
         amount,
-        balanceAfter: newBalance,
+        balanceAfter: 0,
         source: 'expense',
         sourceRef: expense._id,
         sourceLabel: `Expense: ${title}`,
@@ -233,7 +220,7 @@ export async function POST(req: NextRequest) {
         notes: remark,
         createdBy,
       })
-      await BankAccount.findByIdAndUpdate(paidFromOid, { currentBalance: newBalance })
+      await recalculateBankAccountLedger(paidFromOid, { updatedBy: createdBy })
     }
 
     return NextResponse.json({

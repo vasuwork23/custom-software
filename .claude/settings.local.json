@@ -51,7 +51,13 @@
       "Bash(echo \"--- exit: $? ---\")",
       "Bash(grep -rn \"cloud-backup\\\\|normal-backup\" --include=\"*.tsx\" app components | head -20; echo \"=== restore.sh head ===\"; head -40 restore.sh; echo \"=== env.local keys ===\"; sed 's/=.*/=<redacted>/' .env.local)",
       "Bash(grep -rn \"\\\\.find\\({}\\)\\\\|find\\({}）\\\\|\\\\.find\\(\\)\\\\s*$\" --include=\"*.ts\" app lib)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(NODE_PATH=\"$\\(pwd\\)/node_modules\" node /tmp/inspect.js)",
+      "Bash(NODE_PATH=\"$\\(pwd\\)/node_modules\" node \"C:\\\\Users\\\\Linux\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Linux-custom-software\\\\ca0ae338-8ab1-4395-9d09-e1cde187892c\\\\scratchpad\\\\full-preflight.js\")",
+      "Bash(NODE_PATH=\"$\\(pwd\\)/node_modules\" node \"C:\\\\Users\\\\Linux\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Linux-custom-software\\\\ca0ae338-8ab1-4395-9d09-e1cde187892c\\\\scratchpad\\\\check-payal.js\")",
+      "Bash(NODE_PATH=\"$\\(pwd\\)/node_modules\" node \"C:\\\\Users\\\\Linux\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Linux-custom-software\\\\ca0ae338-8ab1-4395-9d09-e1cde187892c\\\\scratchpad\\\\fix-payal.js\")",
+      "Bash(grep -n \"recalculateBankAccountLedger\\(oldBank\\\\|recalculateBankAccountLedger\\(newBankRaw\\\\|recalculateBankAccountLedger\\(bankId, { updatedBy }\\)\" \"c:\\\\Users\\\\Linux\\\\custom-software\\\\app\\\\api\\\\india-buying-entries\\\\[id]\\\\route.ts\")",
+      "Bash(NODE_PATH=\"$\\(pwd\\)/node_modules\" node \"C:\\\\Users\\\\Linux\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Linux-custom-software\\\\ca0ae338-8ab1-4395-9d09-e1cde187892c\\\\scratchpad\\\\verify-no-unintended-changes.js\")"
     ],
     "additionalDirectories": [
       "/Users/nexus/Desktop/custom-software"

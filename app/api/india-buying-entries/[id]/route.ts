@@ -7,6 +7,7 @@ import PaymentReceipt from '@/models/PaymentReceipt'
 import IndiaProduct from '@/models/IndiaProduct'
 import BankAccount from '@/models/BankAccount'
 import BankTransaction from '@/models/BankTransaction'
+import { recalculateBankAccountLedger } from '@/lib/bank-ledger'
 import SellBillItem from '@/models/SellBillItem'
 import mongoose from 'mongoose'
 import { format } from 'date-fns'
@@ -213,24 +214,20 @@ export async function PUT(
             referenceType: 'india_buying_advance',
           })
         } else {
-          const lastTx = await BankTransaction.findOne({ bankAccount: oldBank })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean()
-          const lastBalance = lastTx?.balanceAfter ?? 0
-          const newBalance = lastBalance + oldAdvance
+          // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+          // createdAt order) fixes it below.
           await BankTransaction.create({
             bankAccount: oldBank,
             type: 'credit',
             amount: oldAdvance,
-            balanceAfter: newBalance,
+            balanceAfter: 0,
             source: 'india_buying_advance',
             sourceRef: entry._id,
             sourceLabel: 'Advance refunded — bank account changed (India buying entry)',
             transactionDate: new Date(),
             createdBy: updatedBy,
           })
-          await BankAccount.findByIdAndUpdate(oldBank, { currentBalance: newBalance })
+          await recalculateBankAccountLedger(new mongoose.Types.ObjectId(oldBank), { updatedBy })
         }
       }
 
@@ -249,17 +246,13 @@ export async function PUT(
             referenceType: 'india_buying_advance',
           })
         } else {
-          const lastTx = await BankTransaction.findOne({ bankAccount: newBankRaw })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean()
-          const lastBalance = lastTx?.balanceAfter ?? 0
-          const newBalance = lastBalance - newAdvance
+          // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+          // createdAt order) fixes it below.
           await BankTransaction.create({
             bankAccount: newBankRaw,
             type: 'debit',
             amount: newAdvance,
-            balanceAfter: newBalance,
+            balanceAfter: 0,
             source: 'india_buying_advance',
             sourceRef: entry._id,
             sourceLabel: `Advance for India buying entry — ${productName}`,
@@ -267,7 +260,7 @@ export async function PUT(
             notes: body.advanceNote ?? entry.advanceNote,
             createdBy: updatedBy,
           })
-          await BankAccount.findByIdAndUpdate(newBankRaw, { currentBalance: newBalance })
+          await recalculateBankAccountLedger(new mongoose.Types.ObjectId(newBankRaw), { updatedBy })
         }
       }
     } else {
@@ -293,17 +286,13 @@ export async function PUT(
             referenceType: 'india_buying_advance',
           })
         } else {
-          const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean()
-          const lastBalance = lastTx?.balanceAfter ?? 0
-          const newBalance = isDebit ? lastBalance - Math.abs(diff) : lastBalance + Math.abs(diff)
+          // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+          // createdAt order) fixes it below.
           await BankTransaction.create({
             bankAccount: bankId,
             type: isDebit ? 'debit' : 'credit',
             amount: Math.abs(diff),
-            balanceAfter: newBalance,
+            balanceAfter: 0,
             source: 'india_buying_advance',
             sourceRef: entry._id,
             sourceLabel: label,
@@ -311,7 +300,7 @@ export async function PUT(
             notes: body.advanceNote ?? entry.advanceNote,
             createdBy: updatedBy,
           })
-          await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+          await recalculateBankAccountLedger(new mongoose.Types.ObjectId(bankId), { updatedBy })
         }
       }
     }
@@ -429,25 +418,20 @@ export async function DELETE(
           referenceType: 'india_buying_advance',
         })
       } else {
-        const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
-          .sort({ transactionDate: -1, createdAt: -1 })
-          .select('balanceAfter')
-          .lean()
-        const lastBalance = lastTx?.balanceAfter ?? 0
-        const newBalance = lastBalance + amount
-
+        // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+        // createdAt order) fixes it below.
         await BankTransaction.create({
           bankAccount: bankId,
           type: 'credit',
           amount,
-          balanceAfter: newBalance,
+          balanceAfter: 0,
           source: 'india_buying_advance',
           sourceRef: entry._id,
           sourceLabel: `Reversal: Advance for India Product: ${productName} (deleted entry)`,
           transactionDate: new Date(),
           createdBy: updatedBy,
         })
-        await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+        await recalculateBankAccountLedger(new mongoose.Types.ObjectId(bankId), { updatedBy })
       }
     }
 
@@ -473,22 +457,19 @@ export async function DELETE(
             referenceType: 'india_buying_payment',
           })
         } else {
-          const lastTx = await BankTransaction.findOne({ bankAccount: bankId })
-            .sort({ transactionDate: -1, createdAt: -1 })
-            .select('balanceAfter')
-            .lean()
-          const newBalance = (lastTx?.balanceAfter ?? 0) + p.amount
+          // balanceAfter is a placeholder — recalculateBankAccountLedger (true
+          // createdAt order) fixes it below.
           await BankTransaction.create({
             bankAccount: bankId,
             type: 'credit',
             amount: p.amount,
-            balanceAfter: newBalance,
+            balanceAfter: 0,
             source: 'manual',
             sourceLabel: `Reversal: payment for India buying entry (deleted)`,
             transactionDate: new Date(),
             createdBy: p.createdBy,
           })
-          await BankAccount.findByIdAndUpdate(bankId, { currentBalance: newBalance })
+          await recalculateBankAccountLedger(bankId, { updatedBy: p.createdBy })
         }
       }
     }
