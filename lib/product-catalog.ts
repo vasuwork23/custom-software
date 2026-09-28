@@ -17,6 +17,10 @@ export interface SellableProduct {
 /**
  * All in-stock products (China + India) with their stock totals and carton size.
  * Stock is computed via aggregation — no per-product N+1 queries.
+ * `qtyPerCtn` is the carton size of the oldest available batch, i.e. the one
+ * `processFIFO` consumes first, so the sell-bill CTN↔PCS conversion matches FIFO.
+ * `availablePcs` is summed per batch, so it stays correct when batches have
+ * different carton sizes (it is NOT availableCtn × qtyPerCtn).
  */
 export async function getSellableProducts(search = ''): Promise<SellableProduct[]> {
   const nameFilter = search ? { productName: new RegExp(search, 'i') } : {}
@@ -24,7 +28,8 @@ export async function getSellableProducts(search = ''): Promise<SellableProduct[
   const [chinaStock, indiaStock, chinaProducts, indiaProducts] = await Promise.all([
     BuyingEntry.aggregate([
       { $match: { chinaWarehouseReceived: 'yes', isLocked: true, availableCtn: { $gt: 0 } } },
-      { $sort: { createdAt: -1 } },
+      // Oldest first: $first below must report the batch FIFO will actually consume
+      { $sort: { createdAt: 1 } },
       {
         $group: {
           _id: '$product',
@@ -36,6 +41,7 @@ export async function getSellableProducts(search = ''): Promise<SellableProduct[
     ]),
     IndiaBuyingEntry.aggregate([
       { $match: { availableCtn: { $gt: 0 } } },
+      // Oldest first: $first below must report the batch FIFO will actually consume
       { $sort: { createdAt: 1 } },
       {
         $group: {

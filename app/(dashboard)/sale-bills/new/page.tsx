@@ -40,6 +40,8 @@ interface LineRow {
   productId: string
   productName: string
   availableCtn: number
+  /** True stock in pcs, summed per batch by the API. Not availableCtn × qtyPerCtn — batches can differ in carton size. */
+  availablePcs: number
   ctnSold: number
   qtyPerCtn: number
   pcsSold: number
@@ -132,7 +134,7 @@ export default function NewSellBillPage() {
   const extraCharges = parseFloat(extraChargesStr) || 0
   const discount = parseFloat(discountStr) || 0
   const [lines, setLines] = useState<LineRow[]>([
-    { id: '1', productSource: 'china', productId: '', productName: '', availableCtn: 0, ctnSold: 0, qtyPerCtn: 0, pcsSold: 0, ratePerPcs: 0, lineTotal: 0 },
+    { id: '1', productSource: 'china', productId: '', productName: '', availableCtn: 0, availablePcs: 0, ctnSold: 0, qtyPerCtn: 0, pcsSold: 0, ratePerPcs: 0, lineTotal: 0 },
   ])
   const [saving, setSaving] = useState(false)
   const [addCompanyName, setAddCompanyName] = useState<string | null>(null)
@@ -154,7 +156,7 @@ export default function NewSellBillPage() {
     fetchBankAccounts()
   }, [fetchCompanies, fetchBankAccounts])
 
-  function setLineProduct(id: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number) {
+  function setLineProduct(id: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number, availablePcs: number) {
     const isIndia = compositeValue.startsWith('india:')
     const source: 'china' | 'india' = isIndia ? 'india' : 'china'
     const productId = compositeValue.includes(':') ? compositeValue.slice(compositeValue.indexOf(':') + 1) : compositeValue
@@ -168,6 +170,7 @@ export default function NewSellBillPage() {
               productId,
               productName,
               availableCtn,
+              availablePcs,
               qtyPerCtn,
               ctnSold: 0,
               pcsSold: 0,
@@ -181,7 +184,7 @@ export default function NewSellBillPage() {
   function addLine() {
     setLines((prev) => [
       ...prev,
-      { id: String(Date.now()), productSource: 'china', productId: '', productName: '', availableCtn: 0, ctnSold: 0, qtyPerCtn: 0, pcsSold: 0, ratePerPcs: 0, lineTotal: 0 },
+      { id: String(Date.now()), productSource: 'china', productId: '', productName: '', availableCtn: 0, availablePcs: 0, ctnSold: 0, qtyPerCtn: 0, pcsSold: 0, ratePerPcs: 0, lineTotal: 0 },
     ])
   }
 
@@ -225,7 +228,7 @@ export default function NewSellBillPage() {
     if (!canSave) return
     const availablePcsByLine = lines.filter((r) => r.productId && r.pcsSold > 0).map((r) => ({
       id: r.id,
-      availablePcs: Math.round(r.availableCtn * r.qtyPerCtn),
+      availablePcs: r.availablePcs,
       pcs: r.pcsSold,
       productName: r.productName,
     }))
@@ -393,11 +396,11 @@ export default function NewSellBillPage() {
                         <ProductSelect
                           value={row.productId ? `${row.productSource}:${row.productId}` : ''}
                           selectedLabel={row.productName}
-                          onValueChange={(v, label, qtyPerCtn, availableCtn) => setLineProduct(row.id, v, label, qtyPerCtn, availableCtn)}
+                          onValueChange={(v, label, qtyPerCtn, availableCtn, availablePcs) => setLineProduct(row.id, v, label, qtyPerCtn, availableCtn, availablePcs)}
                         />
                         {row.productId && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Available: {row.availableCtn} CTN ({Math.round(row.availableCtn * row.qtyPerCtn).toLocaleString('en-IN')} pcs)
+                            Available: {row.availableCtn} CTN ({row.availablePcs.toLocaleString('en-IN')} pcs)
                           </p>
                         )}
                       </div>

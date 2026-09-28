@@ -11,6 +11,38 @@ export interface ProcessFIFOResult {
 }
 
 /**
+ * Insufficient-stock message. Unlocked entries are excluded from FIFO, so when any
+ * exist the message says so — otherwise the stock is visibly in the warehouse and
+ * the plain "insufficient stock" wording looks like a bug to the user.
+ */
+async function buildInsufficientStockError(
+  productId: mongoose.Types.ObjectId,
+  effectiveAvailable: number,
+  totalAvailablePcs: number,
+  pcsAlreadyOnThisBill: number
+): Promise<string> {
+  const base = `Insufficient stock. Only ${Math.round(effectiveAvailable)} pcs available (${Math.round(
+    totalAvailablePcs
+  )} in stock + ${pcsAlreadyOnThisBill} on this bill) in India Warehouse for this product.`
+
+  const unlocked = await BuyingEntry.find({
+    product: productId,
+    chinaWarehouseReceived: 'yes',
+    isLocked: { $ne: true },
+    availableCtn: { $gt: 0 },
+  })
+    .select('qty availableCtn')
+    .lean()
+
+  if (unlocked.length === 0) return base
+
+  const unlockedPcs = Math.round(unlocked.reduce((s, e) => s + (e.availableCtn ?? 0) * (e.qty ?? 0), 0))
+  return `${base} A further ${unlockedPcs} pcs sit in ${unlocked.length} unlocked buying ${
+    unlocked.length === 1 ? 'entry' : 'entries'
+  } — lock ${unlocked.length === 1 ? 'it' : 'them'} to make that stock sellable.`
+}
+
+/**
  * Process FIFO for one line item: consume PCS from oldest india_warehouse entries,
  * build breakdown, deduct availableCtn (decimal ok), return breakdown and totals.
  * CTN consumed per entry can be decimal (pcsConsumed / entry.qty).
@@ -22,9 +54,13 @@ export async function processFIFO(
   ratePerPcs: number,
   pcsAlreadyOnThisBill: number = 0
 ): Promise<ProcessFIFOResult> {
+  // isLocked is required: an unlocked entry has no finalised avgRmbRate/carryingRate,
+  // so its finalCost can still be 0 — selling from it would book the whole sale as
+  // profit. This must stay in sync with the filter in `getSellableProducts`.
   const entries = await BuyingEntry.find({
     product: productId,
     chinaWarehouseReceived: 'yes',
+    isLocked: true,
     availableCtn: { $gt: 0 },
   })
     .sort({ createdAt: 1 })
@@ -33,10 +69,7 @@ export async function processFIFO(
   const totalAvailablePcs = entries.reduce((s, e) => s + e.availableCtn * e.qty, 0)
   const effectiveAvailable = totalAvailablePcs + pcsAlreadyOnThisBill
   if (Math.round(pcsToSell) > Math.round(effectiveAvailable)) {
-    const totalAvailableCtn = entries.reduce((s, e) => s + e.availableCtn, 0)
-    throw new Error(
-      `Insufficient stock. Only ${Math.round(effectiveAvailable)} pcs available (${Math.round(totalAvailablePcs)} in stock + ${pcsAlreadyOnThisBill} on this bill) in India Warehouse for this product.`
-    )
+    throw new Error(await buildInsufficientStockError(productId, effectiveAvailable, totalAvailablePcs, pcsAlreadyOnThisBill))
   }
 
   let remainingPcsToSell = pcsToSell
@@ -89,10 +122,7 @@ export async function processFIFO(
 
   if (remainingPcsToSell > 0) {
     await reverseFIFO(fifoBreakdown)
-    const totalAvailableCtn = entries.reduce((s, e) => s + e.availableCtn, 0)
-    throw new Error(
-      `Insufficient stock. Only ${Math.round(effectiveAvailable)} pcs available (${Math.round(totalAvailablePcs)} in stock + ${pcsAlreadyOnThisBill} on this bill) in India Warehouse for this product.`
-    )
+    throw new Error(await buildInsufficientStockError(productId, effectiveAvailable, totalAvailablePcs, pcsAlreadyOnThisBill))
   }
 
   const fifoNote =

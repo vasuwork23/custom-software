@@ -36,7 +36,14 @@ interface ProductOption {
   qtyPerCtn: number
 }
 
-type ProductSelectCallback = (value: string, label: string, qtyPerCtn: number, availableCtn: number) => void
+type ProductSelectCallback = (
+  value: string,
+  label: string,
+  qtyPerCtn: number,
+  availableCtn: number,
+  /** True stock in pcs, summed per batch. Never re-derive it as availableCtn × qtyPerCtn — batches can have different carton sizes. */
+  availablePcs: number
+) => void
 
 function ProductSelect({
   value,
@@ -110,7 +117,7 @@ function ProductSelect({
                       key={opt.value}
                       value={opt.value}
                       onSelect={() => {
-                        onValueChange(opt.value, opt.label, opt.qtyPerCtn, opt.availableCtn)
+                        onValueChange(opt.value, opt.label, opt.qtyPerCtn, opt.availableCtn, opt.availablePcs)
                         setOpen(false)
                         setSearch('')
                       }}
@@ -180,8 +187,8 @@ export default function EditSellBillPage() {
   const discount = parseFloat(discountStr) || 0
   const [lines, setLines] = useState<LineRow[]>([])
   const [saving, setSaving] = useState(false)
-  /** Fresh availableCtn + qtyPerCtn per productId (from product APIs). Used so getAvailablePcsForEdit is correct when line.availableCtn is 0. */
-  const [productStock, setProductStock] = useState<Record<string, { availableCtn: number; qtyPerCtn: number }>>({})
+  /** Fresh availableCtn + availablePcs + qtyPerCtn per productId (from product APIs). Used so getAvailablePcsForEdit is correct when line.availableCtn is 0. */
+  const [productStock, setProductStock] = useState<Record<string, { availableCtn: number; availablePcs: number; qtyPerCtn: number }>>({})
 
   const fetchBill = useCallback(async () => {
     if (!id) return
@@ -257,13 +264,13 @@ export default function EditSellBillPage() {
     lineRows.forEach((row, idx) => {
       if (row.productId) {
         fetchStockAndQty(row.productSource, row.productId).then(
-          ({ availableCtn, qtyPerCtn: fetchedQty }) => {
+          ({ availableCtn, availablePcs, qtyPerCtn: fetchedQty }) => {
             const finalQtyPerCtn =
               fetchedQty && fetchedQty > 0 ? fetchedQty : row.qtyPerCtn
 
             setProductStock((prev) => ({
               ...prev,
-              [row.productId]: { availableCtn, qtyPerCtn: finalQtyPerCtn },
+              [row.productId]: { availableCtn, availablePcs, qtyPerCtn: finalQtyPerCtn },
             }))
 
             setLines((prev) =>
@@ -299,23 +306,24 @@ export default function EditSellBillPage() {
     fetchBill().finally(() => setLoading(false))
   }, [fetchBill])
 
-  async function fetchStockAndQty(source: 'china' | 'india', productId: string): Promise<{ availableCtn: number; qtyPerCtn: number }> {
-    if (source === 'china') {
-      const [detailRes, qtyRes] = await Promise.all([
-        apiGet<{ availableCtn: number }>(`/api/products/${productId}`),
-        apiGet<{ qtyPerCtn: number }>(`/api/products/${productId}/qty-per-ctn`),
-      ])
-      const data = detailRes.success ? detailRes.data : undefined
-      const qtyData = qtyRes.success ? qtyRes.data : undefined
-      return { availableCtn: data?.availableCtn ?? 0, qtyPerCtn: qtyData?.qtyPerCtn ?? 0 }
-    }
+  async function fetchStockAndQty(source: 'china' | 'india', productId: string): Promise<{ availableCtn: number; availablePcs: number; qtyPerCtn: number }> {
+    const base = source === 'china' ? 'products' : 'india-products'
     const [detailRes, qtyRes] = await Promise.all([
-      apiGet<{ availableCtn: number }>(`/api/india-products/${productId}`),
-      apiGet<{ qtyPerCtn: number }>(`/api/india-products/${productId}/qty-per-ctn`),
+      apiGet<{ availableCtn: number; availablePcs: number; sellableCtn?: number; sellablePcs?: number }>(
+        `/api/${base}/${productId}`
+      ),
+      apiGet<{ qtyPerCtn: number }>(`/api/${base}/${productId}/qty-per-ctn`),
     ])
     const data = detailRes.success ? detailRes.data : undefined
     const qtyData = qtyRes.success ? qtyRes.data : undefined
-    return { availableCtn: data?.availableCtn ?? 0, qtyPerCtn: qtyData?.qtyPerCtn ?? 0 }
+    return {
+      // Prefer the locked-only totals: China FIFO refuses unlocked entries. India
+      // entries have no lock concept, so that route returns availableCtn/Pcs only.
+      availableCtn: data?.sellableCtn ?? data?.availableCtn ?? 0,
+      // Summed per batch by the API — correct even when batches have different carton sizes
+      availablePcs: data?.sellablePcs ?? data?.availablePcs ?? 0,
+      qtyPerCtn: qtyData?.qtyPerCtn ?? 0,
+    }
   }
 
   function addLine() {
@@ -342,11 +350,11 @@ export default function EditSellBillPage() {
     setLines((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== lineId)))
   }
 
-  function setLineProduct(lineId: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number) {
+  function setLineProduct(lineId: string, compositeValue: string, productName: string, qtyPerCtn: number, availableCtn: number, availablePcs: number) {
     const isIndia = compositeValue.startsWith('india:')
     const source: 'china' | 'india' = isIndia ? 'india' : 'china'
     const productId = compositeValue.includes(':') ? compositeValue.slice(compositeValue.indexOf(':') + 1) : compositeValue
-    setProductStock((prev) => ({ ...prev, [productId]: { availableCtn, qtyPerCtn } }))
+    setProductStock((prev) => ({ ...prev, [productId]: { availableCtn, availablePcs, qtyPerCtn } }))
     setLines((prev) =>
       prev.map((r) =>
         r.id === lineId
@@ -400,9 +408,13 @@ export default function EditSellBillPage() {
     companyId &&
     lines.some((r) => r.productId && r.pcsSold > 0 && r.ratePerPcs >= 0)
 
-  /** For edit: available PCS = in-stock PCS + this line's original PCS (already on this bill). Use productStock so we use fresh product data, not line.availableCtn which can be 0 when all sold. */
-  function getAvailablePcsForEdit(row: LineRow): number {
+  /** PCS currently in stock for this line's product, excluding anything already on this bill. Uses productStock so we read fresh product data, not line.availableCtn which can be 0 when all sold. */
+  function getInStockPcs(row: LineRow): number {
     const product = productStock[row.productId]
+    // Prefer the API's per-batch pcs total; availableCtn × qtyPerCtn is only a
+    // fallback and is wrong when batches have different carton sizes.
+    if (product?.availablePcs != null) return Math.round(product.availablePcs)
+
     const availableCtn = product?.availableCtn ?? row.availableCtn ?? 0
     const fromProduct =
       product?.qtyPerCtn && product.qtyPerCtn > 0 ? product.qtyPerCtn : null
@@ -412,15 +424,13 @@ export default function EditSellBillPage() {
         : null
     const fromRow = row.qtyPerCtn && row.qtyPerCtn > 0 ? row.qtyPerCtn : null
 
-    const qtyPerCtn =
-      fromProduct ??
-      fromOriginal ??
-      fromRow ??
-      1
+    const qtyPerCtn = fromProduct ?? fromOriginal ?? fromRow ?? 1
+    return Math.round(availableCtn * qtyPerCtn)
+  }
 
-    const inStock = Math.round(availableCtn * qtyPerCtn)
-    const onThisBill = row.originalPcs ?? 0
-    return inStock + onThisBill
+  /** For edit: available PCS = in-stock PCS + this line's original PCS (already on this bill, so editing down is always allowed). */
+  function getAvailablePcsForEdit(row: LineRow): number {
+    return getInStockPcs(row) + (row.originalPcs ?? 0)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -437,7 +447,7 @@ export default function EditSellBillPage() {
     })
     if (over) {
       const maxPcs = getAvailablePcsForEdit(over)
-      const inStock = maxPcs - (over.originalPcs ?? 0)
+      const inStock = getInStockPcs(over)
       toast.error(
         `Only ${maxPcs} pcs available for ${over.productName || 'this product'} (${inStock} in stock + ${over.originalPcs ?? 0} on this bill).`
       )
@@ -616,13 +626,13 @@ export default function EditSellBillPage() {
                         <ProductSelect
                           value={row.productId ? `${row.productSource}:${row.productId}` : ''}
                           selectedLabel={row.productName}
-                          onValueChange={(v, label, qtyPerCtn, availableCtn) => setLineProduct(row.id, v, label, qtyPerCtn, availableCtn)}
+                          onValueChange={(v, label, qtyPerCtn, availableCtn, availablePcs) => setLineProduct(row.id, v, label, qtyPerCtn, availableCtn, availablePcs)}
                         />
                         {row.productId ? (
                           <p className="text-xs text-muted-foreground">
                             {row.originalCtn > 0
-                              ? `Available for edit: ${getAvailablePcsForEdit(row)} pcs (${getAvailablePcsForEdit(row) - (row.originalPcs ?? 0)} in stock + ${row.originalPcs ?? 0} on this bill)`
-                              : `Available: ${row.availableCtn} CTN (${Math.round(row.availableCtn * (row.qtyPerCtn || 1))} pcs)`}
+                              ? `Available for edit: ${getAvailablePcsForEdit(row)} pcs (${getInStockPcs(row)} in stock + ${row.originalPcs ?? 0} on this bill)`
+                              : `Available: ${row.availableCtn} CTN (${getInStockPcs(row)} pcs)`}
                           </p>
                         ) : null}
                       </div>

@@ -72,6 +72,37 @@ export async function GET(
                 ],
               },
             },
+            // Locked-only totals: what processFIFO will actually let you sell.
+            // availableCtn/availablePcs above stay unfiltered so the product page
+            // keeps reporting physical stock.
+            sellableCtnIndia: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ['$chinaWarehouseReceived', 'yes'] },
+                      { $eq: ['$isLocked', true] },
+                    ],
+                  },
+                  '$availableCtn',
+                  0,
+                ],
+              },
+            },
+            sellablePcsIndia: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ['$chinaWarehouseReceived', 'yes'] },
+                      { $eq: ['$isLocked', true] },
+                    ],
+                  },
+                  { $multiply: ['$availableCtn', '$qty'] },
+                  0,
+                ],
+              },
+            },
             chinaFactoryCtn: {
               $sum: {
                 $cond: [
@@ -140,6 +171,8 @@ export async function GET(
         totalCtn: 0,
         availableCtnIndia: 0,
         availablePcsIndia: 0,
+        sellableCtnIndia: 0,
+        sellablePcsIndia: 0,
         inTransitCtn: 0,
         chinaFactoryCtn: 0,
         chinaWhCtn: 0,
@@ -152,6 +185,8 @@ export async function GET(
     // Round to 2dp to eliminate floating-point residuals from FIFO division
     const availableCtn = Math.round((stats.availableCtnIndia ?? 0) * 100) / 100
     const availablePcs = Math.round((stats.availablePcsIndia ?? 0) * 100) / 100
+    const sellableCtn = Math.round((stats.sellableCtnIndia ?? 0) * 100) / 100
+    const sellablePcs = Math.round((stats.sellablePcsIndia ?? 0) * 100) / 100
     const totalSoldCtn = Math.round((stats.soldCtn ?? 0) * 100) / 100
     const inTransitCtn = stats.inTransitCtn ?? 0
     const chinaFactoryCtn = stats.chinaFactoryCtn ?? 0
@@ -212,6 +247,8 @@ export async function GET(
         totalCtn,
         availableCtn,
         availablePcs,
+        sellableCtn,
+        sellablePcs,
         totalSoldCtn,
         chinaWhCtn,
         inTransitCtn,

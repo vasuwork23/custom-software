@@ -234,7 +234,8 @@ export default function QuickBillPage() {
     value: string,
     label: string,
     qtyPerCtn: number,
-    availableCtn: number
+    availableCtn: number,
+    availablePcs: number
   ) {
     setDrafts((prev) =>
       prev.map((d) => {
@@ -252,7 +253,7 @@ export default function QuickBillPage() {
               productLabel: label,
               qtyPerCtn,
               availableCtn,
-              availablePcs: Math.round(availableCtn * qtyPerCtn),
+              availablePcs,
               ctn: parseFloat(ctn.toFixed(4)),
               pcs,
               confidence: 'high',
@@ -746,8 +747,8 @@ export default function QuickBillPage() {
                               <ProductSelect
                                 value={item.productValue ?? ''}
                                 selectedLabel={item.productLabel ?? ''}
-                                onValueChange={(v, label, qtyPerCtn, availableCtn) =>
-                                  setItemProduct(draft.key, i, v, label, qtyPerCtn, availableCtn)
+                                onValueChange={(v, label, qtyPerCtn, availableCtn, availablePcs) =>
+                                  setItemProduct(draft.key, i, v, label, qtyPerCtn, availableCtn, availablePcs)
                                 }
                               />
                               {item.productValue && (
