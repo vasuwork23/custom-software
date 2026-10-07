@@ -27,6 +27,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 interface ProductOption {
   value: string
@@ -167,6 +168,7 @@ interface BankAccountOption {
 
 export default function EditSellBillPage() {
   const router = useRouter()
+  const listHref = useListHref('/sale-bills')
   const params = useParams()
   const id = params?.id as string
   const [companyOptions, setCompanyOptions] = useState<SearchableSelectOption<string>[]>([])
@@ -496,7 +498,7 @@ export default function EditSellBillPage() {
         title="Edit Sale Bill"
         breadcrumb={
           <>
-            <Link href="/sale-bills" className="text-muted-foreground hover:text-foreground">
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">
               Sale Bills
             </Link>
             <span className="text-muted-foreground"> / Edit</span>

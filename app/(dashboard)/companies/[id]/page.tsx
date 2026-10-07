@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { format } from 'date-fns'
 import { cn, generateOutstandingFileName } from '@/lib/utils'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 interface SellingRow {
   _id: string
@@ -67,6 +68,7 @@ interface CompanyDetailData {
 export default function CompanyDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/companies')
   const id = params?.id as string
   const [data, setData] = useState<CompanyDetailData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -221,7 +223,7 @@ export default function CompanyDetailPage() {
         }
         breadcrumb={
           <>
-            <Link href="/companies" className="text-muted-foreground hover:text-foreground">
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">
               Companies
             </Link>
             <span className="text-muted-foreground"> / </span>

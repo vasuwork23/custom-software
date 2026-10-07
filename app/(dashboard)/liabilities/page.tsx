@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import { format } from 'date-fns'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api-client'
 import { toast } from 'sonner'
+import { useUrlParams, useSyncUrlParams } from '@/hooks/useUrlFilters'
 
 type Source = 'cash' | 'bank'
 type StatusFilter = 'all' | 'blocked' | 'unblocked'
@@ -41,11 +42,13 @@ interface BankAccountOption {
   type: 'cash' | 'online'
 }
 
-export default function LiabilitiesPage() {
+function LiabilitiesPageContent() {
   const [liabilities, setLiabilities] = useState<Liability[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<StatusFilter>('all')
+  const url = useUrlParams()
+  const [filter, setFilter] = useState<StatusFilter>(() => url.oneOf('status', ['all', 'blocked', 'unblocked'], 'all'))
+  useSyncUrlParams({ status: filter !== 'all' ? filter : undefined })
   const [showBlock, setShowBlock] = useState(false)
   const [showUnblock, setShowUnblock] = useState(false)
   const [amount, setAmount] = useState('')
@@ -454,3 +457,10 @@ export default function LiabilitiesPage() {
   )
 }
 
+export default function LiabilitiesPage() {
+  return (
+    <Suspense fallback={null}>
+      <LiabilitiesPageContent />
+    </Suspense>
+  )
+}

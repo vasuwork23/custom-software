@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Building2, LayoutGrid, List, Plus, Pencil, Trash2, Wallet, MessageCircle, Download } from 'lucide-react'
@@ -15,6 +15,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { apiGet, apiDelete, apiPost, authHeaders } from '@/lib/api-client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useUrlParams, useSyncUrlParams, useOnFiltersChange } from '@/hooks/useUrlFilters'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -38,6 +39,8 @@ function AlertDots({ level }: { level: 0 | 1 | 2 | 3 }) {
 type ViewMode = 'card' | 'table'
 type OutstandingFilter = 'all' | 'positive' | 'negative' | 'clear'
 
+const OUTSTANDING_FILTERS: OutstandingFilter[] = ['all', 'positive', 'negative', 'clear']
+
 interface CompanyItem {
   _id: string
   companyName: string
@@ -58,10 +61,20 @@ interface CompanyItem {
 }
 
 export default function CompaniesPage() {
+  return (
+    <Suspense fallback={<TableSkeleton rows={8} columns={6} />}>
+      <CompaniesPageContent />
+    </Suspense>
+  )
+}
+
+function CompaniesPageContent() {
   const router = useRouter()
-  const [search, setSearch] = useState('')
-  const [view, setView] = useState<ViewMode>('table')
-  const [page, setPage] = useState(1)
+  // Filters are initialised from the URL so they survive navigating into a company and back
+  const url = useUrlParams()
+  const [search, setSearch] = useState(() => url.str('search'))
+  const [view, setView] = useState<ViewMode>(() => url.oneOf('view', ['card', 'table'], 'table'))
+  const [page, setPage] = useState(() => url.int('page', 1))
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{
     companies: CompanyItem[]
@@ -71,12 +84,14 @@ export default function CompaniesPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
-  const [outstandingFilter, setOutstandingFilter] = useState<OutstandingFilter>('all')
+  const [outstandingFilter, setOutstandingFilter] = useState<OutstandingFilter>(() =>
+    url.oneOf('outstanding', OUTSTANDING_FILTERS, 'all')
+  )
   const [whatsappCompany, setWhatsappCompany] = useState<CompanyItem | null>(null)
   const [whatsappPhone, setWhatsappPhone] = useState('')
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
-  const [minOutstanding, setMinOutstanding] = useState('')
-  const [maxOutstanding, setMaxOutstanding] = useState('')
+  const [minOutstanding, setMinOutstanding] = useState(() => url.str('min'))
+  const [maxOutstanding, setMaxOutstanding] = useState(() => url.str('max'))
   const debouncedSearch = useDebounce(search, 400)
   const debouncedOutstandingFilter = useDebounce(outstandingFilter, 400)
   const debouncedMinOutstanding = useDebounce(minOutstanding, 400)
@@ -105,9 +120,19 @@ export default function CompaniesPage() {
     fetchCompanies()
   }, [fetchCompanies])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, debouncedOutstandingFilter, debouncedMinOutstanding, debouncedMaxOutstanding])
+  useOnFiltersChange(
+    [debouncedSearch, debouncedOutstandingFilter, debouncedMinOutstanding, debouncedMaxOutstanding],
+    () => setPage(1)
+  )
+
+  useSyncUrlParams({
+    search: debouncedSearch.trim(),
+    outstanding: debouncedOutstandingFilter !== 'all' ? debouncedOutstandingFilter : undefined,
+    min: debouncedMinOutstanding.trim(),
+    max: debouncedMaxOutstanding.trim(),
+    view: view !== 'table' ? view : undefined,
+    page: page > 1 ? page : undefined,
+  })
 
   function openAdd() {
     setEditingCompany(null)

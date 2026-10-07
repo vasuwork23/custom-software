@@ -16,6 +16,7 @@ import { authHeaders } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { cn, generateBillFileName } from '@/lib/utils'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 interface FifoItem {
   buyingEntry: { _id: string; entryDate?: string }
@@ -71,6 +72,7 @@ interface BillDetail {
 export default function SellBillDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/sale-bills')
   const id = params?.id as string
   const [bill, setBill] = useState<BillDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -142,7 +144,7 @@ export default function SellBillDetailPage() {
     const result = await apiDelete(`/api/sell-bills/${id}`)
     if (result.success) {
       toast.success('Bill deleted')
-      router.push('/sale-bills')
+      router.push(listHref)
     } else toast.error(result.message)
   }
 
@@ -179,7 +181,7 @@ export default function SellBillDetailPage() {
         description={format(new Date(bill.billDate), 'PPP')}
         breadcrumb={
           <>
-            <Link href="/sale-bills" className="text-muted-foreground hover:text-foreground">
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">
               Sale Bills
             </Link>
             <span className="text-muted-foreground"> / Bill #{bill.billNumber}</span>

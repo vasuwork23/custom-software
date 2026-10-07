@@ -32,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 interface ContainerEntry {
   buyingEntry: string | { _id: string; mark?: string; entryDate?: string; inTransitCtn?: number }
@@ -76,6 +77,7 @@ function statusBadgeClass(status: string): string {
 export default function ContainerDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/containers')
   const id = params?.id as string
   const [data, setData] = useState<ContainerDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -216,7 +218,7 @@ export default function ContainerDetailPage() {
         description={data.containerName}
         breadcrumb={
           <>
-            <Link href="/containers" className="text-muted-foreground hover:text-foreground">Containers</Link>
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">Containers</Link>
             <span className="text-muted-foreground"> / </span>
             <span>{data.containerName}</span>
           </>

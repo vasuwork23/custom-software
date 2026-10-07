@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, Suspense } from 'react'
 import { format } from 'date-fns'
 import { Trash2, FileDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { useDebounce } from '@/hooks/useDebounce'
 import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
 import { exportTableToPdf } from '@/lib/exportPdf'
+import { useUrlParams, useSyncUrlParams, dateRangeParams } from '@/hooks/useUrlFilters'
 
 interface CashTransactionRow {
   _id: string
@@ -37,13 +38,16 @@ interface CashHistoryData {
   totalPages: number
 }
 
-export default function CashHistoryPage() {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [page, setPage] = useState(1)
+function CashHistoryPageContent() {
+  const url = useUrlParams()
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
+  const [page, setPage] = useState(() => url.int('page', 1))
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<CashHistoryData | null>(null)
-  const [typeFilter, setTypeFilter] = useState<'all' | 'credit' | 'debit'>('all')
-  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'credit' | 'debit'>(() =>
+    url.oneOf('type', ['all', 'credit', 'debit'], 'all')
+  )
+  const [search, setSearch] = useState(() => url.str('search'))
   const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
   const [exportingAll, setExportingAll] = useState(false)
@@ -70,6 +74,13 @@ export default function CashHistoryPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useSyncUrlParams({
+    search: debouncedSearch.trim(),
+    type: typeFilter !== 'all' ? typeFilter : undefined,
+    ...dateRangeParams(dateRange),
+    page: page > 1 ? page : undefined,
+  })
 
   const handleDeleteCashTransaction = async (tx: CashTransactionRow) => {
     setDeletingTxId(tx._id)
@@ -377,3 +388,10 @@ export default function CashHistoryPage() {
   )
 }
 
+export default function CashHistoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <CashHistoryPageContent />
+    </Suspense>
+  )
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -17,6 +17,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { cn } from '@/lib/utils'
 import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
 import { exportTableToPdf } from '@/lib/exportPdf'
+import { useUrlParams, useSyncUrlParams, useOnFiltersChange, useListHref } from '@/hooks/useUrlFilters'
 
 interface TransactionRow {
   _id: string
@@ -45,13 +46,17 @@ interface PageData {
   pagination: { page: number; limit: number; total: number; pages: number }
 }
 
-export default function JackDetailPage() {
+function JackDetailPageContent() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/sophia')
   const id = typeof params.id === 'string' ? params.id : ''
   const [data, setData] = useState<PageData | null>(null)
-  const [page, setPage] = useState(1)
-  const [typeFilter, setTypeFilter] = useState<'all' | 'pay_in' | 'pay_out'>('all')
+  const url = useUrlParams()
+  const [page, setPage] = useState(() => url.int('page', 1))
+  const [typeFilter, setTypeFilter] = useState<'all' | 'pay_in' | 'pay_out'>(() =>
+    url.oneOf('type', ['all', 'pay_in', 'pay_out'], 'all')
+  )
   const [loading, setLoading] = useState(true)
   const [payDialogOpen, setPayDialogOpen] = useState(false)
   const [payMode, setPayMode] = useState<'pay_in' | 'pay_out'>('pay_in')
@@ -75,9 +80,12 @@ export default function JackDetailPage() {
     fetchData()
   }, [fetchData])
 
-  useEffect(() => {
-    setPage(1)
-  }, [typeFilter])
+  useOnFiltersChange([typeFilter], () => setPage(1))
+
+  useSyncUrlParams({
+    type: typeFilter !== 'all' ? typeFilter : undefined,
+    page: page > 1 ? page : undefined,
+  })
 
   async function handleDeleteTx(tx: TransactionRow) {
     const result = await apiDelete(`/api/sophia/transactions/${tx._id}`)
@@ -156,7 +164,7 @@ export default function JackDetailPage() {
     <div className="space-y-6">
       <PageHeader
         breadcrumb={
-          <Link href="/sophia" className="text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <Link href={listHref} className="text-muted-foreground hover:text-foreground flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" />
             Sophia
           </Link>
@@ -376,5 +384,13 @@ export default function JackDetailPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function JackDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <JackDetailPageContent />
+    </Suspense>
   )
 }

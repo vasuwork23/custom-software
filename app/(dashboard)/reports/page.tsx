@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
   XAxis,
@@ -23,6 +23,7 @@ import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { cn } from '@/lib/utils'
 import type { DateRange } from 'react-day-picker'
 import { TrendChart, type TrendRow } from '@/components/reports/TrendChart'
+import { useUrlParams, useSyncUrlParams, dateRangeParams, boolParam } from '@/hooks/useUrlFilters'
 
 type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
 type Granularity = 'day' | 'week' | 'month'
@@ -43,17 +44,30 @@ const GRANULARITY_LABEL: Record<Granularity, string> = {
   month: 'Monthly',
 }
 
-export default function ReportsPage() {
-  const [period, setPeriod] = useState<Period>('today')
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+function ReportsPageContent() {
+  const url = useUrlParams()
+  const [period, setPeriod] = useState<Period>(() => url.oneOf('period', PERIODS, 'today'))
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
   // 'auto' lets the API pick one step finer than the period; the toggle overrides it.
-  const [granularity, setGranularity] = useState<Granularity | 'auto'>('auto')
+  const [granularity, setGranularity] = useState<Granularity | 'auto'>(() =>
+    url.oneOf('granularity', ['auto', 'day', 'week', 'month'], 'auto')
+  )
   const [drillStack, setDrillStack] = useState<{ period: Period; dateRange?: DateRange; label: string }[]>([])
-  const [withExpenses, setWithExpenses] = useState(true)
+  const [withExpenses, setWithExpenses] = useState(() => url.bool('expenses', true))
   const [loading, setLoading] = useState(true)
-  const [showAvailableOnly, setShowAvailableOnly] = useState(true)
-  const [archive, setArchive] = useState('')
-  const [reportTab, setReportTab] = useState('pnl')
+  const [showAvailableOnly, setShowAvailableOnly] = useState(() => url.bool('availableOnly', true))
+  const [archive, setArchive] = useState(() => url.str('archive'))
+  const [reportTab, setReportTab] = useState(() => url.oneOf('tab', ['pnl', 'stock', 'selling'], 'pnl'))
+
+  useSyncUrlParams({
+    tab: reportTab !== 'pnl' ? reportTab : undefined,
+    period: period !== 'today' ? period : undefined,
+    ...(period === 'custom' ? dateRangeParams(dateRange) : {}),
+    granularity: granularity !== 'auto' ? granularity : undefined,
+    expenses: boolParam(withExpenses, true),
+    availableOnly: boolParam(showAvailableOnly, true),
+    archive,
+  })
   const [archives, setArchives] = useState<{ name: string; resetDate: string; sellBills: number }[]>([])
   const [pnl, setPnl] = useState<{
     summary: { revenue: number; cost: number; grossProfit: number; totalExpenses: number; netProfit: number; marginPct: number; netMarginPct: number; ctnSold: number }
@@ -1050,5 +1064,13 @@ export default function ReportsPage() {
         )}
       </Tabs>
     </div>
+  )
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReportsPageContent />
+    </Suspense>
   )
 }

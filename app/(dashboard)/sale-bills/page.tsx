@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FileText, Plus, Pencil, Trash2, Download, Sparkles } from 'lucide-react'
@@ -19,6 +19,7 @@ import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Pagination } from '@/components/ui/Pagination'
 import { generateBillFileName } from '@/lib/utils'
+import { useUrlParams, useSyncUrlParams, dateRangeParams } from '@/hooks/useUrlFilters'
 
 interface BillRow {
   _id: string
@@ -38,11 +39,12 @@ interface BillRow {
   contact2Mobile?: string
 }
 
-export default function SellBillsPage() {
+function SellBillsPageContent() {
   const router = useRouter()
-  const [search, setSearch] = useState('')
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [page, setPage] = useState(1)
+  const url = useUrlParams()
+  const [search, setSearch] = useState(() => url.str('search'))
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
+  const [page, setPage] = useState(() => url.int('page', 1))
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [data, setData] = useState<{
@@ -70,6 +72,12 @@ export default function SellBillsPage() {
   useEffect(() => {
     fetchBills()
   }, [fetchBills])
+
+  useSyncUrlParams({
+    search: debouncedSearch.trim(),
+    ...dateRangeParams(dateRange),
+    page: page > 1 ? page : undefined,
+  })
 
   async function handleDelete(billId: string) {
     const result = await apiDelete(`/api/sell-bills/${billId}`)
@@ -276,5 +284,13 @@ export default function SellBillsPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function SellBillsPage() {
+  return (
+    <Suspense fallback={<TableSkeleton rows={10} columns={6} />}>
+      <SellBillsPageContent />
+    </Suspense>
   )
 }

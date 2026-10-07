@@ -31,6 +31,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ interface BankAccountOption {
 
 export default function NewSellBillPage() {
   const router = useRouter()
+  const listHref = useListHref('/sale-bills')
   const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([])
   const [companyId, setCompanyId] = useState<string>('')
   const [bankAccountId, setBankAccountId] = useState<string>('')
@@ -267,7 +269,7 @@ export default function NewSellBillPage() {
         title="New Sale Bill"
         breadcrumb={
           <>
-            <Link href="/sale-bills" className="text-muted-foreground hover:text-foreground">
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">
               Sale Bills
             </Link>
             <span className="text-muted-foreground"> / New</span>
@@ -514,7 +516,7 @@ export default function NewSellBillPage() {
             {saving ? 'Saving...' : 'Save Bill'}
           </Button>
           <Button type="button" variant="outline" asChild>
-            <Link href="/sale-bills">Cancel</Link>
+            <Link href={listHref}>Cancel</Link>
           </Button>
         </div>
       </form>

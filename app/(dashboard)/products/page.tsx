@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import { Package, LayoutGrid, List, Plus } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Pagination } from '@/components/ui/Pagination'
+import { useUrlParams, useSyncUrlParams, useOnFiltersChange } from '@/hooks/useUrlFilters'
 
 type ViewMode = 'card' | 'table'
 
@@ -58,12 +59,13 @@ interface IndiaProductItem {
   hasUnpaidEntries: boolean
 }
 
-export default function ProductsPage() {
-  const [activeTab, setActiveTab] = useState<'china' | 'india'>('china')
-  const [search, setSearch] = useState('')
-  const [view, setView] = useState<ViewMode>('card')
-  const [page, setPage] = useState(1)
-  const [indiaPage, setIndiaPage] = useState(1)
+function ProductsPageContent() {
+  const url = useUrlParams()
+  const [activeTab, setActiveTab] = useState<'china' | 'india'>(() => url.oneOf('tab', ['china', 'india'], 'china'))
+  const [search, setSearch] = useState(() => url.str('search'))
+  const [view, setView] = useState<ViewMode>(() => url.oneOf('view', ['card', 'table'], 'card'))
+  const [page, setPage] = useState(() => url.int('page', 1))
+  const [indiaPage, setIndiaPage] = useState(() => url.int('indiaPage', 1))
   const [loading, setLoading] = useState(true)
   const [indiaLoading, setIndiaLoading] = useState(true)
   const [data, setData] = useState<{
@@ -92,7 +94,8 @@ export default function ProductsPage() {
   const [indiaFilter, setIndiaFilter] = useState<IndiaFilterType>(() => {
     if (typeof window === 'undefined') return 'all'
     const s = sessionStorage.getItem(INDIA_FILTER_KEY)
-    return (INDIA_ALLOWED_FILTERS.includes(s as IndiaFilterType) ? s : 'all') as IndiaFilterType
+    const stored = (INDIA_ALLOWED_FILTERS.includes(s as IndiaFilterType) ? s : 'all') as IndiaFilterType
+    return url.oneOf('indiaFilter', INDIA_ALLOWED_FILTERS, stored)
   })
   const [dialogOpen, setDialogOpen] = useState(false)
   const [indiaDialogOpen, setIndiaDialogOpen] = useState(false)
@@ -103,7 +106,8 @@ export default function ProductsPage() {
   const [chinaFilter, setChinaFilter] = useState<ChinaFilterType>(() => {
     if (typeof window === 'undefined') return 'all'
     const s = sessionStorage.getItem(CHINA_FILTER_KEY)
-    return (ALLOWED_FILTERS.includes(s as ChinaFilterType) ? s : 'all') as ChinaFilterType
+    const stored = (ALLOWED_FILTERS.includes(s as ChinaFilterType) ? s : 'all') as ChinaFilterType
+    return url.oneOf('chinaFilter', ALLOWED_FILTERS, stored)
   })
   const debouncedSearch = useDebounce(search, 400)
 
@@ -170,14 +174,19 @@ export default function ProductsPage() {
     if (activeTab === 'china') fetchProducts()
   }, [activeTab, fetchProducts])
 
-  // Reset to first page when filter or search changes
-  useEffect(() => {
-    setPage(1)
-  }, [chinaFilter, debouncedSearch])
+  // Reset to first page when filter or search changes (not on mount, so a page from the URL is kept)
+  useOnFiltersChange([chinaFilter, debouncedSearch], () => setPage(1))
+  useOnFiltersChange([indiaFilter, debouncedSearch], () => setIndiaPage(1))
 
-  useEffect(() => {
-    setIndiaPage(1)
-  }, [indiaFilter, debouncedSearch])
+  useSyncUrlParams({
+    tab: activeTab !== 'china' ? activeTab : undefined,
+    search: debouncedSearch.trim(),
+    view: view !== 'card' ? view : undefined,
+    chinaFilter: chinaFilter !== 'all' ? chinaFilter : undefined,
+    indiaFilter: indiaFilter !== 'all' ? indiaFilter : undefined,
+    page: page > 1 ? page : undefined,
+    indiaPage: indiaPage > 1 ? indiaPage : undefined,
+  })
 
   useEffect(() => {
     if (activeTab === 'india') fetchIndiaProducts()
@@ -836,5 +845,13 @@ export default function ProductsPage() {
         submitLabel="Create"
       />
     </div>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProductsPageContent />
+    </Suspense>
   )
 }

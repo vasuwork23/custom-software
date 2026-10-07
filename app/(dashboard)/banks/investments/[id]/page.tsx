@@ -13,6 +13,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { apiDelete, apiGet } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 interface InvestmentInfo {
   _id: string
@@ -37,6 +38,7 @@ interface PageData {
 export default function InvestmentHistoryPage() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/banks')
   const id = typeof params.id === 'string' ? params.id : ''
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<PageData | null>(null)
@@ -100,7 +102,7 @@ export default function InvestmentHistoryPage() {
         title={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
-              <Link href="/banks">
+              <Link href={listHref}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>

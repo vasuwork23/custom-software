@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { format } from 'date-fns'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Pagination } from '@/components/ui/Pagination'
 import { Receipt } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
+import { useUrlParams, useSyncUrlParams, useOnFiltersChange, dateRangeParams } from '@/hooks/useUrlFilters'
 
 interface ExpenseRow {
   _id: string
@@ -37,14 +38,15 @@ interface ExpensesData {
   summary: { today: number; thisMonth: number; thisYear: number; dateRange: number | null }
 }
 
-export default function ExpensesPage() {
+function ExpensesPageContent() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<ExpensesData | null>(null)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [paidFromFilter, setPaidFromFilter] = useState('')
-  const [search, setSearch] = useState('')
+  const url = useUrlParams()
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
+  const [paidFromFilter, setPaidFromFilter] = useState(() => url.str('paidFrom'))
+  const [search, setSearch] = useState(() => url.str('search'))
   const debouncedSearch = useDebounce(search, 400)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => url.int('page', 1))
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<ExpenseFormValues | null>(null)
   const [accountOptions, setAccountOptions] = useState<SearchableSelectOption<string>[]>([])
@@ -74,9 +76,14 @@ export default function ExpensesPage() {
     fetchExpenses()
   }, [fetchExpenses])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, dateRange?.from, dateRange?.to, paidFromFilter])
+  useOnFiltersChange([debouncedSearch, dateRange?.from, dateRange?.to, paidFromFilter], () => setPage(1))
+
+  useSyncUrlParams({
+    search: debouncedSearch.trim(),
+    paidFrom: paidFromFilter,
+    ...dateRangeParams(dateRange),
+    page: page > 1 ? page : undefined,
+  })
 
   useEffect(() => {
     fetchAccounts()
@@ -266,5 +273,13 @@ export default function ExpensesPage() {
         editExpense={editingExpense}
       />
     </div>
+  )
+}
+
+export default function ExpensesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ExpensesPageContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback, Suspense } from 'react'
 import { DateRange } from 'react-day-picker'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { format } from 'date-fns'
@@ -13,6 +13,7 @@ import type { CarryingBill } from '@/lib/carrying-types'
 import { apiGet, apiPost, apiDelete } from '@/lib/api-client'
 import { useDebounce } from '@/hooks/useDebounce'
 import { Plus } from 'lucide-react'
+import { useUrlParams, useSyncUrlParams, dateRangeParams } from '@/hooks/useUrlFilters'
 
 interface CarryingListResponse {
   bills: (CarryingBill & {
@@ -34,15 +35,16 @@ function formatMoney(n: number): string {
   }).format(n)
 }
 
-export default function CarryingPage() {
+function CarryingPageContent() {
   const [bills, setBills] = useState<CarryingListResponse['bills']>([])
   const [totals, setTotals] = useState<CarryingListResponse['totals']>({
     totalCBM: 0,
     totalAmount: 0,
     totalProfit: 0,
   })
-  const [search, setSearch] = useState('')
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const url = useUrlParams()
+  const [search, setSearch] = useState(() => url.str('search'))
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingBill, setEditingBill] = useState<CarryingBill | null>(null)
   const [viewingBill, setViewingBill] = useState<CarryingBill | null>(null)
@@ -50,6 +52,8 @@ export default function CarryingPage() {
 
   const debouncedSearch = useDebounce(search, 400)
   const debouncedRange = useDebounce(dateRange, 400)
+
+  useSyncUrlParams({ search: debouncedSearch.trim(), ...dateRangeParams(debouncedRange) })
 
   const fetchBills = useCallback(
     (overrideSearch?: string, overrideRange?: DateRange | undefined) => {
@@ -206,5 +210,13 @@ export default function CarryingPage() {
         onSave={handleSave}
       />
     </div>
+  )
+}
+
+export default function CarryingPage() {
+  return (
+    <Suspense fallback={null}>
+      <CarryingPageContent />
+    </Suspense>
   )
 }

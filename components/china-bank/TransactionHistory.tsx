@@ -16,6 +16,7 @@ import { apiGet, apiDelete } from '@/lib/api-client'
 import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
+import { useUrlParams, useSyncUrlParams, useOnFiltersChange, dateRangeParams } from '@/hooks/useUrlFilters'
 
 interface Transaction {
   _id: string
@@ -45,13 +46,17 @@ export function TransactionHistory({
   onRefresh?: () => void
   refreshTrigger?: number
 }) {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [page, setPage] = useState(1)
+  const url = useUrlParams()
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
+  const [page, setPage] = useState(() => url.int('page', 1))
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{ transactions: Transaction[]; pagination: Pagination } | null>(null)
-  const [selectedTypes, setSelectedTypes] = useState<Set<'credit' | 'debit' | 'reversal'>>(new Set())
+  const [selectedTypes, setSelectedTypes] = useState<Set<'credit' | 'debit' | 'reversal'>>(() => {
+    const allowed = ['credit', 'debit', 'reversal'] as const
+    return new Set(url.str('types').split(',').filter((t): t is (typeof allowed)[number] => (allowed as readonly string[]).includes(t)))
+  })
   const [exportingAll, setExportingAll] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => url.str('search'))
   const debouncedSearch = useDebounce(search, 400)
 
   const pdfColumns = ['Date', 'Type', 'Reference', 'Notes', 'Amount', 'Balance After']
@@ -127,9 +132,14 @@ export function TransactionHistory({
     else toast.error(result.message)
   }, [page, dateRange?.from, dateRange?.to, selectedTypes, debouncedSearch])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, dateRange?.from, dateRange?.to])
+  useOnFiltersChange([debouncedSearch, dateRange?.from, dateRange?.to], () => setPage(1))
+
+  useSyncUrlParams({
+    search: debouncedSearch.trim(),
+    types: Array.from(selectedTypes).sort().join(','),
+    ...dateRangeParams(dateRange),
+    page: page > 1 ? page : undefined,
+  })
 
   useEffect(() => {
     fetchTransactions()
