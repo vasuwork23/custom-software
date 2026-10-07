@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import { Ship, Plus, CheckCircle, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
+import { useUrlParams, useSyncUrlParams } from '@/hooks/useUrlFilters'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 type StatusFilter = 'all' | 'loading' | 'in_transit' | 'customs_clearance' | 'arrived' | 'inWarehouse'
+const STATUS_FILTERS: StatusFilter[] = ['all', 'loading', 'in_transit', 'customs_clearance', 'arrived', 'inWarehouse']
 
 interface ContainerEntry {
   buyingEntry: string
@@ -76,10 +78,12 @@ interface ContainersData {
   summary: { totalCtn: number }
 }
 
-export default function ContainersPage() {
+function ContainersPageContent() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<ContainersData | null>(null)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const url = useUrlParams()
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => url.oneOf('status', STATUS_FILTERS, 'all'))
+  useSyncUrlParams({ status: statusFilter !== 'all' ? statusFilter : undefined })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingContainer, setEditingContainer] = useState<ContainerItem | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -485,5 +489,13 @@ export default function ContainersPage() {
         editContainer={editingContainer ?? undefined}
       />
     </div>
+  )
+}
+
+export default function ContainersPage() {
+  return (
+    <Suspense fallback={<TableSkeleton rows={6} columns={5} />}>
+      <ContainersPageContent />
+    </Suspense>
   )
 }

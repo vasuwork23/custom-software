@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -19,6 +19,7 @@ import type { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 import { ExportPdfButton } from '@/components/ui/ExportPdfButton'
 import { exportTableToPdf } from '@/lib/exportPdf'
+import { useUrlParams, useSyncUrlParams, useOnFiltersChange, dateRangeParams, useListHref } from '@/hooks/useUrlFilters'
 
 interface BankTransactionRow {
   _id: string
@@ -44,19 +45,23 @@ interface PageData {
   pagination: { page: number; limit: number; total: number; pages: number }
 }
 
-export default function BankAccountHistoryPage() {
+function BankAccountHistoryPageContent() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/banks')
   const id = typeof params.id === 'string' ? params.id : ''
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [page, setPage] = useState(1)
+  const url = useUrlParams()
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
+  const [page, setPage] = useState(() => url.int('page', 1))
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<PageData | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => url.str('search'))
   const debouncedSearch = useDebounce(search, 400)
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null)
   const [exportingAll, setExportingAll] = useState(false)
-  const [typeFilter, setTypeFilter] = useState<'all' | 'credit' | 'debit'>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'credit' | 'debit'>(() =>
+    url.oneOf('type', ['all', 'credit', 'debit'], 'all')
+  )
 
   const fetchData = useCallback(async () => {
     if (!id) return
@@ -78,9 +83,14 @@ export default function BankAccountHistoryPage() {
     }
   }, [id, page, dateRange?.from, dateRange?.to, debouncedSearch, typeFilter, router])
 
-  useEffect(() => {
-    setPage(1)
-  }, [typeFilter, debouncedSearch, dateRange])
+  useOnFiltersChange([typeFilter, debouncedSearch, dateRange], () => setPage(1))
+
+  useSyncUrlParams({
+    search: debouncedSearch.trim(),
+    type: typeFilter !== 'all' ? typeFilter : undefined,
+    ...dateRangeParams(dateRange),
+    page: page > 1 ? page : undefined,
+  })
 
   useEffect(() => {
     fetchData()
@@ -172,7 +182,7 @@ export default function BankAccountHistoryPage() {
         title={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
-              <Link href="/banks">
+              <Link href={listHref}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
@@ -344,5 +354,13 @@ export default function BankAccountHistoryPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function BankAccountHistoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <BankAccountHistoryPageContent />
+    </Suspense>
   )
 }

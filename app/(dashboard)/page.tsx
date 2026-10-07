@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ArrowDownRight, ArrowUpRight, ChevronDown } from 'lucide-react'
@@ -16,8 +16,10 @@ import { apiGet } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
+import { useUrlParams, useSyncUrlParams, dateRangeParams } from '@/hooks/useUrlFilters'
 
 type DashboardPeriod = 'today' | 'week' | 'month' | 'year' | 'custom'
+const DASHBOARD_PERIODS: DashboardPeriod[] = ['today', 'week', 'month', 'year', 'custom']
 
 interface DashboardPnl {
   summary: {
@@ -154,17 +156,27 @@ interface ExtendedDashboardStats extends DashboardStats {
   }
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const { user } = useAuthStore()
-  const [period, setPeriod] = useState<DashboardPeriod>('today')
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const url = useUrlParams()
+  const [period, setPeriod] = useState<DashboardPeriod>(() => url.oneOf('period', DASHBOARD_PERIODS, 'today'))
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => url.dateRange())
   const [loadingPnl, setLoadingPnl] = useState(true)
   const [loadingStats, setLoadingStats] = useState(true)
   const [pnl, setPnl] = useState<DashboardPnl | null>(null)
   const [stats, setStats] = useState<ExtendedDashboardStats | null>(null)
-  const [daysFilter, setDaysFilter] = useState('')
+  const [daysFilter, setDaysFilter] = useState(() => url.str('days'))
   const [statsOpen, setStatsOpen] = useState(false)
-  const [productsTab, setProductsTab] = useState<'byDays' | 'never'>('byDays')
+  const [productsTab, setProductsTab] = useState<'byDays' | 'never'>(() =>
+    url.oneOf('productsTab', ['byDays', 'never'], 'byDays')
+  )
+
+  useSyncUrlParams({
+    period: period !== 'today' ? period : undefined,
+    ...(period === 'custom' ? dateRangeParams(dateRange) : {}),
+    days: daysFilter.trim(),
+    productsTab: productsTab !== 'byDays' ? productsTab : undefined,
+  })
 
   const buildPnlParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -1031,3 +1043,10 @@ export default function DashboardPage() {
   )
 }
 
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageContent />
+    </Suspense>
+  )
+}

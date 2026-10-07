@@ -27,6 +27,7 @@ import {
 import { apiGet, apiPost } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 // ─── Types (mirror of /api/sell-bills/parse response) ────────────────────────
 
@@ -159,6 +160,7 @@ const FORMAT_HINTS: [string, string][] = [
 
 export default function QuickBillPage() {
   const router = useRouter()
+  const listHref = useListHref('/sale-bills')
   const [rawText, setRawText] = useState('')
   const [parsing, setParsing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -234,7 +236,8 @@ export default function QuickBillPage() {
     value: string,
     label: string,
     qtyPerCtn: number,
-    availableCtn: number
+    availableCtn: number,
+    availablePcs: number
   ) {
     setDrafts((prev) =>
       prev.map((d) => {
@@ -252,7 +255,7 @@ export default function QuickBillPage() {
               productLabel: label,
               qtyPerCtn,
               availableCtn,
-              availablePcs: Math.round(availableCtn * qtyPerCtn),
+              availablePcs,
               ctn: parseFloat(ctn.toFixed(4)),
               pcs,
               confidence: 'high',
@@ -434,7 +437,7 @@ export default function QuickBillPage() {
         title="Quick Bill from Message"
         breadcrumb={
           <>
-            <Link href="/sale-bills" className="text-muted-foreground hover:text-foreground">
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">
               Sale Bills
             </Link>
             <span className="text-muted-foreground"> / Quick Bill</span>
@@ -492,7 +495,7 @@ export default function QuickBillPage() {
             <Button size="sm" variant="outline" onClick={reset}>
               Paste another message
             </Button>
-            <Button size="sm" onClick={() => router.push('/sale-bills')}>
+            <Button size="sm" onClick={() => router.push(listHref)}>
               Go to Sale Bills
             </Button>
           </div>
@@ -556,7 +559,7 @@ export default function QuickBillPage() {
               Try sample
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/sale-bills">Cancel</Link>
+              <Link href={listHref}>Cancel</Link>
             </Button>
           </div>
 
@@ -746,8 +749,8 @@ export default function QuickBillPage() {
                               <ProductSelect
                                 value={item.productValue ?? ''}
                                 selectedLabel={item.productLabel ?? ''}
-                                onValueChange={(v, label, qtyPerCtn, availableCtn) =>
-                                  setItemProduct(draft.key, i, v, label, qtyPerCtn, availableCtn)
+                                onValueChange={(v, label, qtyPerCtn, availableCtn, availablePcs) =>
+                                  setItemProduct(draft.key, i, v, label, qtyPerCtn, availableCtn, availablePcs)
                                 }
                               />
                               {item.productValue && (

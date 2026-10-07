@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -22,6 +22,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Pagination } from '@/components/ui/Pagination'
 import type { IndiaBuyingEntryRow } from '@/components/products/IndiaBuyingEntryTable'
 import { cn } from '@/lib/utils'
+import { useUrlParams, useSyncUrlParams, useListHref } from '@/hooks/useUrlFilters'
 
 const SELLING_HISTORY_PAGE_SIZE = 20
 
@@ -57,9 +58,10 @@ interface IndiaProductDetail {
   sellingHistory: SellingHistoryRow[]
 }
 
-export default function IndiaProductDetailPage() {
+function IndiaProductDetailPageContent() {
   const params = useParams()
   const router = useRouter()
+  const listHref = useListHref('/products')
   const id = params?.id as string
   const [product, setProduct] = useState<IndiaProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -67,7 +69,9 @@ export default function IndiaProductDetailPage() {
   const [entrySheetOpen, setEntrySheetOpen] = useState(false)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<IndiaBuyingEntryRow | null>(null)
-  const [sellingPage, setSellingPage] = useState(1)
+  const url = useUrlParams()
+  const [sellingPage, setSellingPage] = useState(() => url.int('sellingPage', 1))
+  useSyncUrlParams({ sellingPage: sellingPage > 1 ? sellingPage : undefined })
 
   const fetchProduct = useCallback(async () => {
     if (!id) return
@@ -102,7 +106,7 @@ export default function IndiaProductDetailPage() {
       return
     }
     toast.success('Product deleted')
-    router.push('/products')
+    router.push(listHref)
   }
 
   function openAddEntry() {
@@ -137,7 +141,7 @@ export default function IndiaProductDetailPage() {
         title={product.productName}
         description={product.productDescription ?? undefined}
         breadcrumb={
-          <Link href="/products" className="text-muted-foreground hover:text-foreground">
+          <Link href={listHref} className="text-muted-foreground hover:text-foreground">
             Products
           </Link>
         }
@@ -355,5 +359,13 @@ export default function IndiaProductDetailPage() {
         submitLabel="Update"
       />
     </div>
+  )
+}
+
+export default function IndiaProductDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <IndiaProductDetailPageContent />
+    </Suspense>
   )
 }

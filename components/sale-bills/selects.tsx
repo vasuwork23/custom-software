@@ -35,7 +35,9 @@ export type ProductSelectCallback = (
   value: string,
   label: string,
   qtyPerCtn: number,
-  availableCtn: number
+  availableCtn: number,
+  /** True stock in pcs, summed per batch. Never re-derive it as availableCtn × qtyPerCtn — batches can have different carton sizes. */
+  availablePcs: number
 ) => void
 
 // ─── Quick-Add Company Dialog ─────────────────────────────────────────────────
@@ -289,7 +291,7 @@ export function ProductSelect({
                       key={opt.value}
                       value={opt.value}
                       onSelect={() => {
-                        onValueChange(opt.value, opt.label, opt.qtyPerCtn, opt.availableCtn)
+                        onValueChange(opt.value, opt.label, opt.qtyPerCtn, opt.availableCtn, opt.availablePcs)
                         setOpen(false)
                         setSearch('')
                       }}

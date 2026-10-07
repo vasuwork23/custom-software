@@ -21,6 +21,7 @@ import { QuickAddCompanyDialog, CompanySelect, type CompanyOption } from '@/comp
 import { apiGet, apiPost } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useListHref } from '@/hooks/useUrlFilters'
 
 type Confidence = 'exact' | 'high' | 'medium' | 'low'
 
@@ -122,6 +123,7 @@ function WarningList({ warnings }: { warnings: string[] }) {
 
 export default function QuickVoucherPage() {
   const router = useRouter()
+  const listHref = useListHref('/received-voucher')
   const [rawText, setRawText] = useState('')
   const [parsing, setParsing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -261,7 +263,7 @@ export default function QuickVoucherPage() {
         title="Quick Voucher from Message"
         breadcrumb={
           <>
-            <Link href="/received-voucher" className="text-muted-foreground hover:text-foreground">
+            <Link href={listHref} className="text-muted-foreground hover:text-foreground">
               Receive Voucher
             </Link>
             <span className="text-muted-foreground"> / Quick Voucher</span>
@@ -312,7 +314,7 @@ export default function QuickVoucherPage() {
             <Button size="sm" variant="outline" onClick={reset}>
               Paste another message
             </Button>
-            <Button size="sm" onClick={() => router.push('/received-voucher')}>
+            <Button size="sm" onClick={() => router.push(listHref)}>
               Go to Receive Voucher
             </Button>
           </div>
@@ -375,7 +377,7 @@ export default function QuickVoucherPage() {
               Try sample
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/received-voucher">Cancel</Link>
+              <Link href={listHref}>Cancel</Link>
             </Button>
           </div>
 

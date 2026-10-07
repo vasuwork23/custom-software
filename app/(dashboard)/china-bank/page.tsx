@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ChinaBankCard } from '@/components/china-bank/ChinaBankCard'
 import { TransactionHistory } from '@/components/china-bank/TransactionHistory'
@@ -8,7 +8,7 @@ import { AddPaymentDialog } from '@/components/china-bank/AddPaymentDialog'
 import { WithdrawDialog } from '@/components/china-bank/WithdrawDialog'
 import { apiGet } from '@/lib/api-client'
 
-export default function ChinaBankPage() {
+function ChinaBankPageContent() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [balance, setBalance] = useState<number | null>(null)
@@ -64,5 +64,13 @@ export default function ChinaBankPage() {
 
       <TransactionHistory onRefresh={fetchBalance} refreshTrigger={refreshTrigger} />
     </div>
+  )
+}
+
+export default function ChinaBankPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChinaBankPageContent />
+    </Suspense>
   )
 }

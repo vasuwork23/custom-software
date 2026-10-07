@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { Banknote, Plus, Pencil, Trash2, ArrowLeftRight } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -28,6 +28,7 @@ import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/utils'
+import { useUrlParams, useSyncUrlParams, boolParam } from '@/hooks/useUrlFilters'
 
 interface BankAccountRow {
   _id: string
@@ -53,11 +54,13 @@ interface InvestmentTransactionRow {
   note: string
 }
 
-export default function BanksPage() {
+function BanksPageContent() {
   const [accounts, setAccounts] = useState<BankAccountRow[]>([])
   const [investments, setInvestments] = useState<InvestmentRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAllBanks, setShowAllBanks] = useState(false)
+  const url = useUrlParams()
+  const [showAllBanks, setShowAllBanks] = useState(() => url.bool('all', false))
+  useSyncUrlParams({ all: boolParam(showAllBanks, false) })
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<BankAccountRow | null>(null)
@@ -1226,5 +1229,13 @@ export default function BanksPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function BanksPage() {
+  return (
+    <Suspense fallback={null}>
+      <BanksPageContent />
+    </Suspense>
   )
 }

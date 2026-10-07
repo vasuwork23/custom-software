@@ -6,7 +6,7 @@ import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
 
-/** Returns qty per CTN from the latest india_warehouse buying entry for this product. Used for sale bill line PCS auto-fill. */
+/** Returns qty per CTN from the oldest available india_warehouse buying entry (FIFO order — the batch processFIFO consumes first). Used for sale bill line PCS auto-fill. */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,12 +29,15 @@ export async function GET(
 
     await connectDB()
 
+    // Same filter as processFIFO: unlocked entries are never consumed, so the
+    // carton size must come from the oldest *locked* available batch.
     const entry = await BuyingEntry.findOne({
       product: id,
       chinaWarehouseReceived: 'yes',
+      isLocked: true,
       availableCtn: { $gt: 0 },
     })
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 })
       .select('qty')
       .lean()
 
