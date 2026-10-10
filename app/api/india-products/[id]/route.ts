@@ -128,6 +128,10 @@ export async function GET(
           ratePerPcs: item.ratePerPcs,
           totalAmount: item.totalAmount,
           totalProfit: item.totalProfit ?? 0,
+          marginPercent:
+            item.totalAmount && item.totalAmount > 0
+              ? ((item.totalProfit ?? 0) / item.totalAmount) * 100
+              : 0,
           fifoNote: item.fifoNote,
           fifoBreakdown: item.fifoBreakdown ?? [],
         }
