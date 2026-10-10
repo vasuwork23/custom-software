@@ -57,3 +57,10 @@ export function generateOutstandingFileName(companyNameInput: string, suffix?: s
 
   return `${companyName}_${label}_${date}.pdf`
 }
+
+/** Optional positive number from a request body; '' / null / 0 clears it. */
+export function parseMeasure(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : null
+}

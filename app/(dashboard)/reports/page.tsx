@@ -23,6 +23,7 @@ import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { cn } from '@/lib/utils'
 import type { DateRange } from 'react-day-picker'
 import { TrendChart, type TrendRow } from '@/components/reports/TrendChart'
+import { ProductInsights } from '@/components/reports/ProductInsights'
 import { useUrlParams, useSyncUrlParams, dateRangeParams, boolParam } from '@/hooks/useUrlFilters'
 
 type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
@@ -57,7 +58,7 @@ function ReportsPageContent() {
   const [loading, setLoading] = useState(true)
   const [showAvailableOnly, setShowAvailableOnly] = useState(() => url.bool('availableOnly', true))
   const [archive, setArchive] = useState(() => url.str('archive'))
-  const [reportTab, setReportTab] = useState(() => url.oneOf('tab', ['pnl', 'stock', 'selling'], 'pnl'))
+  const [reportTab, setReportTab] = useState(() => url.oneOf('tab', ['pnl', 'stock', 'selling', 'insights'], 'pnl'))
 
   useSyncUrlParams({
     tab: reportTab !== 'pnl' ? reportTab : undefined,
@@ -304,8 +305,10 @@ function ReportsPageContent() {
             <TabsTrigger value="pnl">P&L</TabsTrigger>
             <TabsTrigger value="stock">Stock</TabsTrigger>
             <TabsTrigger value="selling">Selling</TabsTrigger>
+            <TabsTrigger value="insights">Product Insights</TabsTrigger>
           </TabsList>
 
+          {reportTab !== 'insights' && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-10 items-center gap-1 rounded-md bg-muted p-1">
               {PERIODS.map((p) => (
@@ -342,15 +345,20 @@ function ReportsPageContent() {
               </select>
             )}
           </div>
+          )}
         </div>
 
-        {archive && (
+        <TabsContent value="insights">
+          <ProductInsights />
+        </TabsContent>
+
+        {archive && reportTab !== 'insights' && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
             Reading a past year, frozen at the reset on {archive.slice(-10)}. Nothing here can be edited.
           </p>
         )}
 
-        {loading ? (
+        {reportTab === 'insights' ? null : loading ? (
           <div className="space-y-6">
             <TableSkeleton rows={4} columns={6} />
             <TableSkeleton rows={5} columns={5} />

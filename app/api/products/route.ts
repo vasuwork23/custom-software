@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/mongodb'
 import { ensureNotViewer } from '@/lib/permissions'
 import Product from '@/models/Product'
 import BuyingEntry from '@/models/BuyingEntry'
+import { parseMeasure } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -385,6 +386,8 @@ export async function POST(req: NextRequest) {
       productName: body.productName.trim(),
       productDescription: body.productDescription?.trim() || undefined,
       productImage: body.productImage || undefined,
+      ctnWeightKg: parseMeasure(body.ctnWeightKg),
+      ctnCbm: parseMeasure(body.ctnCbm),
       createdBy,
       updatedBy: createdBy,
     })

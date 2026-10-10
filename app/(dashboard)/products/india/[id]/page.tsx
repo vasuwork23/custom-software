@@ -49,6 +49,8 @@ interface IndiaProductDetail {
   productName: string
   productDescription?: string
   productImage?: string
+  ctnWeightKg?: number | null
+  ctnCbm?: number | null
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
@@ -368,6 +370,8 @@ function IndiaProductDetailPageContent() {
           productName: product.productName,
           productDescription: product.productDescription ?? '',
           productImage: product.productImage ?? '',
+          ctnWeightKg: product.ctnWeightKg,
+          ctnCbm: product.ctnCbm,
         }}
         title="Edit India Product"
         submitLabel="Update"

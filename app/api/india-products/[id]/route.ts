@@ -7,6 +7,7 @@ import SellBillItem from '@/models/SellBillItem'
 import SellBill from '@/models/SellBill'
 import mongoose from 'mongoose'
 import { ensureCanDelete, ensureNotViewer } from '@/lib/permissions'
+import { parseMeasure } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -202,6 +203,8 @@ export async function PUT(
         ...(body.productName != null && { productName: String(body.productName).trim() }),
         ...(body.productDescription !== undefined && { productDescription: body.productDescription?.trim() || undefined }),
         ...(body.productImage !== undefined && { productImage: body.productImage || undefined }),
+        ...(body.ctnWeightKg !== undefined && { ctnWeightKg: parseMeasure(body.ctnWeightKg) }),
+        ...(body.ctnCbm !== undefined && { ctnCbm: parseMeasure(body.ctnCbm) }),
         updatedBy,
       },
       { new: true, runValidators: true }
