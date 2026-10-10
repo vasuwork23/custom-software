@@ -397,20 +397,7 @@ function ProductsPageContent() {
               </div>
             </div>
           )}
-          {currentLoading ? (
-            <TableSkeleton rows={8} columns={5} />
-          ) : !data?.products.length ? (
-            <EmptyState
-              icon={Package}
-              title="No China products yet"
-              description="Add your first China product to track buying entries and stock."
-            >
-              <Button onClick={() => { setEditingProduct(null); setDialogOpen(true); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add China Product
-              </Button>
-            </EmptyState>
-          ) : view === 'card' ? (
+          {!currentLoading && (
             <>
               {data && (
                 <div className="flex flex-wrap items-center gap-2 my-3">
@@ -522,6 +509,27 @@ function ProductsPageContent() {
                   </div>
                 </div>
               )}
+            </>
+          )}
+          {currentLoading ? (
+            <TableSkeleton rows={8} columns={5} />
+          ) : !data?.products.length ? (
+            <EmptyState
+              icon={Package}
+              title={debouncedSearch.trim() || chinaFilter !== 'all' ? 'No products match your search or filter' : 'No China products yet'}
+              description={
+                debouncedSearch.trim() || chinaFilter !== 'all'
+                  ? 'Try a different search term or select another filter above.'
+                  : 'Add your first China product to track buying entries and stock.'
+              }
+            >
+              <Button onClick={() => { setEditingProduct(null); setDialogOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add China Product
+              </Button>
+            </EmptyState>
+          ) : view === 'card' ? (
+            <>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredChinaProducts.map((p) => (
                   <ProductCard
@@ -743,14 +751,14 @@ function ProductsPageContent() {
               {!indiaData?.products.length ? (
                 <EmptyState
                   icon={Package}
-                  title={indiaFilter !== 'all' ? 'No products match this filter' : 'No India products yet'}
+                  title={indiaFilter !== 'all' || debouncedSearch.trim() ? 'No products match your search or filter' : 'No India products yet'}
                   description={
-                    indiaFilter !== 'all'
-                      ? 'Try selecting a different filter above.'
+                    indiaFilter !== 'all' || debouncedSearch.trim()
+                      ? 'Try a different search term or select another filter above.'
                       : 'Add your first India product to track buying entries and stock.'
                   }
                 >
-                  {indiaFilter === 'all' && (
+                  {indiaFilter === 'all' && !debouncedSearch.trim() && (
                     <Button onClick={() => setIndiaDialogOpen(true)}>
                       <Plus className="mr-2 h-4 w-4" />
                       Add India Product

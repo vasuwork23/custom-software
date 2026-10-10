@@ -40,6 +40,7 @@ interface SellingHistoryRow {
   ratePerPcs: number
   totalAmount: number
   totalProfit: number
+  marginPercent: number
   fifoNote?: string
 }
 
@@ -48,6 +49,8 @@ interface IndiaProductDetail {
   productName: string
   productDescription?: string
   productImage?: string
+  ctnWeightKg?: number | null
+  ctnCbm?: number | null
   buyingEntriesCount: number
   totalCtn: number
   availableCtn: number
@@ -254,6 +257,7 @@ function IndiaProductDetailPageContent() {
                     <th className="text-right p-3 font-medium">Rate per PCS (₹)</th>
                     <th className="text-right p-3 font-medium">Total Amount (₹)</th>
                     <th className="text-right p-3 font-medium">Profit (₹)</th>
+                    <th className="text-right p-3 font-medium">Margin %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -295,6 +299,18 @@ function IndiaProductDetailPageContent() {
                         <span className={cn('font-medium tabular-nums', row.totalProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive')}>
                           <AmountDisplay amount={row.totalProfit} showSign />
                         </span>
+                      </td>
+                      <td
+                        className={cn(
+                          'p-3 text-right tabular-nums',
+                          row.marginPercent > 20
+                            ? 'text-green-600'
+                            : row.marginPercent >= 10
+                            ? 'text-amber-500'
+                            : 'text-red-600'
+                        )}
+                      >
+                        {(row.marginPercent ?? 0).toFixed(1)}%
                       </td>
                     </tr>
                   ))}
@@ -354,6 +370,8 @@ function IndiaProductDetailPageContent() {
           productName: product.productName,
           productDescription: product.productDescription ?? '',
           productImage: product.productImage ?? '',
+          ctnWeightKg: product.ctnWeightKg,
+          ctnCbm: product.ctnCbm,
         }}
         title="Edit India Product"
         submitLabel="Update"
