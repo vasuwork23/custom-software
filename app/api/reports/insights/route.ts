@@ -296,6 +296,7 @@ export async function GET(req: NextRequest) {
         // Same buckets as the products page: factory + China WH + in transit
         pipelineCtn:
           (e.chinaWarehouseReceived === 'no' ? e.totalCtn ?? 0 : e.chinaWarehouseCtn ?? 0) + (e.inTransitCtn ?? 0),
+        arrivedCtn: (e.availableCtn ?? 0) + (e.soldCtn ?? 0),
         // Container warehouse date when we have it (delivered containers are
         // deleted at a year reset); otherwise purchase date + lead time. Either
         // way, never later than the batch's first sale.
@@ -324,6 +325,7 @@ export async function GET(req: NextRequest) {
         finalCost: e.finalCost ?? 0,
         availableCtn: e.availableCtn ?? 0,
         pipelineCtn: 0,
+        arrivedCtn: e.totalCtn ?? 0,
         // Bought locally: in the warehouse from the purchase date
         arrivedAt: earliest(new Date(e.entryDate).getTime(), firstSaleOfBatch.get(String(e._id))),
       }))

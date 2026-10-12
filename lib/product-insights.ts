@@ -35,6 +35,7 @@ export interface EntryRow {
   availableCtn: number // in India, ready to sell
   pipelineCtn: number // factory + China WH + in transit (China only)
   arrivedAt: Date | null // when this batch became sellable in India; null if not arrived yet
+  arrivedCtn: number // CTN of this batch that reached India (sold + still available)
 }
 
 export interface ProductRow {
@@ -123,6 +124,10 @@ export interface ProductInsight {
   flowPerMonth: number | null // CTN sold per 30 days since arrival
   slowMover: boolean
   daysUntilReorder: number | null
+  // stock-outs (India stock rebuilt day by day for 180 days)
+  outOfStockDays: number // current run of empty days up to today
+  stockoutDays180: number
+  lostSalesCtn: number
   reorderPoint: number
   suggestMin: number
   suggestMax: number
@@ -241,28 +246,70 @@ export function computeInsights(
       if (week < 12) weekly[11 - week] += s.ctnSold
     }
 
-    // Velocity counts only the days the product has actually been selling,
-    // so a product launched 3 weeks ago isn't diluted over 90 days.
-    const activeDays = (window: number) => Math.max(14, Math.min(window, firstSaleAgo + 1))
-    const v30 = firstSaleAgo >= 0 ? sold30 / activeDays(30) : 0
-    const v90 = firstSaleAgo >= 0 ? sold90 / activeDays(90) : 0
-    let dailyDemand = 0.6 * v30 + 0.4 * v90 // recent weeks weigh more
+    // ── Stock timeline: was it actually on the shelf? ──────────────────────
+    // Rebuild India stock day by day for the last 180 days, backwards from
+    // today's real stock: before a sale there was more, before an arrival less.
+    // A day counts as "in stock" if stock was left or something sold that day.
+    // Low sales while out of stock are missing stock, not missing demand.
+    const HORIZON = 180
+    const soldOn = new Array(HORIZON + 1).fill(0) as number[]
+    const arrivedOn = new Array(HORIZON + 1).fill(0) as number[]
+    for (const s of ss) {
+      const ago = daysAgo(s.billDate)
+      if (ago <= HORIZON) soldOn[ago] += s.ctnSold
+    }
+    for (const e of es) {
+      if (!e.arrivedAt || e.arrivedCtn <= 0) continue
+      const ago = daysAgo(e.arrivedAt)
+      if (ago <= HORIZON) arrivedOn[ago] += e.arrivedCtn
+    }
+    const EPS = 0.05
+    const inStock = new Array(HORIZON).fill(false) as boolean[]
+    let level = es.reduce((a, e) => a + e.availableCtn, 0) // end of today
+    for (let d = 0; d < HORIZON; d++) {
+      inStock[d] = level > EPS || soldOn[d] > 0
+      level = Math.max(0, level + soldOn[d] - arrivedOn[d]) // end of the day before
+    }
+    const inStockDays = (from: number, to: number) => inStock.slice(from, to).filter(Boolean).length
+    const stock30 = inStockDays(0, 30)
+    const stockPrev30 = inStockDays(30, 60)
+    const stock90 = inStockDays(0, 90)
+    const stock180 = inStockDays(0, HORIZON)
+    // Current stock-out: consecutive empty days up to today
+    let outOfStockDays = 0
+    while (outOfStockDays < HORIZON && !inStock[outOfStockDays]) outOfStockDays++
+    // Days before the product first had stock aren't stock-outs
+    let firstStocked = HORIZON - 1
+    while (firstStocked >= 0 && !inStock[firstStocked]) firstStocked--
+    const stockoutDays180 = firstStocked < 0 ? 0 : firstStocked + 1 - stock180
+    if (firstStocked < 0) outOfStockDays = 0
+
+    // Selling speed per day *on the shelf*; a window needs a week in stock to count
+    const rate = (sold: number, days: number) => (days >= 7 ? sold / days : null)
+    const r30 = rate(sold30, stock30)
+    const r90 = rate(sold90, stock90)
+    const r180 = rate(sold180, stock180)
+    // Recent windows weigh more; a window with too little shelf time drops out
+    const blend = ([[r30, 0.5], [r90, 0.3], [r180, 0.2]] as [number | null, number][]).filter(([r]) => r != null)
+    const blendWeight = blend.reduce((a, [, w]) => a + w, 0)
+    let dailyDemand = blendWeight > 0 ? blend.reduce((a, [r, w]) => a + (r as number) * w, 0) / blendWeight : 0
 
     let trendPct: number | null = null
     let trend: TrendDir = 'none'
-    if (sold30 + soldPrev30 >= 3 && firstSaleAgo >= 45) {
-      trendPct = soldPrev30 > 0 ? ((sold30 - soldPrev30) / soldPrev30) * 100 : 100
+    const rPrev30 = rate(soldPrev30, stockPrev30)
+    if (r30 != null && rPrev30 != null && sold30 + soldPrev30 >= 3 && firstSaleAgo >= 45) {
+      trendPct = rPrev30 > 0 ? ((r30 - rPrev30) / rPrev30) * 100 : 100
       trend = trendPct > 20 ? 'up' : trendPct < -20 ? 'down' : 'flat'
     }
 
-    // Demand variability (coefficient of variation of weekly sales)
-    const activeWeeks = firstSaleAgo >= 0 ? Math.min(12, Math.floor(firstSaleAgo / 7) + 1) : 0
+    // Demand variability (coefficient of variation of weekly sales), using only
+    // weeks that had stock for most of the week
+    const stockedWeeks = weekly.filter((_, i) => inStockDays((11 - i) * 7, (12 - i) * 7) >= 4)
     let xyz: ProductInsight['xyz'] = null
     let weeklyStd = 0
-    if (activeWeeks >= 4) {
-      const w = weekly.slice(12 - activeWeeks)
-      const mean = w.reduce((a, b) => a + b, 0) / w.length
-      weeklyStd = Math.sqrt(w.reduce((a, b) => a + (b - mean) ** 2, 0) / w.length)
+    if (stockedWeeks.length >= 4) {
+      const mean = stockedWeeks.reduce((a, b) => a + b, 0) / stockedWeeks.length
+      weeklyStd = Math.sqrt(stockedWeeks.reduce((a, b) => a + (b - mean) ** 2, 0) / stockedWeeks.length)
       const cv = mean > 0 ? weeklyStd / mean : Infinity
       xyz = cv < 0.5 ? 'X' : cv <= 1 ? 'Y' : 'Z'
     }
@@ -338,8 +385,9 @@ export function computeInsights(
     if (flowRate != null && daysInIndia != null && daysInIndia >= 30) dailyDemand = 0.5 * dailyDemand + 0.5 * flowRate
     // Sold out: recent sales are zero because there was nothing to sell, not
     // because nobody wants it. Fall back to half the 180-day pace.
-    const soldOut = availableCtn + pipelineCtn <= 0 && sold180 > 0
-    if (soldOut && dailyDemand === 0) dailyDemand = (sold180 / activeDays(180)) * 0.5
+    // No in-stock window long enough to measure: half the 180-day pace as a floor
+    if (sold180 > 0 && dailyDemand === 0) dailyDemand = (sold180 / HORIZON) * 0.5
+    const lostSalesCtn = dailyDemand * stockoutDays180
     const daysOfCover = dailyDemand > 0 ? availableCtn / dailyDemand : null
     // Slow mover: under ~1.5 CTN a month, or less than half the stock sold after
     // 45+ days in India. These get no safety stock and are reordered only when
@@ -357,8 +405,9 @@ export function computeInsights(
       customers180: customerCtn.size, topCustomerShare, lost, lostShare,
       revenue90, profit90, profit180, profitPerCtn, marginPct, marginDeltaPp, priceChangePct, costChangePct,
       qtyPerCtn, cbmPerCtn, cbmSource, weightPerCtn, weightSource, kgPerCbm, profitPerCbm,
-      availableCtn, pipelineCtn, stockValue, oldestStockDays, daysOfCover, soldOut, stockReturn,
+      availableCtn, pipelineCtn, stockValue, oldestStockDays, daysOfCover, stockReturn,
       cycleStart, daysInIndia, soldSinceArrival, sellThrough, flowRate, slowMover,
+      outOfStockDays, stockoutDays180, lostSalesCtn,
       saleLines180: ss.filter((s) => daysAgo(s.billDate) < 180).length,
     }
   })
@@ -500,7 +549,19 @@ export function computeInsights(
       signals.push({ tone: 'good', text: `Fast flow: ${(b.sellThrough * 100).toFixed(0)}% of the stock sold in ${b.daysInIndia} days in India` })
     if (b.daysInIndia != null && b.daysInIndia > 120 && !deadStock)
       signals.push({ tone: 'warn', text: `Current stock has been in India ${b.daysInIndia} days` })
-    if (b.soldOut) signals.push({ tone: 'warn', text: 'Out of stock with nothing on the way — sales are being lost' })
+    if (b.outOfStockDays > 0 && b.sold180 > 0) {
+      const monthly = round(b.dailyDemand * 30, 1)
+      signals.push({
+        tone: 'warn',
+        text: `Out of stock in India for ${b.outOfStockDays} days${b.pipelineCtn > 0 ? ` (${round(b.pipelineCtn, 1)} CTN on the way)` : ' with nothing on the way'} — while in stock it sold ~${monthly} CTN/month, so recent low sales are from no stock, not low demand. About ${round(b.dailyDemand * b.outOfStockDays, 1)} CTN of sales missed so far`,
+      })
+    }
+    const pastStockout = b.stockoutDays180 - b.outOfStockDays
+    if (pastStockout >= 14 && b.dailyDemand * pastStockout >= 1)
+      signals.push({
+        tone: 'info',
+        text: `Also ran out for ${pastStockout} days earlier in the last 180 — about ${round(b.dailyDemand * pastStockout, 1)} CTN of sales missed`,
+      })
     if (reorderStatus === 'now' && need > 0) signals.push({ tone: 'info', text: `Stock + pipeline below reorder point (${round(reorderPoint, 1)} CTN)` })
     if (b.stockReturn != null && b.stockReturn < 0.5 && !deadStock)
       signals.push({ tone: 'warn', text: `Stock money earns only ${b.stockReturn.toFixed(1)}× a year — too much stock for what it sells` })
@@ -559,6 +620,9 @@ export function computeInsights(
       sellThrough: b.sellThrough == null ? null : round(b.sellThrough, 3),
       flowPerMonth: b.flowRate == null ? null : round(b.flowRate * 30, 2),
       slowMover: b.slowMover,
+      outOfStockDays: b.outOfStockDays,
+      stockoutDays180: b.stockoutDays180,
+      lostSalesCtn: round(b.lostSalesCtn, 1),
       daysUntilReorder:
         demand > 0 && onHand > reorderPoint && reorderStatus !== 'no-demand'
           ? Math.round((onHand - reorderPoint) / demand)

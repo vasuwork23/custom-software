@@ -253,11 +253,17 @@ export function ProductInsights() {
             <div className="space-y-2">
               <p className="font-medium">Reorder suggestion</p>
               <p className="text-muted-foreground">
-                Daily demand = 60% last-30-day pace + 40% last-90-day pace; once stock has been in India 30+ days, half
+                Daily demand = CTN sold per in-stock day: 50% last 30 days, 30% last 90, 20% last 180; once stock has been in India 30+ days, half
                 of it comes from the real flow since arrival (CTN sold ÷ days in India). Need = demand × (lead time +
                 keep-stock days) + safety stock − (India stock + factory + China WH + in transit). Safety stock is at most
                 half the lead-time need. Cut 30% if sales are falling and 20% more if there are competitor signals.
                 Shown as a range: wider when demand is unpredictable.
+              </p>
+              <p className="font-medium">Stock-outs</p>
+              <p className="text-muted-foreground">
+                India stock is rebuilt day by day for the last 180 days. Selling speed, trend and reorder use only the
+                days it was actually in stock, so a product that ran out isn&apos;t marked down for &ldquo;no sales&rdquo;.
+                Missed sales = selling speed × days out of stock.
               </p>
               <p className="font-medium">Slow movers</p>
               <p className="text-muted-foreground">
@@ -519,6 +525,11 @@ export function ProductInsights() {
                       )}
                       <td className="p-2 text-right tabular-nums whitespace-nowrap">
                         {num(p.availableCtn, 1)}
+                        {p.availableCtn <= 0 && p.outOfStockDays > 0 && p.sold180 > 0 && (
+                          <span className="block text-[10px] font-medium text-red-700 dark:text-red-400" title="Days since India stock ran out">
+                            out {p.outOfStockDays}d
+                          </span>
+                        )}
                         {p.pipelineCtn > 0 && (
                           <span className="block text-[10px] text-blue-700 dark:text-blue-400" title="Factory + China WH + in transit">
                             +{num(p.pipelineCtn, 1)} coming
@@ -653,6 +664,12 @@ export function ProductInsights() {
                                 {p.soldSinceArrival == null
                                   ? '—'
                                   : `${p.soldSinceArrival} of ${num(p.soldSinceArrival + p.availableCtn, 2)} CTN (${((p.sellThrough ?? 0) * 100).toFixed(0)}%)`}
+                              </dd>
+                              <dt className="text-muted-foreground">Out of stock (180d)</dt>
+                              <dd className="tabular-nums">
+                                {p.stockoutDays180 === 0
+                                  ? 'Never'
+                                  : `${p.stockoutDays180} days${p.lostSalesCtn >= 0.1 ? ` · ~${p.lostSalesCtn} CTN missed` : ''}`}
                               </dd>
                               <dt className="text-muted-foreground">Flow · stock lasts</dt>
                               <dd className="tabular-nums">
