@@ -34,6 +34,7 @@ export interface EntryRow {
   finalCost: number // INR per piece (landed)
   availableCtn: number // in India, ready to sell
   pipelineCtn: number // factory + China WH + in transit (China only)
+  arrivedAt: Date | null // when this batch became sellable in India; null if not arrived yet
 }
 
 export interface ProductRow {
@@ -114,6 +115,14 @@ export interface ProductInsight {
   stockValue: number
   oldestStockDays: number | null
   daysOfCover: number | null
+  // flow of the stock now in India, counted from when it arrived
+  inIndiaSince: string | null
+  daysInIndia: number | null
+  soldSinceArrival: number | null
+  sellThrough: number | null // share of (sold + left) that has sold, 0..1
+  flowPerMonth: number | null // CTN sold per 30 days since arrival
+  slowMover: boolean
+  daysUntilReorder: number | null
   reorderPoint: number
   suggestMin: number
   suggestMax: number
@@ -308,13 +317,36 @@ export function computeInsights(
     const availableCtn = es.reduce((a, e) => a + e.availableCtn, 0)
     const pipelineCtn = es.reduce((a, e) => a + e.pipelineCtn, 0)
     const stockValue = es.reduce((a, e) => a + e.availableCtn * e.qtyPerCtn * e.finalCost, 0)
-    const withStock = es.filter((e) => e.availableCtn > 0)
-    const oldestStockDays = withStock.length ? Math.max(...withStock.map((e) => daysAgo(e.entryDate))) : null
+
+    // ── Flow since the current stock reached India ─────────────────────────
+    // Counted from the earliest arrival among batches still in stock: how many
+    // CTN went out since then, against what is left.
+    const arrivals = es
+      .filter((e) => e.availableCtn > 0 && e.arrivedAt)
+      .map((e) => (e.arrivedAt as Date).getTime())
+    const cycleStart = arrivals.length ? Math.min(...arrivals) : null
+    const daysInIndia = cycleStart != null ? Math.min(365, daysAgo(new Date(cycleStart))) : null
+    const soldSinceArrival =
+      cycleStart != null ? ss.filter((s) => s.billDate.getTime() >= cycleStart).reduce((a, s) => a + s.ctnSold, 0) : null
+    const flowRate = daysInIndia != null && soldSinceArrival != null ? soldSinceArrival / Math.max(14, daysInIndia) : null
+    const sellThrough =
+      soldSinceArrival != null && soldSinceArrival + availableCtn > 0
+        ? soldSinceArrival / (soldSinceArrival + availableCtn)
+        : null
+    const oldestStockDays = daysInIndia
+    // Once stock has sat in India a month, its real outflow is half the demand estimate
+    if (flowRate != null && daysInIndia != null && daysInIndia >= 30) dailyDemand = 0.5 * dailyDemand + 0.5 * flowRate
     // Sold out: recent sales are zero because there was nothing to sell, not
     // because nobody wants it. Fall back to half the 180-day pace.
     const soldOut = availableCtn + pipelineCtn <= 0 && sold180 > 0
     if (soldOut && dailyDemand === 0) dailyDemand = (sold180 / activeDays(180)) * 0.5
     const daysOfCover = dailyDemand > 0 ? availableCtn / dailyDemand : null
+    // Slow mover: under ~1.5 CTN a month, or less than half the stock sold after
+    // 45+ days in India. These get no safety stock and are reordered only when
+    // nearly gone.
+    const slowMover =
+      dailyDemand > 0 &&
+      (dailyDemand * 30 < 1.5 || (sellThrough != null && sellThrough < 0.5 && (daysInIndia ?? 0) >= 45))
     // How hard the money sitting in stock works: profit per year for each rupee
     // of stock at cost. Skipped for near-empty stock where the ratio means nothing.
     const stockReturn = stockValue >= 1000 ? (profit180 * 2) / stockValue : null
@@ -326,6 +358,7 @@ export function computeInsights(
       revenue90, profit90, profit180, profitPerCtn, marginPct, marginDeltaPp, priceChangePct, costChangePct,
       qtyPerCtn, cbmPerCtn, cbmSource, weightPerCtn, weightSource, kgPerCbm, profitPerCbm,
       availableCtn, pipelineCtn, stockValue, oldestStockDays, daysOfCover, soldOut, stockReturn,
+      cycleStart, daysInIndia, soldSinceArrival, sellThrough, flowRate, slowMover,
       saleLines180: ss.filter((s) => daysAgo(s.billDate) < 180).length,
     }
   })
@@ -361,7 +394,9 @@ export function computeInsights(
       b.customers180 === 0
         ? null
         : clamp(Math.min(100, b.customers180 * 20) - (b.topCustomerShare != null && b.topCustomerShare > 0.7 ? 30 : 0))
-    const age = b.oldestStockDays == null ? 100 : clamp(100 - ((b.oldestStockDays - 60) / 180) * 100)
+    // Turnover: how long the stock in India will last at the current pace
+    const turnover =
+      b.availableCtn <= 0 ? 100 : b.daysOfCover == null ? 0 : clamp(100 - ((b.daysOfCover - 60) / 180) * 100)
 
     const scoreParts = [
       { key: 'earn', label: b.profitPerCbm != null ? 'Profit per CBM' : 'Margin %', weight: 25, value: earn },
@@ -369,7 +404,7 @@ export function computeInsights(
       { key: 'velocity', label: 'Selling speed', weight: 20, value: velocity },
       { key: 'marginTrend', label: 'Margin trend', weight: 15, value: marginTrend },
       { key: 'spread', label: 'Customer spread', weight: 10, value: spread },
-      { key: 'age', label: 'Stock age', weight: 10, value: age },
+      { key: 'turnover', label: 'Stock turnover', weight: 10, value: turnover },
     ]
     // Missing parts are skipped and the rest re-weighted
     const known = scoreParts.filter((s) => s.value != null)
@@ -389,9 +424,15 @@ export function computeInsights(
     const demand = b.dailyDemand * adjust
     const z = 1.65 // ~95% service level
     const dailyStd = (b.weeklyStd / Math.sqrt(7)) * adjust
-    const safety = z * dailyStd * Math.sqrt(opts.leadTimeDays)
-    const reorderPoint = demand * opts.leadTimeDays + safety
-    const target = demand * (opts.leadTimeDays + opts.coverDays) + safety
+    const leadDemand = demand * opts.leadTimeDays
+    // Safety stock never exceeds half the lead-time demand, so one big order
+    // can't inflate it; slow movers carry none.
+    const safety = b.slowMover ? 0 : Math.min(z * dailyStd * Math.sqrt(opts.leadTimeDays), 0.5 * leadDemand)
+    // Slow movers: reorder only when about one carton (or the lead-time need) is left
+    const reorderPoint = b.slowMover ? Math.max(leadDemand, 1) : leadDemand + safety
+    const target = b.slowMover
+      ? Math.max(demand * (opts.leadTimeDays + opts.coverDays), reorderPoint + 1)
+      : demand * (opts.leadTimeDays + opts.coverDays) + safety
     const onHand = b.availableCtn + b.pipelineCtn
     let need = Math.max(0, target - onHand)
 
@@ -448,8 +489,17 @@ export function computeInsights(
     if (b.costChangePct != null && b.costChangePct > 5) signals.push({ tone: 'warn', text: `Landed cost per piece ${pct(b.costChangePct)} on the latest batch` })
     if (b.topCustomerShare != null && b.topCustomerShare > 0.7 && b.customers180 > 0)
       signals.push({ tone: 'warn', text: `One customer takes ${(b.topCustomerShare * 100).toFixed(0)}% of named sales` })
-    if (b.oldestStockDays != null && b.oldestStockDays > 120 && !deadStock)
-      signals.push({ tone: 'warn', text: `Oldest batch in stock is ${b.oldestStockDays} days old` })
+    if (b.slowMover && b.daysInIndia != null && b.soldSinceArrival != null && !deadStock)
+      signals.push({
+        tone: 'warn',
+        text: `Slow mover: sold ${round(b.soldSinceArrival, 2)} of ${round(b.soldSinceArrival + b.availableCtn, 2)} CTN (${((b.sellThrough ?? 0) * 100).toFixed(0)}%) in ${b.daysInIndia} days in India — reorder only when ${round(reorderPoint, 1)} CTN left`,
+      })
+    else if (b.slowMover && !deadStock)
+      signals.push({ tone: 'warn', text: `Slow mover (~${round(demand * 30, 1)} CTN/month) — reorder only when ${round(reorderPoint, 1)} CTN left` })
+    if (!b.slowMover && b.sellThrough != null && b.sellThrough >= 0.7 && b.daysInIndia != null && b.daysInIndia <= 60)
+      signals.push({ tone: 'good', text: `Fast flow: ${(b.sellThrough * 100).toFixed(0)}% of the stock sold in ${b.daysInIndia} days in India` })
+    if (b.daysInIndia != null && b.daysInIndia > 120 && !deadStock)
+      signals.push({ tone: 'warn', text: `Current stock has been in India ${b.daysInIndia} days` })
     if (b.soldOut) signals.push({ tone: 'warn', text: 'Out of stock with nothing on the way — sales are being lost' })
     if (reorderStatus === 'now' && need > 0) signals.push({ tone: 'info', text: `Stock + pipeline below reorder point (${round(reorderPoint, 1)} CTN)` })
     if (b.stockReturn != null && b.stockReturn < 0.5 && !deadStock)
@@ -503,6 +553,16 @@ export function computeInsights(
       stockValue: Math.round(b.stockValue),
       oldestStockDays: b.oldestStockDays,
       daysOfCover: b.daysOfCover == null ? null : Math.round(b.daysOfCover),
+      inIndiaSince: b.cycleStart == null ? null : new Date(b.cycleStart).toISOString(),
+      daysInIndia: b.daysInIndia,
+      soldSinceArrival: b.soldSinceArrival == null ? null : round(b.soldSinceArrival),
+      sellThrough: b.sellThrough == null ? null : round(b.sellThrough, 3),
+      flowPerMonth: b.flowRate == null ? null : round(b.flowRate * 30, 2),
+      slowMover: b.slowMover,
+      daysUntilReorder:
+        demand > 0 && onHand > reorderPoint && reorderStatus !== 'no-demand'
+          ? Math.round((onHand - reorderPoint) / demand)
+          : null,
       reorderPoint: round(reorderPoint, 1),
       suggestMin,
       suggestMax,
