@@ -1,12 +1,13 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowRight, ArrowUpDown } from 'lucide-react'
+import { ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowRight, ArrowUpDown, Maximize2, Minimize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiGet } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
@@ -68,6 +69,54 @@ export function ProductInsights() {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'score', dir: -1 })
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [fullScreen, setFullScreen] = useState(false)
+  // True only while the browser itself is in full screen because we asked for it
+  const browserFull = useRef(false)
+
+  const exitFullScreen = useCallback(() => {
+    setFullScreen(false)
+    if (browserFull.current && typeof document !== 'undefined' && document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined)
+    }
+    browserFull.current = false
+  }, [])
+
+  const enterFullScreen = useCallback(() => {
+    setFullScreen(true)
+    // Covering the header and sidebar works everywhere; real browser full screen
+    // is a bonus where it's allowed.
+    document.documentElement
+      .requestFullscreen?.()
+      .then(() => {
+        browserFull.current = true
+      })
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (!fullScreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.fullscreenElement) exitFullScreen()
+    }
+    // Esc in browser full screen leaves it without a keydown; follow it out
+    const onChange = () => {
+      if (!document.fullscreenElement && browserFull.current) exitFullScreen()
+    }
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('fullscreenchange', onChange)
+    }
+  }, [fullScreen, exitFullScreen])
+
+  // Leaving the tab or page while expanded must not strand the browser in full screen
+  useEffect(() => () => {
+    if (browserFull.current && document.fullscreenElement) document.exitFullscreen().catch(() => undefined)
+  }, [])
   const [view, setView] = useState<View>('table')
   const [matrix, setMatrix] = useState<{ abc: string; xyz: string } | null>(null)
 
@@ -163,7 +212,24 @@ export function ProductInsights() {
   const colCount = isChina ? 14 : 12
 
   return (
-    <div className="space-y-4">
+    <div
+      className={cn(
+        'space-y-4',
+        fullScreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-4 sm:p-6'
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        {fullScreen ? <h2 className="text-lg font-semibold tracking-tight">Product Insights</h2> : <span />}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fullScreen ? exitFullScreen : enterFullScreen}
+          title={fullScreen ? 'Exit full screen (Esc)' : 'Full screen'}
+        >
+          {fullScreen ? <Minimize2 className="mr-2 h-4 w-4" /> : <Maximize2 className="mr-2 h-4 w-4" />}
+          {fullScreen ? 'Exit full screen' : 'Full screen'}
+        </Button>
+      </div>
       {/* Controls */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex h-10 items-center gap-1 rounded-md bg-muted p-1">
