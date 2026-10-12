@@ -55,6 +55,7 @@ function buildPlan(products: InsightRow[], cap: { cbm: number; kg: number }, inc
                 (p.label === 'star' || p.label === 'good') &&
                 p.abc !== 'C' &&
                 !p.competitorPressure &&
+                !p.slowMover &&
                 p.dailyDemand > 0 &&
                 p.reorderStatus !== 'overstock'
             )

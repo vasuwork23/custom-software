@@ -29,7 +29,7 @@ type Filter = 'all' | InsightLabel | 'reorder' | 'pressure' | 'tagged'
 type View = 'table' | 'matrix' | 'planner'
 type SortKey =
   | 'name' | 'score' | 'sold30' | 'trendPct' | 'profitPerCtn' | 'profitPerCbm'
-  | 'marginPct' | 'stockReturn' | 'kgPerCbm' | 'availableCtn' | 'daysOfCover' | 'suggestMax'
+  | 'marginPct' | 'stockReturn' | 'kgPerCbm' | 'availableCtn' | 'sellThrough' | 'daysOfCover' | 'suggestMax'
 
 function TrendCell({ p }: { p: InsightRow }) {
   if (p.trend === 'none' || p.trendPct == null) return <span className="text-muted-foreground">—</span>
@@ -160,7 +160,7 @@ export function ProductInsights() {
     </th>
   )
 
-  const colCount = isChina ? 13 : 11
+  const colCount = isChina ? 14 : 12
 
   return (
     <div className="space-y-4">
@@ -253,9 +253,18 @@ export function ProductInsights() {
             <div className="space-y-2">
               <p className="font-medium">Reorder suggestion</p>
               <p className="text-muted-foreground">
-                Daily demand = 60% last-30-day pace + 40% last-90-day pace. Need = demand × (lead time + keep-stock days)
-                + safety stock − (India stock + factory + China WH + in transit). Cut 30% if sales are falling and 20% more
-                if there are competitor signals. Shown as a range: wider when demand is unpredictable.
+                Daily demand = 60% last-30-day pace + 40% last-90-day pace; once stock has been in India 30+ days, half
+                of it comes from the real flow since arrival (CTN sold ÷ days in India). Need = demand × (lead time +
+                keep-stock days) + safety stock − (India stock + factory + China WH + in transit). Safety stock is at most
+                half the lead-time need. Cut 30% if sales are falling and 20% more if there are competitor signals.
+                Shown as a range: wider when demand is unpredictable.
+              </p>
+              <p className="font-medium">Slow movers</p>
+              <p className="text-muted-foreground">
+                Under ~1.5 CTN a month, or less than half the stock sold after 45+ days in India. No safety stock;
+                reorder only when stock falls to 1 CTN (or the lead-time need, if bigger). &ldquo;In India&rdquo; counts
+                from the container&apos;s warehouse date, or purchase date + lead time when there&apos;s no container —
+                never later than the batch&apos;s first sale.
               </p>
               <p className="font-medium">Competitor signals</p>
               <p className="text-muted-foreground">
@@ -417,6 +426,7 @@ export function ProductInsights() {
                 <SortHead k="stockReturn" className="text-right">Return on stock</SortHead>
                 {isChina && <SortHead k="kgPerCbm" className="text-right">Kg/CTN · kg/CBM</SortHead>}
                 <SortHead k="availableCtn" className="text-right">Stock</SortHead>
+                <SortHead k="sellThrough" className="text-right">In India · sold</SortHead>
                 <SortHead k="daysOfCover" className="text-right">Days left</SortHead>
                 <SortHead k="suggestMax" className="text-right">Buy (CTN)</SortHead>
               </tr>
@@ -515,6 +525,31 @@ export function ProductInsights() {
                           </span>
                         )}
                       </td>
+                      <td
+                        className="p-2 text-right tabular-nums whitespace-nowrap"
+                        title={
+                          p.daysInIndia != null && p.soldSinceArrival != null
+                            ? `Sold ${p.soldSinceArrival} of ${num(p.soldSinceArrival + p.availableCtn, 2)} CTN in ${p.daysInIndia} days since arriving in India`
+                            : undefined
+                        }
+                      >
+                        {p.daysInIndia == null ? (
+                          '—'
+                        ) : (
+                          <>
+                            {p.daysInIndia}d
+                            <span
+                              className={cn(
+                                'block text-[10px]',
+                                p.slowMover ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
+                              )}
+                            >
+                              {p.sellThrough == null ? '—' : `${(p.sellThrough * 100).toFixed(0)}% sold`}
+                              {p.slowMover && ' · slow'}
+                            </span>
+                          </>
+                        )}
+                      </td>
                       <td className={cn('p-2 text-right tabular-nums', p.daysOfCover != null && data && p.daysOfCover < data.leadTimeDays && 'text-red-600 dark:text-red-400')}>
                         {num(p.daysOfCover)}
                       </td>
@@ -525,6 +560,12 @@ export function ProductInsights() {
                         <span className={cn('block text-[10px]', REORDER[p.reorderStatus].className)}>
                           {REORDER[p.reorderStatus].text}
                         </span>
+                        {p.reorderStatus !== 'no-demand' && p.reorderStatus !== 'now' && (
+                          <span className="block text-[10px] text-muted-foreground" title="Reorder when India stock + on the way falls to this">
+                            at ≤{num(p.reorderPoint, 1)}
+                            {p.daysUntilReorder != null && ` · ~${p.daysUntilReorder}d`}
+                          </span>
+                        )}
                       </td>
                     </tr>
                     {open && (
@@ -601,16 +642,33 @@ export function ProductInsights() {
                               <dd className="tabular-nums">{p.priceChangePct == null ? '—' : `${p.priceChangePct > 0 ? '+' : ''}${p.priceChangePct}%`}</dd>
                               <dt className="text-muted-foreground">Landed cost change</dt>
                               <dd className="tabular-nums">{p.costChangePct == null ? '—' : `${p.costChangePct > 0 ? '+' : ''}${p.costChangePct}%`}</dd>
-                              <dt className="text-muted-foreground">Stock value · oldest</dt>
-                              <dd className="tabular-nums"><AmountDisplay amount={p.stockValue} decimals={0} /> · {p.oldestStockDays == null ? '—' : `${p.oldestStockDays}d`}</dd>
+                              <dt className="text-muted-foreground">Stock value</dt>
+                              <dd className="tabular-nums"><AmountDisplay amount={p.stockValue} decimals={0} /></dd>
+                              <dt className="text-muted-foreground">In India since</dt>
+                              <dd className="tabular-nums">
+                                {p.inIndiaSince ? `${format(new Date(p.inIndiaSince), 'd MMM yyyy')} (${p.daysInIndia}d)` : '—'}
+                              </dd>
+                              <dt className="text-muted-foreground">Sold since arrival</dt>
+                              <dd className="tabular-nums">
+                                {p.soldSinceArrival == null
+                                  ? '—'
+                                  : `${p.soldSinceArrival} of ${num(p.soldSinceArrival + p.availableCtn, 2)} CTN (${((p.sellThrough ?? 0) * 100).toFixed(0)}%)`}
+                              </dd>
+                              <dt className="text-muted-foreground">Flow · stock lasts</dt>
+                              <dd className="tabular-nums">
+                                {p.flowPerMonth == null ? '—' : `${p.flowPerMonth} CTN/month`} · {p.daysOfCover == null ? '—' : `~${p.daysOfCover}d`}
+                              </dd>
                               {isChina && (
                                 <>
                                   <dt className="text-muted-foreground">CBM / CTN · pcs / CTN</dt>
                                   <dd className="tabular-nums">{num(p.cbmPerCtn, 4)}<SourceTag source={p.cbmSource} /> · {num(p.qtyPerCtn)}</dd>
                                 </>
                               )}
-                              <dt className="text-muted-foreground">Reorder point · confidence</dt>
-                              <dd className="tabular-nums">{p.reorderPoint} CTN · {p.confidence}</dd>
+                              <dt className="text-muted-foreground">Reorder at · confidence</dt>
+                              <dd className="tabular-nums">
+                                ≤{p.reorderPoint} CTN{p.slowMover && ' (slow mover)'}
+                                {p.daysUntilReorder != null && `, in ~${p.daysUntilReorder}d`} · {p.confidence}
+                              </dd>
                             </dl>
                             <OverrideEditor key={`${p.id}:${p.override?.updatedAt ?? ''}`} p={p} source={source} onSaved={load} />
                           </div>

@@ -22,7 +22,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 const DAY = 86_400_000
-const HISTORY_DAYS = 180
+// A year of sales: windows use the last 180 days, stock flow can reach further back
+const HISTORY_DAYS = 365
 const DEFAULT_LEAD_TIME = 45
 
 type Source = 'china' | 'india'
@@ -36,6 +37,7 @@ interface RawSale {
   pcsSold: number
   revenue: number
   cost: number
+  batches: (mongoose.Types.ObjectId | null)[] // buying entries this line was sold from (FIFO)
 }
 
 /** Sale lines of one source since `since`, discount-adjusted the same way the P&L report does. */
@@ -62,6 +64,9 @@ async function loadSales(archive: string | null, source: Source, since: Date): P
               ],
             },
           ],
+        },
+        batches: {
+          $ifNull: [source === 'china' ? '$fifoBreakdown.buyingEntry' : '$fifoBreakdown.indiaBuyingEntry', []],
         },
         ctnSold: { $ifNull: ['$ctnSold', 0] },
         pcsSold: { $ifNull: ['$pcsSold', 0] },
@@ -101,6 +106,18 @@ async function loadSales(archive: string | null, source: Source, since: Date): P
 }
 
 /** Average days from purchase to reaching India, from delivered containers. */
+/** Earliest date each buying entry's cartons reached the India warehouse, by container. */
+async function containerArrivals(): Promise<Map<string, Date>> {
+  const rows = await Container.aggregate<{ _id: mongoose.Types.ObjectId; at: Date }>([
+    { $match: { $or: [{ reachedIndiaWarehouse: true }, { arrivedDate: { $ne: null } }] } },
+    { $unwind: '$entries' },
+    { $project: { entry: '$entries.buyingEntry', at: { $ifNull: ['$warehouseDate', '$arrivedDate'] } } },
+    { $match: { at: { $ne: null } } },
+    { $group: { _id: '$entry', at: { $min: '$at' } } },
+  ])
+  return new Map(rows.map((r) => [String(r._id), new Date(r.at)]))
+}
+
 async function measuredLeadTime(): Promise<{ days: number; samples: number } | null> {
   const rows = await Container.aggregate<{ days: number }>([
     { $match: { $or: [{ warehouseDate: { $ne: null } }, { arrivedDate: { $ne: null } }] } },
@@ -239,6 +256,21 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // A batch was in India no later than its first sale
+    const firstSaleOfBatch = new Map<string, number>()
+    for (const s of salesLists.flat()) {
+      const t = new Date(s.billDate).getTime()
+      for (const b of s.batches ?? []) {
+        if (!b) continue
+        const k = String(b)
+        if (!firstSaleOfBatch.has(k) || t < (firstSaleOfBatch.get(k) as number)) firstSaleOfBatch.set(k, t)
+      }
+    }
+    const earliest = (...ts: (number | undefined)[]) => {
+      const valid = ts.filter((t): t is number => t != null && Number.isFinite(t))
+      return valid.length ? new Date(Math.min(...valid)) : null
+    }
+
     const { BuyingEntry, IndiaBuyingEntry } = reportModels(null)
     let products: { _id: mongoose.Types.ObjectId; productName: string; ctnWeightKg?: number | null; ctnCbm?: number | null }[]
     let entries: EntryRow[]
@@ -248,9 +280,10 @@ export async function GET(req: NextRequest) {
         {},
         {
           product: 1, entryDate: 1, totalCtn: 1, qty: 1, cbm: 1, weight: 1, finalCost: 1,
-          availableCtn: 1, chinaWarehouseReceived: 1, chinaWarehouseCtn: 1, inTransitCtn: 1,
+          availableCtn: 1, chinaWarehouseReceived: 1, chinaWarehouseCtn: 1, inTransitCtn: 1, soldCtn: 1,
         }
       ).lean()
+      const arrivedByContainer = await containerArrivals().catch(() => new Map<string, Date>())
       entries = raw.map((e) => ({
         productId: String(e.product),
         entryDate: new Date(e.entryDate),
@@ -263,6 +296,17 @@ export async function GET(req: NextRequest) {
         // Same buckets as the products page: factory + China WH + in transit
         pipelineCtn:
           (e.chinaWarehouseReceived === 'no' ? e.totalCtn ?? 0 : e.chinaWarehouseCtn ?? 0) + (e.inTransitCtn ?? 0),
+        // Container warehouse date when we have it (delivered containers are
+        // deleted at a year reset); otherwise purchase date + lead time. Either
+        // way, never later than the batch's first sale.
+        arrivedAt:
+          (e.availableCtn ?? 0) + (e.soldCtn ?? 0) > 0
+            ? earliest(
+                arrivedByContainer.get(String(e._id))?.getTime() ??
+                  Math.min(new Date(e.entryDate).getTime() + leadTimeDays * DAY, now.getTime()),
+                firstSaleOfBatch.get(String(e._id))
+              )
+            : null,
       }))
     } else {
       products = await IndiaProduct.find({}, { productName: 1, ctnWeightKg: 1, ctnCbm: 1 }).lean()
@@ -280,6 +324,8 @@ export async function GET(req: NextRequest) {
         finalCost: e.finalCost ?? 0,
         availableCtn: e.availableCtn ?? 0,
         pipelineCtn: 0,
+        // Bought locally: in the warehouse from the purchase date
+        arrivedAt: earliest(new Date(e.entryDate).getTime(), firstSaleOfBatch.get(String(e._id))),
       }))
     }
 
