@@ -30,6 +30,7 @@ export interface BuyingEntryRow {
   qty: number
   rate: number
   cbm: number
+  cbmBreakdown?: { ctn: number; cbm: number }[]
   weight: number
   givenAmount: number
   hasAdvancePayment?: boolean
@@ -397,6 +398,9 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                           totalExpenseINR={entry.totalExpenseINR}
                           qty={entry.qty}
                           finalCost={entry.finalCost}
+                          rate={entry.rate}
+                          cbm={entry.cbm}
+                          cbmBreakdown={entry.cbmBreakdown}
                           onSuccess={fetchEntries}
                         />
                       </div>
@@ -538,8 +542,15 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                                 </div>
 
                                 <div className="flex flex-col">
-                                  <span className="text-xs text-muted-foreground">CBM per CTN</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    CBM per CTN{entry.cbmBreakdown?.length ? ' (avg)' : ''}
+                                  </span>
                                   <span className="font-semibold">{entry.cbm}</span>
+                                  {entry.cbmBreakdown?.length ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {entry.cbmBreakdown.map((r) => `${r.ctn} × ${r.cbm}`).join(' + ')}
+                                    </span>
+                                  ) : null}
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-xs text-muted-foreground">Total CBM</span>

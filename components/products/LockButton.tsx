@@ -15,6 +15,13 @@ import {
 import { Label } from '@/components/ui/label'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { cn } from '@/lib/utils'
+import { avgCbmPerCtn, indiaCtn, type CbmBreakdownRow } from '@/lib/cbm-breakdown'
+import {
+  CbmBreakdownEditor,
+  cbmBreakdownError,
+  toBreakdownRows,
+  type CbmSizeRow,
+} from '@/components/products/CbmBreakdownEditor'
 
 interface LockButtonProps {
   entryId: string
@@ -31,6 +38,9 @@ interface LockButtonProps {
   totalExpenseINR?: number
   qty?: number
   finalCost?: number
+  rate?: number
+  cbm?: number
+  cbmBreakdown?: CbmBreakdownRow[]
   onSuccess: () => void
   size?: 'sm' | 'default' | 'lg'
 }
@@ -50,6 +60,9 @@ export function LockButton({
   totalExpenseINR,
   qty,
   finalCost,
+  rate,
+  cbm,
+  cbmBreakdown,
   onSuccess,
   size = 'sm',
 }: LockButtonProps) {
@@ -57,18 +70,31 @@ export function LockButton({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [chinaCtn, setChinaCtn] = useState<number | undefined>(chinaWarehouseCtn)
   const [transitCtn, setTransitCtn] = useState<number | undefined>(inTransitCtn)
+  const [mixedSizes, setMixedSizes] = useState(false)
+  const [sizeRows, setSizeRows] = useState<CbmSizeRow[]>([])
 
   // Sync from props when dialog opens
   useEffect(() => {
     if (dialogOpen) {
       setChinaCtn(chinaWarehouseCtn)
       setTransitCtn(inTransitCtn)
+      const saved = cbmBreakdown && cbmBreakdown.length > 0 ? cbmBreakdown : null
+      setMixedSizes(!!saved)
+      setSizeRows(saved ? saved.map((r) => ({ ...r })) : [])
     }
-  }, [dialogOpen, chinaWarehouseCtn, inTransitCtn])
+  }, [dialogOpen, chinaWarehouseCtn, inTransitCtn, cbmBreakdown])
 
   const total = totalCtn ?? 0
   const chinaVal = chinaCtn ?? 0
   const transitVal = transitCtn ?? 0
+
+  // Carton sizes are measured only for the CTN in India (available + sold);
+  // their average becomes CBM per CTN for the whole entry
+  const indiaCtnCount = indiaCtn(total, chinaVal, transitVal)
+  const sizeError = mixedSizes ? cbmBreakdownError(sizeRows, indiaCtnCount) : null
+  // With sizes, their average becomes CBM per CTN for every CTN of the entry
+  const effectiveCbm = mixedSizes && !sizeError ? avgCbmPerCtn(toBreakdownRows(sizeRows)) : (cbm ?? 0)
+  const effectiveTotalCbm = total * effectiveCbm
   const sold = soldCtn ?? 0
   const maxDistributable = total - sold
 
@@ -101,8 +127,21 @@ export function LockButton({
       ? `Total exceeds ${maxDistributable} CTN available (${total} total - ${sold} sold). Reduce China WH or In Transit CTN.`
       : null
 
-  const finalCostPerPiece = finalCost ?? 0
   const qtyPerCtn = qty ?? 0
+  // Entries without carton sizes keep using the saved finalCost exactly as before.
+  // With sizes, preview with the same formula as the BuyingEntry pre-save hook.
+  const hadSizes = (cbmBreakdown?.length ?? 0) > 0
+  const sizesInvolved = mixedSizes || hadSizes
+  const totalPieces = total * qtyPerCtn
+  const finalCostPerPiece = sizesInvolved && totalPieces > 0
+    ? parseFloat(
+        (
+          ((rate ?? 0) * (avgRmbRate ?? 0) * totalPieces + effectiveTotalCbm * (carryingRate ?? 0)) /
+          totalPieces
+        ).toFixed(5)
+      )
+    : (finalCost ?? 0)
+  const cbmChanged = Math.abs(finalCostPerPiece - (finalCost ?? 0)) > 1e-4
 
   const displayAvailableCtn = computedAvailable
   const displaySoldCtn = useMemo(
@@ -175,7 +214,7 @@ export function LockButton({
 
       {!isLocked && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{isFullySold ? 'Re-lock Entry' : 'Lock Entry'}</DialogTitle>
             </DialogHeader>
@@ -305,6 +344,48 @@ export function LockButton({
                 </div>
               )}
 
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Carton Sizes (CBM)
+                  </p>
+                  <label
+                    className={cn(
+                      'flex items-center gap-2 text-xs',
+                      indiaCtnCount > 0 || mixedSizes ? 'cursor-pointer' : 'opacity-50'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5"
+                      checked={mixedSizes}
+                      disabled={indiaCtnCount <= 0 && !mixedSizes}
+                      onChange={(e) => {
+                        setMixedSizes(e.target.checked)
+                        if (e.target.checked && sizeRows.length === 0) {
+                          setSizeRows([{ ctn: indiaCtnCount || undefined, cbm }])
+                        }
+                      }}
+                    />
+                    Different carton sizes
+                  </label>
+                </div>
+
+                {!mixedSizes ? (
+                  <p className="text-sm text-muted-foreground">
+                    All {total} CTN @ <span className="font-medium text-foreground">{cbm ?? 0}</span> CBM
+                    = {parseFloat(effectiveTotalCbm.toFixed(5))} CBM. Tick if the {indiaCtnCount} CTN in
+                    India came in different sizes.
+                  </p>
+                ) : (
+                  <CbmBreakdownEditor
+                    indiaCtn={indiaCtnCount}
+                    rows={sizeRows}
+                    onChange={setSizeRows}
+                  />
+                )}
+              </div>
+
               <div className="rounded-lg border p-3 space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Costing Summary
@@ -323,8 +404,19 @@ export function LockButton({
                     </span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Carrying</span>
+                    <span className="font-medium">
+                      ₹{parseFloat((effectiveTotalCbm * (carryingRate ?? 0)).toFixed(2)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Final Cost per piece</span>
                     <span className="font-medium">
+                      {cbmChanged && (
+                        <span className="mr-2 text-xs text-muted-foreground line-through">
+                          <AmountDisplay amount={finalCost ?? 0} decimals={5} />
+                        </span>
+                      )}
                       <AmountDisplay amount={finalCostPerPiece} decimals={5} />
                     </span>
                   </div>
@@ -406,6 +498,7 @@ export function LockButton({
                   disabled={
                     loading ||
                     displayLockedCtn <= 0 ||
+                    !!sizeError ||
                     (!isFullySold && hasDistributionErrors)
                   }
                   className={cn(
@@ -422,6 +515,10 @@ export function LockButton({
                     const result = await apiPost(`/api/buying-entries/${entryId}/lock`, {
                       chinaWarehouseCtn: chinaVal,
                       inTransitCtn: transitVal,
+                      // Only sent when sizes are used or being removed — plain entries lock exactly as before
+                      ...(sizesInvolved
+                        ? { cbmBreakdown: mixedSizes ? toBreakdownRows(sizeRows) : null }
+                        : {}),
                     })
                     setLoading(false)
                     if (result.success) {

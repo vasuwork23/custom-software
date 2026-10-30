@@ -58,6 +58,8 @@ export interface EntryAfter {
   lockedCtn: number; lockedAmount: number; isLocked: boolean
   totalCbm: number; totalWeight: number; rmbInrPurchase: number
   totalCarrying: number; totalExpenseINR: number; finalCost: number; shippingCostPerPiece: number
+  /** Entry had mixed carton sizes — clear them (cbm keeps their average) */
+  clearCbmSizes?: boolean
 }
 export interface EntryTrim {
   id: string; mark: string; product: string
@@ -244,6 +246,9 @@ export async function buildPlan(
     // ── trim: keep what is left, with identical per-piece economics ──────
     const qty = e.qty ?? 0
     const rate = e.rate ?? 0
+    // Carton-size rows describe the pre-reset India CTN; cbm already holds their
+    // average, so the rows are cleared on apply
+    const hasCbmSizes = Array.isArray(e.cbmBreakdown) && e.cbmBreakdown.length > 0
     const cbm = e.cbm ?? 0
     const weight = e.weight ?? 0
     const carryingRate = e.carryingRate ?? 0
@@ -287,6 +292,7 @@ export async function buildPlan(
         lockedCtn: newLockedCtn, lockedAmount: newLockedAmount,
         isLocked: newLockedCtn > CTN_TOL ? !!e.isLocked : false,
         totalCbm: r5(newTotalCtn * cbm),
+        ...(hasCbmSizes ? { clearCbmSizes: true } : {}),
         totalWeight: r5(newTotalCtn * weight),
         rmbInrPurchase: r5(rmbInrRaw),
         totalCarrying: r5(carryingRaw),

@@ -27,6 +27,13 @@ import {
 } from '@/components/ui/select'
 import { WarehouseStatusSelect, type WarehouseStatus } from '@/components/products/WarehouseStatusSelect'
 import { AutoCalculatedFields } from '@/components/products/AutoCalculatedFields'
+import {
+  CbmBreakdownEditor,
+  cbmBreakdownError,
+  toBreakdownRows,
+  type CbmSizeRow,
+} from '@/components/products/CbmBreakdownEditor'
+import { avgCbmPerCtn, indiaCtn } from '@/lib/cbm-breakdown'
 import { cn } from '@/lib/utils'
 import { apiGet, apiPost, apiPut } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -164,6 +171,7 @@ interface BuyingEntryFormProps {
     qty: number
     rate: number
     cbm: number
+    cbmBreakdown?: { ctn: number; cbm: number }[]
     weight: number
     givenAmount: number
     hasAdvancePayment?: boolean
@@ -200,6 +208,9 @@ export function BuyingEntryForm({
   } | null>(null)
   const [lockSubmitting, setLockSubmitting] = useState(false)
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null)
+  // Mixed carton sizes in one entry (e.g. 35 + 35 + 30 CTN, each with its own CBM)
+  const [mixedSizes, setMixedSizes] = useState(false)
+  const [sizeRows, setSizeRows] = useState<CbmSizeRow[]>([])
   useEffect(() => {
     if (open) {
       apiGet<{ persons: { _id: string; name: string; currentBalance: number }[] }>('/api/sophia').then((r) => {
@@ -243,10 +254,36 @@ export function BuyingEntryForm({
   const watchTotalCtn = watch('totalCtn')
   const watchChinaWarehouseCtn = watch('chinaWarehouseCtn')
   const watchInTransitCtn = watch('inTransitCtn')
+
+  // Carton sizes are measured only for the CTN in India (available + sold);
+  // their average becomes CBM per CTN for the whole entry
+  const indiaCtnCount =
+    watched.chinaWarehouseReceived === 'yes'
+      ? indiaCtn(watchTotalCtn ?? 0, watchChinaWarehouseCtn ?? 0, watchInTransitCtn ?? 0)
+      : 0
+  const useSizes = mixedSizes && indiaCtnCount > 0
+  const sizeError = useSizes ? cbmBreakdownError(sizeRows, indiaCtnCount) : null
+  useEffect(() => {
+    if (mixedSizes && sizeRows.length === 1 && sizeRows[0].ctn !== indiaCtnCount && indiaCtnCount > 0) {
+      setSizeRows([{ ...sizeRows[0], ctn: indiaCtnCount }])
+    }
+  }, [mixedSizes, sizeRows, indiaCtnCount])
+  // With sizes, CBM per CTN is locked to their average (used for every CTN)
+  const sizesAvgCbm = useSizes && !sizeError ? avgCbmPerCtn(toBreakdownRows(sizeRows)) : null
+  useEffect(() => {
+    if (sizesAvgCbm != null && sizesAvgCbm !== watched.cbm) {
+      setValue('cbm', sizesAvgCbm, { shouldValidate: true })
+    }
+  }, [sizesAvgCbm, watched.cbm, setValue])
   const [ctnWarning, setCtnWarning] = useState<string | null>(null)
   const [totalCtnError, setTotalCtnError] = useState<string | null>(null)
   useEffect(() => {
     if (open) setTotalCtnError(null)
+    if (open) {
+      const saved = editEntry?.cbmBreakdown && editEntry.cbmBreakdown.length > 0 ? editEntry.cbmBreakdown : null
+      setMixedSizes(!!saved)
+      setSizeRows(saved ? saved.map((r) => ({ ...r })) : [])
+    }
     if (open && editEntry) {
       reset({
         mark: editEntry.mark,
@@ -340,6 +377,10 @@ export function BuyingEntryForm({
   }, [open, watchTotalCtn, watchChinaWarehouseCtn, watchInTransitCtn, watched.chinaWarehouseReceived])
 
   async function onSubmit(values: FormValues) {
+    if (sizeError) {
+      toast.error(`Carton sizes: ${sizeError}`)
+      return
+    }
     if (isEdit && (values.totalCtn ?? 0) < soldCtn) {
       toast.error(`Cannot reduce Total CTN below ${soldCtn} (already sold)`)
       return
@@ -352,6 +393,7 @@ export function BuyingEntryForm({
       qty: values.qty ?? 0,
       rate: values.rate ?? 0,
       cbm: values.cbm ?? 0,
+      cbmBreakdown: useSizes ? toBreakdownRows(sizeRows) : null,
       weight: values.weight ?? 0,
       hasAdvancePayment: values.hasAdvancePayment,
       advanceAmount: values.hasAdvancePayment ? (values.advanceAmount ?? null) : null,
@@ -616,11 +658,16 @@ export function BuyingEntryForm({
                     placeholder="Enter CBM"
                     value={field.value}
                     onChange={field.onChange}
-                    className={errors.cbm ? 'border-destructive' : ''}
+                    disabled={useSizes}
+                    title={useSizes ? 'Average of the carton sizes below' : undefined}
+                    className={cn(errors.cbm && 'border-destructive', useSizes && 'bg-muted')}
                   />
                 )}
               />
               {errors.cbm && <p className="text-sm text-destructive">{errors.cbm.message}</p>}
+              {useSizes && (
+                <p className="text-xs text-muted-foreground">Avg of the carton sizes below</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="weight">Weight per CTN</Label>
@@ -882,6 +929,53 @@ export function BuyingEntryForm({
                   </div>
                 </div>
               </>
+            )}
+
+            {/* Carton sizes — right under the CTN split, since they cover the India CTN */}
+            {watched.chinaWarehouseReceived === 'yes' && (
+              <div className="col-span-1 sm:col-span-2 lg:col-span-4 rounded-lg border p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Carton Sizes (CBM) — {indiaCtnCount} CTN in India
+                  </p>
+                  <label
+                    className={cn(
+                      'flex items-center gap-2 text-sm',
+                      indiaCtnCount > 0 ? 'cursor-pointer' : 'opacity-50'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={useSizes}
+                      disabled={indiaCtnCount <= 0}
+                      onChange={(e) => {
+                        setMixedSizes(e.target.checked)
+                        if (e.target.checked && sizeRows.length === 0) {
+                          setSizeRows([{ ctn: indiaCtnCount, cbm: watched.cbm }])
+                        }
+                      }}
+                    />
+                    Different carton sizes
+                  </label>
+                </div>
+                {indiaCtnCount <= 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No CTN in India yet — reduce China Warehouse / In Transit CTN above.
+                  </p>
+                ) : useSizes ? (
+                  <CbmBreakdownEditor
+                    indiaCtn={indiaCtnCount}
+                    rows={sizeRows}
+                    onChange={setSizeRows}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    All {indiaCtnCount} CTN @ {watched.cbm ?? 0} CBM. Tick &quot;Different carton sizes&quot; if
+                    they came in different sizes.
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Row 9: Auto-calculated summary panel full width */}
