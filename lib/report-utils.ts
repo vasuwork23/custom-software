@@ -1,6 +1,6 @@
 /**
  * Get start and end dates for report period.
- * period: 'week' | 'month' | 'year' — relative to today.
+ * period: 'today' | 'yesterday' | 'week' | 'month' | 'year' — relative to today.
  * startDate/endDate: optional ISO date strings for custom range (override period).
  */
 export function getReportDateRange(
@@ -22,6 +22,10 @@ export function getReportDateRange(
   switch (period) {
     case 'today':
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+      break
+    case 'yesterday':
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0)
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999)
       break
     case 'week': {
       const day = now.getDay()
@@ -45,6 +49,7 @@ export function getReportDateRange(
 export function getPeriodFormat(period: string): string {
   switch (period) {
     case 'today':
+    case 'yesterday':
       return '%Y-%m-%d'
     case 'week':
       return '%Y-W%V'
@@ -94,6 +99,7 @@ function spanDays(start: Date, end: Date): number {
 export function getDefaultGranularity(period: string, start: Date, end: Date): Granularity {
   switch (period) {
     case 'today':
+    case 'yesterday':
     case 'week':
     case 'month':
       return 'day'

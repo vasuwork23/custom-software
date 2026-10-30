@@ -22,7 +22,7 @@ import mongoose from 'mongoose'
 
 export const revalidate = 300
 
-type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
@@ -43,6 +43,10 @@ function getPeriodRange(period: Period, startDate?: string | null, endDate?: str
   }
   if (period === 'today') {
     return { start: startOfDay(now), end: endOfDay(now) }
+  }
+  if (period === 'yesterday') {
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+    return { start: startOfDay(yesterday), end: endOfDay(yesterday) }
   }
   if (period === 'week') {
     const day = now.getDay()
@@ -75,7 +79,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const periodParam = (searchParams.get('period') ?? 'month') as Period
-    const period: Period = ['today', 'week', 'month', 'year', 'custom'].includes(periodParam)
+    const period: Period = ['today', 'yesterday', 'week', 'month', 'year', 'custom'].includes(periodParam)
       ? periodParam
       : 'month'
     const startDate = searchParams.get('startDate')?.trim()
@@ -92,7 +96,8 @@ export async function GET(req: NextRequest) {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const monthEnd = endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+    // Monthly comparison covers the last 12 months; the dashboard can show 6 or 12
+    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
 
     const [
       chinaBankLastTx,
@@ -334,7 +339,7 @@ export async function GET(req: NextRequest) {
         },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
-      // Monthly revenue / cost / profit last 6 months
+      // Monthly revenue / cost / profit last 12 months
       SellBillItem.aggregate([
         {
           $lookup: {
@@ -345,7 +350,7 @@ export async function GET(req: NextRequest) {
           },
         },
         { $unwind: '$bill' },
-        { $match: { 'bill.billDate': { $gte: sixMonthsAgo, $lte: monthEnd } } },
+        { $match: { 'bill.billDate': { $gte: twelveMonthsAgo, $lte: monthEnd } } },
         {
           $addFields: {
             itemCost: {
@@ -388,7 +393,7 @@ export async function GET(req: NextRequest) {
       Expense.aggregate([
         {
           $match: {
-            expenseDate: { $gte: sixMonthsAgo, $lte: monthEnd },
+            expenseDate: { $gte: twelveMonthsAgo, $lte: monthEnd },
           },
         },
         {
@@ -759,12 +764,16 @@ export async function GET(req: NextRequest) {
     for (const e of monthlyExpensesAgg as { _id: string; expenses: number }[]) {
       expensesByMonth.set(e._id, e.expenses)
     }
-    const monthlyComparison = (monthlyRevenueAgg as {
-      _id: string
-      revenue: number
-      cost: number
-      profit: number
-    }[]).map((m) => {
+    const revenueByMonth = new Map(
+      (monthlyRevenueAgg as { _id: string; revenue: number; cost: number; profit: number }[]).map((m) => [m._id, m])
+    )
+    // Every month of the window, oldest first — months with no sales still show (with their expenses)
+    const monthKeys = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })
+    const monthlyComparison = monthKeys.map((key) => {
+      const m = revenueByMonth.get(key) ?? { _id: key, revenue: 0, cost: 0, profit: 0 }
       const expenses = expensesByMonth.get(m._id) ?? 0
       const netProfit = (m.profit ?? 0) - expenses
       const margin =

@@ -9,7 +9,7 @@ import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
 
-type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
@@ -49,6 +49,10 @@ function getDashboardRanges(
   } else if (period === 'today') {
     currentStart = startOfDay(now)
     currentEnd = endOfDay(now)
+  } else if (period === 'yesterday') {
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+    currentStart = startOfDay(yesterday)
+    currentEnd = endOfDay(yesterday)
   } else if (period === 'week') {
     const day = now.getDay()
     const diff = now.getDate() - day + (day === 0 ? -6 : 1) // Monday start
@@ -69,7 +73,8 @@ function getDashboardRanges(
   let previousStart: Date
   let previousEnd: Date
 
-  if (period === 'today') {
+  if (period === 'today' || period === 'yesterday') {
+    // The day before the selected day
     const yesterday = new Date(currentStart.getTime() - 24 * 60 * 60 * 1000)
     previousStart = startOfDay(yesterday)
     previousEnd = endOfDay(yesterday)
@@ -97,7 +102,7 @@ function getDashboardRanges(
   const rangeDays = rangeMs / (24 * 60 * 60 * 1000) + 1
 
   let chartFormat: string
-  if (period === 'today' || rangeDays <= 1) {
+  if (period === 'today' || period === 'yesterday' || rangeDays <= 1) {
     chartFormat = '%H:00'
   } else if (rangeDays <= 31) {
     chartFormat = '%Y-%m-%d'
@@ -127,7 +132,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const periodParam = (searchParams.get('period') ?? 'month') as Period
-    const period: Period = ['today', 'week', 'month', 'year', 'custom'].includes(periodParam)
+    const period: Period = ['today', 'yesterday', 'week', 'month', 'year', 'custom'].includes(periodParam)
       ? periodParam
       : 'month'
     const startDate = searchParams.get('startDate')?.trim()
