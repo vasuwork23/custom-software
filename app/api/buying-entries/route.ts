@@ -8,6 +8,7 @@ import Product from '@/models/Product'
 import ChinaPerson from '@/models/ChinaPerson'
 import ChinaPersonTransaction from '@/models/ChinaPersonTransaction'
 import mongoose from 'mongoose'
+import { indiaCtn, parseCbmBreakdown } from '@/lib/cbm-breakdown'
 import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -192,6 +193,17 @@ export async function POST(req: NextRequest) {
 
     const initialAvailableCtn = Math.max(0, totalCtn - chinaWarehouseCtnRaw - inTransitCtnRaw)
 
+    const cbmBreakdown = parseCbmBreakdown(
+      body.cbmBreakdown,
+      indiaCtn(totalCtn, chinaWarehouseCtnRaw, inTransitCtnRaw)
+    )
+    if (typeof cbmBreakdown === 'string') {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: cbmBreakdown },
+        { status: 400 }
+      )
+    }
+
     const entry = await BuyingEntry.create({
       product: body.product,
       mark,
@@ -199,6 +211,7 @@ export async function POST(req: NextRequest) {
       qty: body.qty,
       rate: body.rate,
       cbm: body.cbm,
+      cbmBreakdown: cbmBreakdown ?? undefined,
       weight: body.weight,
       givenAmount: advanceAmt ?? 0,
       hasAdvancePayment: hasAdvance,

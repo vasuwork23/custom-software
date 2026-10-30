@@ -8,6 +8,7 @@ import SellBillItem from '@/models/SellBillItem'
 import mongoose from 'mongoose'
 import { recalculateProfitForEntry } from '@/lib/recalculate-entry-profit'
 import { ensureNotViewer } from '@/lib/permissions'
+import { indiaCtn, parseCbmBreakdown } from '@/lib/cbm-breakdown'
 
 /** Recompute actual soldCtn from FIFO so we don't skip China Bank debit when DB is stale */
 function getActualSoldCtn(
@@ -90,6 +91,23 @@ export async function POST(
       )
     }
 
+    const body = await req.json().catch(() => ({}))
+    // Sizes cover only the CTN in India (available + sold) — the ones being locked
+    const cbmBreakdown = parseCbmBreakdown(
+      body?.cbmBreakdown,
+      indiaCtn(
+        entry.totalCtn ?? 0,
+        typeof body?.chinaWarehouseCtn === 'number' ? body.chinaWarehouseCtn : entry.chinaWarehouseCtn ?? 0,
+        typeof body?.inTransitCtn === 'number' ? body.inTransitCtn : entry.inTransitCtn ?? 0
+      )
+    )
+    if (typeof cbmBreakdown === 'string') {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: cbmBreakdown },
+        { status: 400 }
+      )
+    }
+
     if (entry.isLocked) {
       const debitTx = await ChinaBankTransaction.findOne({ buyingEntry: id, type: 'debit' }).sort({ createdAt: -1 })
       if (debitTx) {
@@ -113,7 +131,13 @@ export async function POST(
       await entry.save()
     }
 
-    const body = await req.json().catch(() => ({}))
+    // Carton sizes decide totalCbm → carrying → finalCost, so save them
+    // before the lock amount is worked out from finalCost.
+    if (cbmBreakdown || (cbmBreakdown === null && (entry.cbmBreakdown?.length ?? 0) > 0)) {
+      entry.cbmBreakdown = cbmBreakdown ?? undefined
+      await entry.save()
+    }
+
     const bodyChinaCtnRaw = body?.chinaWarehouseCtn
     const bodyTransitCtnRaw = body?.inTransitCtn
 

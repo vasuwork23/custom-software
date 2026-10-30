@@ -69,6 +69,7 @@ export async function applyPlan(db: Db, plan: ResetPlan, ownerId: string): Promi
               isLocked: t.after.isLocked,
               updatedAt: resetAt,
             },
+            ...(t.after.clearCbmSizes ? { $unset: { cbmBreakdown: '' } } : {}),
           },
         },
       })),

@@ -9,6 +9,7 @@ import ChinaPerson from '@/models/ChinaPerson'
 import ChinaPersonTransaction from '@/models/ChinaPersonTransaction'
 import SellBillItem from '@/models/SellBillItem'
 import mongoose from 'mongoose'
+import { indiaCtn, parseCbmBreakdown } from '@/lib/cbm-breakdown'
 import { format } from 'date-fns'
 import { recalcBuyingEntryGivenAndStatus } from '@/lib/buying-entry-payments'
 import { recalculateProfitForEntry } from '@/lib/recalculate-entry-profit'
@@ -184,6 +185,22 @@ export async function PUT(
       )
     }
 
+    const nextTotalCtn = body.totalCtn != null ? Number(body.totalCtn) : entry.totalCtn ?? 0
+    const cbmBreakdown = parseCbmBreakdown(
+      body.cbmBreakdown,
+      indiaCtn(
+        nextTotalCtn,
+        body.chinaWarehouseCtn != null ? Number(body.chinaWarehouseCtn) : entry.chinaWarehouseCtn ?? 0,
+        body.inTransitCtn != null ? Number(body.inTransitCtn) : entry.inTransitCtn ?? 0
+      )
+    )
+    if (typeof cbmBreakdown === 'string') {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', message: cbmBreakdown },
+        { status: 400 }
+      )
+    }
+
     if (entry.isLocked) {
       const debitTx = await ChinaBankTransaction.findOne({ buyingEntry: id, type: 'debit' }).sort({ createdAt: -1 })
       if (debitTx) {
@@ -208,6 +225,10 @@ export async function PUT(
     if (body.qty != null) entry.qty = Number(body.qty)
     if (body.rate != null) entry.rate = Number(body.rate)
     if (body.cbm != null) entry.cbm = Number(body.cbm)
+    // Plain entries (no sizes before or after) are left untouched
+    if (cbmBreakdown || (cbmBreakdown === null && (entry.cbmBreakdown?.length ?? 0) > 0)) {
+      entry.cbmBreakdown = cbmBreakdown ?? undefined
+    }
     if (body.weight != null) entry.weight = Number(body.weight)
     if (body.mark != null) {
       const nextMark = String(body.mark).trim()
