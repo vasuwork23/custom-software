@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ArrowDownRight, ArrowUpRight, ChevronDown } from 'lucide-react'
@@ -18,8 +18,8 @@ import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import { useUrlParams, useSyncUrlParams, dateRangeParams } from '@/hooks/useUrlFilters'
 
-type DashboardPeriod = 'today' | 'week' | 'month' | 'year' | 'custom'
-const DASHBOARD_PERIODS: DashboardPeriod[] = ['today', 'week', 'month', 'year', 'custom']
+type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
+const DASHBOARD_PERIODS: DashboardPeriod[] = ['today', 'yesterday', 'week', 'month', 'year', 'custom']
 
 interface DashboardPnl {
   summary: {
@@ -167,6 +167,9 @@ function DashboardPageContent() {
   const [stats, setStats] = useState<ExtendedDashboardStats | null>(null)
   const [daysFilter, setDaysFilter] = useState(() => url.str('days'))
   const [statsOpen, setStatsOpen] = useState(false)
+  const [comparisonMonths, setComparisonMonths] = useState<'6' | '12'>(() =>
+    url.oneOf('months', ['6', '12'], '6')
+  )
   const [productsTab, setProductsTab] = useState<'byDays' | 'never'>(() =>
     url.oneOf('productsTab', ['byDays', 'never'], 'byDays')
   )
@@ -176,7 +179,28 @@ function DashboardPageContent() {
     ...(period === 'custom' ? dateRangeParams(dateRange) : {}),
     days: daysFilter.trim(),
     productsTab: productsTab !== 'byDays' ? productsTab : undefined,
+    months: comparisonMonths !== '6' ? comparisonMonths : undefined,
   })
+
+  // API returns the last 12 months (oldest first); show the latest 6 or all 12
+  const comparisonRows = useMemo(
+    () => (stats?.monthlyComparison ?? []).slice(-Number(comparisonMonths)),
+    [stats, comparisonMonths]
+  )
+  const comparisonTotals = useMemo(
+    () =>
+      comparisonRows.reduce(
+        (t, m) => ({
+          revenue: t.revenue + m.revenue,
+          cost: t.cost + m.cost,
+          profit: t.profit + m.profit,
+          expenses: t.expenses + m.expenses,
+          netProfit: t.netProfit + m.netProfit,
+        }),
+        { revenue: 0, cost: 0, profit: 0, expenses: 0, netProfit: 0 }
+      ),
+    [comparisonRows]
+  )
 
   const buildPnlParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -355,6 +379,7 @@ function DashboardPageContent() {
             {(
               [
                 ['today', 'Today'],
+                ['yesterday', 'Yesterday'],
                 ['week', 'This Week'],
                 ['month', 'This Month'],
                 ['year', 'This Year'],
@@ -899,8 +924,25 @@ function DashboardPageContent() {
       {stats && (
         <section>
           <Card>
-            <CardHeader>
-              <CardTitle>Monthly Comparison (last 6 months)</CardTitle>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+              <CardTitle>Monthly Comparison (last {comparisonMonths} months)</CardTitle>
+              <div className="inline-flex rounded-md border bg-muted/40 p-1 text-xs">
+                {(['6', '12'] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setComparisonMonths(n)}
+                    className={cn(
+                      'rounded px-2 py-1 font-medium',
+                      comparisonMonths === n
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-background'
+                    )}
+                  >
+                    {n} Months
+                  </button>
+                ))}
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="rounded-md border overflow-x-auto">
@@ -917,7 +959,7 @@ function DashboardPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.monthlyComparison.map((m, idx, arr) => (
+                    {comparisonRows.map((m, idx, arr) => (
                       <tr
                         key={m.month}
                         className={cn(
@@ -950,6 +992,40 @@ function DashboardPageContent() {
                       </tr>
                     ))}
                   </tbody>
+                  {comparisonRows.length > 1 && (
+                    <tfoot>
+                      <tr className="border-t bg-muted/50 font-semibold">
+                        <td className="p-2">Total</td>
+                        <td className="p-2 text-right">
+                          <AmountDisplay amount={comparisonTotals.revenue} />
+                        </td>
+                        <td className="p-2 text-right">
+                          <AmountDisplay amount={comparisonTotals.cost} />
+                        </td>
+                        <td className="p-2 text-right">
+                          <AmountDisplay amount={comparisonTotals.profit} />
+                        </td>
+                        <td className="p-2 text-right">
+                          <AmountDisplay amount={comparisonTotals.expenses} />
+                        </td>
+                        <td
+                          className={cn(
+                            'p-2 text-right',
+                            comparisonTotals.netProfit < 0 ? 'text-red-600' : 'text-emerald-600'
+                          )}
+                        >
+                          <AmountDisplay amount={comparisonTotals.netProfit} />
+                        </td>
+                        <td className="p-2 text-right">
+                          {(comparisonTotals.revenue > 0
+                            ? (comparisonTotals.netProfit / comparisonTotals.revenue) * 100
+                            : 0
+                          ).toFixed(1)}
+                          %
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
               <Button asChild variant="outline" size="sm">

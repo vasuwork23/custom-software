@@ -26,13 +26,14 @@ import { TrendChart, type TrendRow } from '@/components/reports/TrendChart'
 import { ProductInsights } from '@/components/reports/ProductInsights'
 import { useUrlParams, useSyncUrlParams, dateRangeParams, boolParam } from '@/hooks/useUrlFilters'
 
-type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
 type Granularity = 'day' | 'week' | 'month'
 
-const PERIODS = ['today', 'week', 'month', 'year', 'custom'] as const
+const PERIODS = ['today', 'yesterday', 'week', 'month', 'year', 'custom'] as const
 
 const PERIOD_LABEL: Record<Period, string> = {
   today: 'Today',
+  yesterday: 'Yesterday',
   week: 'Week',
   month: 'Month',
   year: 'Year',
