@@ -53,6 +53,7 @@ interface CompanyItem {
   address?: string
   city?: string
   primaryMobile?: string
+  excludeFromRevenue?: boolean
   openingBalance?: number
   openingBalanceNotes?: string
   outstandingBalance: number

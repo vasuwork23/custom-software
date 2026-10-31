@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     if (startDate) params.set('startDate', startDate)
     if (endDate) params.set('endDate', endDate)
     if (reportType === 'pnl') params.set('withExpenses', String(withExpenses))
+    if (searchParams.get('includeExcluded') === '1') params.set('includeExcluded', '1')
 
     const origin = new URL(req.url).origin
     const auth = req.headers.get('authorization') ?? ''

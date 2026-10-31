@@ -53,6 +53,7 @@ interface CompanyDetailData {
     address?: string
     city?: string
     primaryMobile?: string
+  excludeFromRevenue?: boolean
     openingBalance?: number
     openingBalanceNotes?: string
     lastWhatsappSentAt?: string
@@ -514,6 +515,7 @@ export default function CompanyDetailPage() {
           primaryMobile: company.primaryMobile,
           openingBalance: company.openingBalance,
           openingBalanceNotes: company.openingBalanceNotes,
+          excludeFromRevenue: company.excludeFromRevenue,
         }}
       />
     </div>

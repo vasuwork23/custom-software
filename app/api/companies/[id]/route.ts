@@ -238,6 +238,7 @@ export async function PUT(
         body.primaryMobile == null || body.primaryMobile === ''
           ? undefined
           : String(body.primaryMobile).trim()
+    if (body.excludeFromRevenue !== undefined) company.excludeFromRevenue = body.excludeFromRevenue === true
     company.updatedBy = updatedBy
     await company.save()
 

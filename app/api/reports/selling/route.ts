@@ -3,6 +3,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import { reportModels } from '@/lib/year-reset/archive'
 import { getReportDateRange } from '@/lib/report-utils'
+import { countedIn, loadRevenueExclusion } from '@/lib/revenue-exclusion'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,11 +24,20 @@ export async function GET(req: NextRequest) {
     const { start, end } = getReportDateRange(period, startDate, endDate)
     await connectDB()
     // No archive parameter means the live database, exactly as before.
-    const { SellBill, SellBillItem } = reportModels(searchParams.get('archive'))
+    const { SellBill, SellBillItem, Company } = reportModels(searchParams.get('archive'))
+    // Companies flagged "Exclude from revenue": out of Revenue (and bill count / average), profit still counts
+    const exclusion = await loadRevenueExclusion(Company, searchParams)
+    const excludedIds = exclusion.ids
 
     const summaryAgg = await SellBill.aggregate([
       { $match: { billDate: { $gte: start, $lte: end } } },
-      { $group: { _id: null, totalBills: { $sum: 1 }, totalRevenue: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } },
+      {
+        $group: {
+          _id: null,
+          totalBills: { $sum: countedIn(1, excludedIds, '$company') },
+          totalRevenue: { $sum: countedIn({ $ifNull: ['$grandTotal', '$totalAmount'] }, excludedIds, '$company') },
+        },
+      },
     ])
     const summary = summaryAgg[0] ?? { totalBills: 0, totalRevenue: 0 }
 
@@ -173,6 +183,7 @@ export async function GET(req: NextRequest) {
         topCompanies,
         bills,
         dateRange: { start, end },
+        revenueExclusion: { companies: exclusion.companies, included: exclusion.included },
       },
     })
   } catch (error) {

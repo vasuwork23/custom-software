@@ -13,10 +13,19 @@ import {
 export interface CbmSizeRow {
   ctn?: number
   cbm?: number
+  /** Optional — when filled for every row, the entry's Carrying Rate becomes their average */
+  carryingRate?: number
+  /** Optional — when filled for every row, the entry's Avg RMB Rate becomes their average */
+  rmbRate?: number
 }
 
 export function toBreakdownRows(rows: CbmSizeRow[]): CbmBreakdownRow[] {
-  return rows.map((r) => ({ ctn: r.ctn ?? 0, cbm: r.cbm ?? 0 }))
+  return rows.map((r) => {
+    const row: CbmBreakdownRow = { ctn: r.ctn ?? 0, cbm: r.cbm ?? 0 }
+    if (r.carryingRate != null) row.carryingRate = r.carryingRate
+    if (r.rmbRate != null) row.rmbRate = r.rmbRate
+    return row
+  })
 }
 
 /** Error message unless the sizes add up to the India CTN. */
@@ -41,42 +50,60 @@ export function CbmBreakdownEditor({ indiaCtn, rows, onChange }: CbmBreakdownEdi
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground">
-        <span>CTN</span>
-        <span>CBM per CTN</span>
-        <span className="text-right">Total CBM</span>
-        <span className="w-8" />
-      </div>
-      {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
-          <NumberInput
-            aria-label={`Carton size ${i + 1} CTN`}
-            placeholder="CTN"
-            value={row.ctn}
-            onChange={(v) => updateRow(i, { ctn: v })}
-          />
-          <NumberInput
-            aria-label={`Carton size ${i + 1} CBM per CTN`}
-            placeholder="CBM"
-            value={row.cbm}
-            onChange={(v) => updateRow(i, { cbm: v })}
-          />
-          <span className="text-right text-sm tabular-nums">
-            {parseFloat(((row.ctn ?? 0) * (row.cbm ?? 0)).toFixed(5))}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            disabled={rows.length <= 1}
-            onClick={() => onChange(rows.filter((_, j) => j !== i))}
-            aria-label="Remove carton size"
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px] space-y-2">
+          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_0.8fr_auto] gap-2 text-xs text-muted-foreground">
+            <span>CTN</span>
+            <span>CBM per CTN</span>
+            <span>Carrying Rate (optional)</span>
+            <span>Avg RMB Rate (optional)</span>
+            <span className="text-right">Total CBM</span>
+            <span className="w-8" />
+          </div>
+          {rows.map((row, i) => (
+            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_0.8fr_auto] gap-2 items-center">
+              <NumberInput
+                aria-label={`Carton size ${i + 1} CTN`}
+                placeholder="CTN"
+                value={row.ctn}
+                onChange={(v) => updateRow(i, { ctn: v })}
+              />
+              <NumberInput
+                aria-label={`Carton size ${i + 1} CBM per CTN`}
+                placeholder="CBM"
+                value={row.cbm}
+                onChange={(v) => updateRow(i, { cbm: v })}
+              />
+              <NumberInput
+                aria-label={`Carton size ${i + 1} carrying rate`}
+                placeholder="Carrying rate"
+                value={row.carryingRate}
+                onChange={(v) => updateRow(i, { carryingRate: v })}
+              />
+              <NumberInput
+                aria-label={`Carton size ${i + 1} RMB rate`}
+                placeholder="RMB rate"
+                value={row.rmbRate}
+                onChange={(v) => updateRow(i, { rmbRate: v })}
+              />
+              <span className="text-right text-sm tabular-nums">
+                {parseFloat(((row.ctn ?? 0) * (row.cbm ?? 0)).toFixed(5))}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={rows.length <= 1}
+                onClick={() => onChange(rows.filter((_, j) => j !== i))}
+                aria-label="Remove carton size"
+              >
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
       <Button
         type="button"
         variant="outline"
@@ -104,6 +131,18 @@ export function CbmBreakdownEditor({ indiaCtn, rows, onChange }: CbmBreakdownEdi
         <span className="text-muted-foreground">Avg CBM per CTN</span>
         <span className="text-right font-semibold text-blue-600 dark:text-blue-400">
           {error ? '—' : parseFloat(summary.avgCbm.toFixed(5))}
+        </span>
+        <span className="text-muted-foreground">Avg Carrying Rate</span>
+        <span className="text-right font-semibold text-blue-600 dark:text-blue-400">
+          {error ? '—' : summary.avgCarryingRate != null ? parseFloat(summary.avgCarryingRate.toFixed(5)) : (
+            <span className="font-normal text-muted-foreground">not split — entered above</span>
+          )}
+        </span>
+        <span className="text-muted-foreground">Avg RMB Rate</span>
+        <span className="text-right font-semibold text-blue-600 dark:text-blue-400">
+          {error ? '—' : summary.avgRmbRate != null ? parseFloat(summary.avgRmbRate.toFixed(5)) : (
+            <span className="font-normal text-muted-foreground">not split — entered above</span>
+          )}
         </span>
       </div>
     </div>

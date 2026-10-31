@@ -5,6 +5,7 @@ import { reportModels } from '@/lib/year-reset/archive'
 import { getReportDateRange, resolveGranularity, buildTrendSeries } from '@/lib/report-utils'
 import mongoose from 'mongoose'
 import { grossProfitPct } from '@/lib/calculations'
+import { countedIn, loadRevenueExclusion } from '@/lib/revenue-exclusion'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,6 +88,9 @@ export async function GET(req: NextRequest) {
     await connectDB()
     // No archive parameter means the live database, exactly as before.
     const { SellBillItem, SellBill, Company, Expense, PaymentReceipt } = reportModels(searchParams.get('archive'))
+    // Companies flagged "Exclude from revenue": out of Revenue / Cost, profit still counts
+    const exclusion = await loadRevenueExclusion(Company, searchParams)
+    const excludedIds = exclusion.ids
 
     const DAY_BUCKET = '%Y-%m-%d'
     const dateMatch = { 'bill.billDate': { $gte: start, $lte: end } }
@@ -115,8 +119,8 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: null,
-            revenue: { $sum: '$adjustedRevenue' },
-            cost: { $sum: '$itemCost' },
+            revenue: { $sum: countedIn('$adjustedRevenue', excludedIds) },
+            cost: { $sum: countedIn('$itemCost', excludedIds) },
             grossProfit: { $sum: '$adjustedProfit' },
             ctnSold: { $sum: '$ctnSold' },
           },
@@ -140,8 +144,8 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: '$period',
-            revenue: { $sum: '$adjustedRevenue' },
-            cost: { $sum: '$itemCost' },
+            revenue: { $sum: countedIn('$adjustedRevenue', excludedIds) },
+            cost: { $sum: countedIn('$itemCost', excludedIds) },
             grossProfit: { $sum: '$adjustedProfit' },
           },
         },
@@ -290,7 +294,11 @@ export async function GET(req: NextRequest) {
     const grossProfit = summary.grossProfit ?? 0
     const ctnSold = summary.ctnSold ?? 0
     const netProfit = grossProfit - totalExpenses
-    const marginPct = grossProfitPct(revenue, cost)
+    // With a company excluded, Revenue − Cost leaves out its profit, so use Gross Profit itself
+    const marginPct =
+      excludedIds.length > 0
+        ? revenue > 0 ? parseFloat(((grossProfit / revenue) * 100).toFixed(2)) : 0
+        : grossProfitPct(revenue, cost)
     const netMarginPct = revenue > 0 ? (netProfit / revenue) * 100 : 0
 
     const productBreakdown = (byProduct as {
@@ -382,6 +390,7 @@ export async function GET(req: NextRequest) {
         byProduct: productBreakdown,
         byCompany: companyBreakdown,
         dateRange: { start, end },
+        revenueExclusion: { companies: exclusion.companies, included: exclusion.included },
       },
     })
   } catch (error) {
