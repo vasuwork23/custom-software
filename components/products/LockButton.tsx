@@ -15,7 +15,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { cn } from '@/lib/utils'
-import { avgCbmPerCtn, indiaCtn, type CbmBreakdownRow } from '@/lib/cbm-breakdown'
+import { breakdownAverages, indiaCtn, type CbmBreakdownRow } from '@/lib/cbm-breakdown'
 import {
   CbmBreakdownEditor,
   cbmBreakdownError,
@@ -93,7 +93,11 @@ export function LockButton({
   const indiaCtnCount = indiaCtn(total, chinaVal, transitVal)
   const sizeError = mixedSizes ? cbmBreakdownError(sizeRows, indiaCtnCount) : null
   // With sizes, their average becomes CBM per CTN for every CTN of the entry
-  const effectiveCbm = mixedSizes && !sizeError ? avgCbmPerCtn(toBreakdownRows(sizeRows)) : (cbm ?? 0)
+  // Carrying / RMB rate follow the rows only when that column is filled in every row
+  const sizesAvg = mixedSizes && !sizeError ? breakdownAverages(toBreakdownRows(sizeRows)) : null
+  const effectiveCbm = sizesAvg ? sizesAvg.cbm : (cbm ?? 0)
+  const effectiveCarryingRate = sizesAvg?.carryingRate ?? carryingRate ?? 0
+  const effectiveRmbRate = sizesAvg?.avgRmbRate ?? avgRmbRate ?? 0
   const effectiveTotalCbm = total * effectiveCbm
   const sold = soldCtn ?? 0
   const maxDistributable = total - sold
@@ -136,7 +140,7 @@ export function LockButton({
   const finalCostPerPiece = sizesInvolved && totalPieces > 0
     ? parseFloat(
         (
-          ((rate ?? 0) * (avgRmbRate ?? 0) * totalPieces + effectiveTotalCbm * (carryingRate ?? 0)) /
+          ((rate ?? 0) * effectiveRmbRate * totalPieces + effectiveTotalCbm * effectiveCarryingRate) /
           totalPieces
         ).toFixed(5)
       )
@@ -214,7 +218,7 @@ export function LockButton({
 
       {!isLocked && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{isFullySold ? 'Re-lock Entry' : 'Lock Entry'}</DialogTitle>
             </DialogHeader>
@@ -394,19 +398,23 @@ export function LockButton({
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Avg RMB Rate</span>
                     <span className="font-medium">
-                      {avgRmbRate != null ? avgRmbRate : '—'}
+                      {sizesAvg?.avgRmbRate != null
+                        ? `${sizesAvg.avgRmbRate} (avg)`
+                        : avgRmbRate != null ? avgRmbRate : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Carrying Rate</span>
                     <span className="font-medium">
-                      {carryingRate != null ? carryingRate : '—'}
+                      {sizesAvg?.carryingRate != null
+                        ? `${sizesAvg.carryingRate} (avg)`
+                        : carryingRate != null ? carryingRate : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Carrying</span>
                     <span className="font-medium">
-                      ₹{parseFloat((effectiveTotalCbm * (carryingRate ?? 0)).toFixed(2)).toLocaleString('en-IN')}
+                      ₹{parseFloat((effectiveTotalCbm * effectiveCarryingRate).toFixed(2)).toLocaleString('en-IN')}
                     </span>
                   </div>
                   <div className="flex justify-between">

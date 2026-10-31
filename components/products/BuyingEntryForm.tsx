@@ -33,7 +33,7 @@ import {
   toBreakdownRows,
   type CbmSizeRow,
 } from '@/components/products/CbmBreakdownEditor'
-import { avgCbmPerCtn, indiaCtn } from '@/lib/cbm-breakdown'
+import { breakdownAverages, indiaCtn } from '@/lib/cbm-breakdown'
 import { cn } from '@/lib/utils'
 import { apiGet, apiPost, apiPut } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -171,7 +171,7 @@ interface BuyingEntryFormProps {
     qty: number
     rate: number
     cbm: number
-    cbmBreakdown?: { ctn: number; cbm: number }[]
+    cbmBreakdown?: { ctn: number; cbm: number; carryingRate?: number; rmbRate?: number }[]
     weight: number
     givenAmount: number
     hasAdvancePayment?: boolean
@@ -268,13 +268,27 @@ export function BuyingEntryForm({
       setSizeRows([{ ...sizeRows[0], ctn: indiaCtnCount }])
     }
   }, [mixedSizes, sizeRows, indiaCtnCount])
-  // With sizes, CBM per CTN is locked to their average (used for every CTN)
-  const sizesAvgCbm = useSizes && !sizeError ? avgCbmPerCtn(toBreakdownRows(sizeRows)) : null
+  // With sizes, CBM per CTN is locked to their average (used for every CTN).
+  // Carrying / RMB rate are locked too, but only when that column is filled in every row.
+  const sizesAvg = useSizes && !sizeError ? breakdownAverages(toBreakdownRows(sizeRows)) : null
+  const sizesAvgCbm = sizesAvg?.cbm ?? null
+  const sizesAvgCarrying = sizesAvg?.carryingRate ?? null
+  const sizesAvgRmb = sizesAvg?.avgRmbRate ?? null
   useEffect(() => {
     if (sizesAvgCbm != null && sizesAvgCbm !== watched.cbm) {
       setValue('cbm', sizesAvgCbm, { shouldValidate: true })
     }
   }, [sizesAvgCbm, watched.cbm, setValue])
+  useEffect(() => {
+    if (sizesAvgCarrying != null && sizesAvgCarrying !== watched.carryingRate) {
+      setValue('carryingRate', sizesAvgCarrying, { shouldValidate: true })
+    }
+  }, [sizesAvgCarrying, watched.carryingRate, setValue])
+  useEffect(() => {
+    if (sizesAvgRmb != null && sizesAvgRmb !== watched.avgRmbRate) {
+      setValue('avgRmbRate', sizesAvgRmb, { shouldValidate: true })
+    }
+  }, [sizesAvgRmb, watched.avgRmbRate, setValue])
   const [ctnWarning, setCtnWarning] = useState<string | null>(null)
   const [totalCtnError, setTotalCtnError] = useState<string | null>(null)
   useEffect(() => {
@@ -697,10 +711,16 @@ export function BuyingEntryForm({
                     placeholder="Enter carrying rate"
                     value={field.value}
                     onChange={field.onChange}
-                    decimal={false}
+                    decimal={sizesAvgCarrying != null}
+                    disabled={sizesAvgCarrying != null}
+                    title={sizesAvgCarrying != null ? 'Average of the carton sizes below' : undefined}
+                    className={cn(sizesAvgCarrying != null && 'bg-muted')}
                   />
                 )}
               />
+              {sizesAvgCarrying != null && (
+                <p className="text-xs text-muted-foreground">Avg of the carton sizes below</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="avgRmbRate">Avg RMB Rate</Label>
@@ -713,9 +733,15 @@ export function BuyingEntryForm({
                     placeholder="Enter RMB rate"
                     value={field.value}
                     onChange={field.onChange}
+                    disabled={sizesAvgRmb != null}
+                    title={sizesAvgRmb != null ? 'Average of the carton sizes below' : undefined}
+                    className={cn(sizesAvgRmb != null && 'bg-muted')}
                   />
                 )}
               />
+              {sizesAvgRmb != null && (
+                <p className="text-xs text-muted-foreground">Avg of the carton sizes below</p>
+              )}
             </div>
             {/* Row 4: Advance Payment checkbox full width */}
             <div className="col-span-1 sm:col-span-2 lg:col-span-4">

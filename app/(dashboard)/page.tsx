@@ -16,7 +16,8 @@ import { apiGet } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
-import { useUrlParams, useSyncUrlParams, dateRangeParams } from '@/hooks/useUrlFilters'
+import { useUrlParams, useSyncUrlParams, dateRangeParams, boolParam } from '@/hooks/useUrlFilters'
+import { RevenueExclusionToggle } from '@/components/reports/RevenueExclusionToggle'
 
 type DashboardPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
 const DASHBOARD_PERIODS: DashboardPeriod[] = ['today', 'yesterday', 'week', 'month', 'year', 'custom']
@@ -42,6 +43,7 @@ interface DashboardPnl {
   chartData: { label: string; revenue: number; cost: number; netProfit: number }[]
   topCompanies: { name: string; revenue: number; profit: number }[]
   recentBills: { id: string; billNumber: number; company: string; amount: number; date: string | Date }[]
+  revenueExclusion?: { companies: { id: string; name: string }[]; included: boolean }
 }
 
 interface DashboardStats {
@@ -167,6 +169,8 @@ function DashboardPageContent() {
   const [stats, setStats] = useState<ExtendedDashboardStats | null>(null)
   const [daysFilter, setDaysFilter] = useState(() => url.str('days'))
   const [statsOpen, setStatsOpen] = useState(false)
+  // Companies flagged "Exclude from revenue" stay out of Revenue / Cost unless switched on
+  const [includeExcluded, setIncludeExcluded] = useState(() => url.bool('includeExcluded', false))
   const [comparisonMonths, setComparisonMonths] = useState<'6' | '12'>(() =>
     url.oneOf('months', ['6', '12'], '6')
   )
@@ -180,6 +184,7 @@ function DashboardPageContent() {
     days: daysFilter.trim(),
     productsTab: productsTab !== 'byDays' ? productsTab : undefined,
     months: comparisonMonths !== '6' ? comparisonMonths : undefined,
+    includeExcluded: boolParam(includeExcluded, false),
   })
 
   // API returns the last 12 months (oldest first); show the latest 6 or all 12
@@ -209,8 +214,9 @@ function DashboardPageContent() {
       params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
       params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     }
+    if (includeExcluded) params.set('includeExcluded', '1')
     return params
-  }, [period, dateRange])
+  }, [period, dateRange, includeExcluded])
 
   const fetchPnl = useCallback(async () => {
     if (period === 'custom' && (!dateRange?.from || !dateRange.to)) return
@@ -237,8 +243,9 @@ function DashboardPageContent() {
       params.set('startDate', format(dateRange.from, 'yyyy-MM-dd'))
       params.set('endDate', format(dateRange.to, 'yyyy-MM-dd'))
     }
+    if (includeExcluded) params.set('includeExcluded', '1')
     return params
-  }, [period, dateRange])
+  }, [period, dateRange, includeExcluded])
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true)
@@ -437,7 +444,15 @@ function DashboardPageContent() {
           <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
             <Card>
               <CardContent className="pt-4 space-y-1">
-                <p className="text-xs text-muted-foreground">Revenue</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">Revenue</p>
+                  <RevenueExclusionToggle
+                    compact
+                    companies={pnl.revenueExclusion?.companies}
+                    included={includeExcluded}
+                    onChange={setIncludeExcluded}
+                  />
+                </div>
                 <p className="text-xl font-semibold">
                   <AmountDisplay amount={pnl.summary.revenue} />
                 </p>
@@ -924,8 +939,8 @@ function DashboardPageContent() {
       {stats && (
         <section>
           <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-              <CardTitle>Monthly Comparison (last {comparisonMonths} months)</CardTitle>
+            <CardHeader className="flex flex-row flex-wrap items-center gap-3 space-y-0">
+              <CardTitle>Monthly Comparison</CardTitle>
               <div className="inline-flex rounded-md border bg-muted/40 p-1 text-xs">
                 {(['6', '12'] as const).map((n) => (
                   <button

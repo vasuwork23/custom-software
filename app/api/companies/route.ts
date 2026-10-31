@@ -323,6 +323,7 @@ export async function POST(req: NextRequest) {
           ? String(body.ownerName).trim()
           : undefined,
       openingBalance: typeof body.openingBalance === 'number' ? body.openingBalance : 0,
+      excludeFromRevenue: body.excludeFromRevenue === true,
       openingBalanceNotes:
         body.openingBalanceNotes != null && body.openingBalanceNotes !== ''
           ? String(body.openingBalanceNotes).trim()

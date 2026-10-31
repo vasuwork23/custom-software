@@ -19,6 +19,7 @@ import Container from '@/models/Container'
 import Liability from '@/models/Liability'
 import Investment from '@/models/Investment'
 import mongoose from 'mongoose'
+import { countedIn, loadRevenueExclusion } from '@/lib/revenue-exclusion'
 
 export const revalidate = 300
 
@@ -87,6 +88,8 @@ export async function GET(req: NextRequest) {
     const { start, end } = getPeriodRange(period, startDate, endDate)
 
     await connectDB()
+    // Companies flagged "Exclude from revenue": out of Revenue / Cost, profit still counts
+    const excludedIds = (await loadRevenueExclusion(Company, searchParams)).ids
     // Ensure referenced models are registered for populate calls
     void Product
     void IndiaProduct
@@ -383,8 +386,8 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: '$month',
-            revenue: { $sum: '$adjustedRevenue' },
-            cost: { $sum: '$itemCost' },
+            revenue: { $sum: countedIn('$adjustedRevenue', excludedIds) },
+            cost: { $sum: countedIn('$itemCost', excludedIds) },
             profit: { $sum: '$adjustedProfit' },
           },
         },

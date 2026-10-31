@@ -29,6 +29,7 @@ const schema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   primaryMobile: z.string().optional(),
+  excludeFromRevenue: z.boolean().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -51,6 +52,7 @@ export interface CompanyFormSheetProps {
     address?: string
     city?: string
     primaryMobile?: string
+    excludeFromRevenue?: boolean
   } | null
 }
 
@@ -84,6 +86,7 @@ export function CompanyFormSheet({
       address: '',
       city: '',
       primaryMobile: '',
+      excludeFromRevenue: false,
     },
   })
 
@@ -102,6 +105,7 @@ export function CompanyFormSheet({
         address: editCompany.address ?? '',
         city: editCompany.city ?? '',
         primaryMobile: editCompany.primaryMobile ?? '',
+        excludeFromRevenue: editCompany.excludeFromRevenue ?? false,
       })
     } else if (open && !editCompany) {
       reset({
@@ -117,6 +121,7 @@ export function CompanyFormSheet({
         address: '',
         city: '',
         primaryMobile: '',
+        excludeFromRevenue: false,
       })
     }
   }, [open, editCompany, reset])
@@ -140,6 +145,7 @@ export function CompanyFormSheet({
       address: normalizeOptional(values.address),
       city: normalizeOptional(values.city),
       primaryMobile: normalizeOptional(values.primaryMobile),
+      excludeFromRevenue: values.excludeFromRevenue ?? false,
     }
     if (isEdit) {
       const result = await apiPut(`/api/companies/${editCompany._id}`, payload)
@@ -297,6 +303,21 @@ export function CompanyFormSheet({
                 </div>
               </div>
             </div>
+
+            <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                {...register('excludeFromRevenue')}
+              />
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium">Exclude from revenue</span>
+                <span className="block text-xs text-muted-foreground leading-snug">
+                  Its sales are left out of Revenue and Cost on the dashboard and reports. Its profit
+                  still counts in Gross and Net Profit. A switch there can include it.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="flex shrink-0 gap-2 border-t pt-3">

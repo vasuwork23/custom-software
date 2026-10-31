@@ -1,6 +1,6 @@
 import mongoose, { Schema, model, models } from 'mongoose'
 import { round, roundQty } from '@/lib/round'
-import { avgCbmPerCtn, summarizeCbmBreakdown, type CbmBreakdownRow } from '@/lib/cbm-breakdown'
+import { breakdownAverages, summarizeCbmBreakdown, type CbmBreakdownRow } from '@/lib/cbm-breakdown'
 export interface IBuyingEntry {
   _id?: mongoose.Types.ObjectId
   product: mongoose.Types.ObjectId
@@ -9,7 +9,8 @@ export interface IBuyingEntry {
   qty: number
   rate: number // RMB ¥ per piece
   cbm: number // CBM per CTN — the average of cbmBreakdown when it is set
-  /** Measured carton sizes of the CTN in India (available + sold), e.g. 20 @ 0.012 + 10 @ 0.011 */
+  /** Measured carton sizes of the CTN in India (available + sold), e.g. 20 @ 0.012 + 10 @ 0.011.
+   *  Rows may also carry their own carrying / RMB rate — averaged into carryingRate / avgRmbRate. */
   cbmBreakdown?: CbmBreakdownRow[]
   weight: number
   givenAmount: number // RMB ¥ — auto: openingGivenAmount + advanceAmount + sum(BuyingPayments)
@@ -60,7 +61,15 @@ const BuyingEntrySchema = new Schema<IBuyingEntry>(
     rate: { type: Number, required: true },
     cbm: { type: Number, required: true },
     cbmBreakdown: {
-      type: [{ _id: false, ctn: { type: Number, required: true }, cbm: { type: Number, required: true } }],
+      type: [
+        {
+          _id: false,
+          ctn: { type: Number, required: true },
+          cbm: { type: Number, required: true },
+          carryingRate: { type: Number },
+          rmbRate: { type: Number },
+        },
+      ],
       default: undefined,
     },
     weight: { type: Number, required: true },
@@ -116,12 +125,19 @@ BuyingEntrySchema.pre('save', function (next) {
 
   const totalCtn = doc.totalCtn ?? 0
 
-  // Measured carton sizes: cbm per CTN becomes their average.
+  // Measured carton sizes: cbm per CTN becomes their average, and so do the
+  // carrying / RMB rates when those columns are filled for every row.
   // A breakdown with more CTN than the entry has is dropped.
   if (doc.cbmBreakdown && doc.cbmBreakdown.length > 0) {
     const summary = summarizeCbmBreakdown(doc.cbmBreakdown)
-    if (!summary.valid || summary.totalCtn > totalCtn + 1e-6) doc.cbmBreakdown = undefined
-    else doc.cbm = avgCbmPerCtn(doc.cbmBreakdown)
+    if (!summary.valid || summary.totalCtn > totalCtn + 1e-6) {
+      doc.cbmBreakdown = undefined
+    } else {
+      const avg = breakdownAverages(doc.cbmBreakdown)
+      doc.cbm = avg.cbm
+      if (avg.carryingRate != null) doc.carryingRate = avg.carryingRate
+      if (avg.avgRmbRate != null) doc.avgRmbRate = avg.avgRmbRate
+    }
   }
 
   const qtyPerCtn = doc.qty ?? 0

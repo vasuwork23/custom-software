@@ -6,6 +6,7 @@ import SellBill from '@/models/SellBill'
 import Expense from '@/models/Expense'
 import Company from '@/models/Company'
 import mongoose from 'mongoose'
+import { countedIn, loadRevenueExclusion } from '@/lib/revenue-exclusion'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,6 +145,9 @@ export async function GET(req: NextRequest) {
     await connectDB()
     // Ensure Company model is registered for any populate/aggregation that relies on it
     void Company
+    // Companies flagged "Exclude from revenue": out of Revenue / Cost, profit still counts
+    const exclusion = await loadRevenueExclusion(Company, searchParams)
+    const excludedIds = exclusion.ids
 
     const [
       summaryResult,
@@ -196,8 +200,8 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: null,
-            revenue: { $sum: '$adjustedRevenue' },
-            cost: { $sum: '$itemCost' },
+            revenue: { $sum: countedIn('$adjustedRevenue', excludedIds) },
+            cost: { $sum: countedIn('$itemCost', excludedIds) },
             grossProfit: { $sum: '$adjustedProfit' },
             ctnSold: { $sum: '$ctnSold' },
           },
@@ -247,8 +251,8 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: '$period',
-            revenue: { $sum: '$adjustedRevenue' },
-            cost: { $sum: '$itemCost' },
+            revenue: { $sum: countedIn('$adjustedRevenue', excludedIds) },
+            cost: { $sum: countedIn('$itemCost', excludedIds) },
             grossProfit: { $sum: '$adjustedProfit' },
           },
         },
@@ -393,8 +397,8 @@ export async function GET(req: NextRequest) {
         {
           $group: {
             _id: null,
-            revenue: { $sum: '$adjustedRevenue' },
-            cost: { $sum: '$itemCost' },
+            revenue: { $sum: countedIn('$adjustedRevenue', excludedIds) },
+            cost: { $sum: countedIn('$itemCost', excludedIds) },
             grossProfit: { $sum: '$adjustedProfit' },
             ctnSold: { $sum: '$ctnSold' },
           },
@@ -516,6 +520,7 @@ export async function GET(req: NextRequest) {
         chartData,
         topCompanies,
         recentBills,
+        revenueExclusion: { companies: exclusion.companies, included: exclusion.included },
       },
     })
   } catch (error) {

@@ -30,7 +30,7 @@ export interface BuyingEntryRow {
   qty: number
   rate: number
   cbm: number
-  cbmBreakdown?: { ctn: number; cbm: number }[]
+  cbmBreakdown?: { ctn: number; cbm: number; carryingRate?: number; rmbRate?: number }[]
   weight: number
   givenAmount: number
   hasAdvancePayment?: boolean
@@ -548,7 +548,17 @@ export function BuyingEntryTable({ productId, onRefresh, onEdit, onAdd, onMakePa
                                   <span className="font-semibold">{entry.cbm}</span>
                                   {entry.cbmBreakdown?.length ? (
                                     <span className="text-xs text-muted-foreground">
-                                      {entry.cbmBreakdown.map((r) => `${r.ctn} × ${r.cbm}`).join(' + ')}
+                                      {entry.cbmBreakdown
+                                        .map((r) =>
+                                          [
+                                            `${r.ctn} × ${r.cbm}`,
+                                            r.carryingRate != null ? `₹${r.carryingRate}/CBM` : null,
+                                            r.rmbRate != null ? `RMB ${r.rmbRate}` : null,
+                                          ]
+                                            .filter(Boolean)
+                                            .join(' @ ')
+                                        )
+                                        .join(' + ')}
                                     </span>
                                   ) : null}
                                 </div>

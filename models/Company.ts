@@ -17,6 +17,8 @@ export interface ICompany {
   primaryMobile?: string
   lastWhatsappSentAt?: Date
   lastWhatsappMessage?: string
+  /** Sales to this company are left out of Revenue / Cost totals (profit still counts) */
+  excludeFromRevenue?: boolean
   createdBy: mongoose.Types.ObjectId
   updatedBy: mongoose.Types.ObjectId
   createdAt: Date
@@ -39,6 +41,7 @@ const CompanySchema = new Schema<ICompany>(
     primaryMobile: { type: String },
     lastWhatsappSentAt: { type: Date },
     lastWhatsappMessage: { type: String },
+    excludeFromRevenue: { type: Boolean, default: false },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },

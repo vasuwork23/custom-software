@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import type { DateRange } from 'react-day-picker'
 import { TrendChart, type TrendRow } from '@/components/reports/TrendChart'
 import { ProductInsights } from '@/components/reports/ProductInsights'
+import { RevenueExclusionToggle } from '@/components/reports/RevenueExclusionToggle'
 import { useUrlParams, useSyncUrlParams, dateRangeParams, boolParam } from '@/hooks/useUrlFilters'
 
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
@@ -56,6 +57,8 @@ function ReportsPageContent() {
   )
   const [drillStack, setDrillStack] = useState<{ period: Period; dateRange?: DateRange; label: string }[]>([])
   const [withExpenses, setWithExpenses] = useState(() => url.bool('expenses', true))
+  // Companies flagged "Exclude from revenue" stay out of Revenue / Cost unless switched on
+  const [includeExcluded, setIncludeExcluded] = useState(() => url.bool('includeExcluded', false))
   const [loading, setLoading] = useState(true)
   const [showAvailableOnly, setShowAvailableOnly] = useState(() => url.bool('availableOnly', true))
   const [archive, setArchive] = useState(() => url.str('archive'))
@@ -67,6 +70,7 @@ function ReportsPageContent() {
     ...(period === 'custom' ? dateRangeParams(dateRange) : {}),
     granularity: granularity !== 'auto' ? granularity : undefined,
     expenses: boolParam(withExpenses, true),
+    includeExcluded: boolParam(includeExcluded, false),
     availableOnly: boolParam(showAvailableOnly, true),
     archive,
   })
@@ -78,6 +82,7 @@ function ReportsPageContent() {
     dateRange?: { start: string; end: string }
     byProduct: { productName: string; revenue: number; cost: number; profit: number; marginPct: number }[]
     byCompany: { companyName: string; isCashbook?: boolean; isBankSale?: boolean; revenue: number; profit: number; outstanding: number }[]
+    revenueExclusion?: { companies: { id: string; name: string }[]; included: boolean }
   } | null>(null)
   const [stock, setStock] = useState<{
     summary: {
@@ -136,8 +141,9 @@ function ReportsPageContent() {
     }
     // Empty means the live database; a name points every query at a frozen year.
     if (archive) params.set('archive', archive)
+    if (includeExcluded) params.set('includeExcluded', '1')
     return params
-  }, [period, dateRange, archive])
+  }, [period, dateRange, archive, includeExcluded])
 
   const handleExport = useCallback(
     async (reportType: 'pnl' | 'stock' | 'selling' | 'buying', formatType: 'pdf' | 'excel') => {
@@ -331,6 +337,11 @@ function ReportsPageContent() {
                 placeholder="Select date range"
               />
             )}
+            <RevenueExclusionToggle
+              companies={pnl?.revenueExclusion?.companies}
+              included={includeExcluded}
+              onChange={setIncludeExcluded}
+            />
             {archives.length > 0 && (
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm"
