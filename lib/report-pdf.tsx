@@ -139,7 +139,9 @@ function StockTable({ title, rows, columns }: { title: string; rows: StockReport
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.headerRow}>
+      {/* fixed: repeats at the top of every page this table runs onto. Each table
+          gets its own <Page>, so one table's header never shows on the other's pages. */}
+      <View style={styles.headerRow} fixed>
         {cols.map((c) => (
           <Text key={c.key} style={styleFor(c.key)}>{c.label}</Text>
         ))}
@@ -217,8 +219,12 @@ export function StockPdfDocument({
           {card('Total Stock Valuation', `Rs ${fmtNum(chinaValue + indiaValue)}`)}
         </View>
         <StockTable title="China Products" rows={rows} columns={columns} />
-        {indiaRows.length > 0 && <StockTable title="India Products" rows={indiaRows} columns={columns} />}
       </Page>
+      {indiaRows.length > 0 && (
+        <Page size="A4" orientation="landscape" style={styles.page}>
+          <StockTable title="India Products" rows={indiaRows} columns={columns} />
+        </Page>
+      )}
     </Document>
   )
 }
