@@ -5,7 +5,16 @@ import {
   View,
   Text,
   StyleSheet,
+  Font,
 } from '@react-pdf/renderer'
+import {
+  STOCK_COLUMNS,
+  ALL_STOCK_COLUMN_KEYS,
+  formatStockCell,
+  stockTotals,
+  type StockColumnKey,
+  type StockReportRow,
+} from '@/lib/stock-report-columns'
 
 const styles = StyleSheet.create({
   page: { padding: 24, fontSize: 10 },
@@ -21,6 +30,9 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 8, color: '#666' },
   summaryValue: { fontSize: 12, fontWeight: 'bold' },
 })
+
+// Wrap long names at spaces only; the default hyphenation splits words like "Chi-na".
+Font.registerHyphenationCallback((word) => [word])
 
 function fmtNum(n: number): string {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)
@@ -98,87 +110,114 @@ export function PnlPdfDocument({
 }
 
 // Stock
-export function StockPdfDocument({
-  data,
-}: {
-  data: {
-    summary: { totalProducts: number; totalAvailableCtn: number; totalInTransit: number; totalInChina: number; totalInIndia: number; totalIndiaProducts?: number; totalIndiaAvailableCtn?: number }
-    rows: { productName: string; totalCtnBought: number; availableCtn: number; chinaWarehouse: number; inTransit: number; indiaWarehouse: number; lockedEntries: number }[]
-    indiaRows?: { productName: string; totalCtnBought: number; availableCtn: number }[]
-  }
-}) {
-  const s = data.summary
-  const indiaRows = data.indiaRows ?? []
+const stockPdfStyles = StyleSheet.create({
+  stockCell: { flex: 1, textAlign: 'right', paddingHorizontal: 2 },
+  stockNameCell: { flex: 2.4, paddingHorizontal: 2 },
+  totalRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#333', paddingVertical: 4, fontWeight: 'bold' },
+  summaryHeading: { fontSize: 10, color: '#444', marginBottom: 4 },
+  summaryCard: { width: '15.5%', marginRight: '1%', marginBottom: 6, padding: 6, backgroundColor: '#f5f5f5' },
+})
+
+/** A stock row as the API sends it: the report columns plus the warehouse figures used by the summary cards. */
+type StockPdfRow = StockReportRow & {
+  chinaWarehouse?: number
+  inTransit?: number
+  availablePcs?: number
+  totalCost?: number
+}
+
+/** Helvetica has no flag emoji, so drop them rather than print boxes. */
+function pdfText(v: string): string {
+  return v.replace(/\uD83C[\uDDE6-\uDDFF]/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
+function StockTable({ title, rows, columns }: { title: string; rows: StockReportRow[]; columns: StockColumnKey[] }) {
+  const cols = STOCK_COLUMNS.filter((c) => columns.includes(c.key))
+  const styleFor = (key: StockColumnKey) =>
+    key === 'productName' ? stockPdfStyles.stockNameCell : stockPdfStyles.stockCell
+  const totals = stockTotals(rows)
   return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.title}>Stock Report</Text>
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>China Products</Text>
-            <Text style={styles.summaryValue}>{safeStr(s.totalProducts)}</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Available (China India WH)</Text>
-            <Text style={styles.summaryValue}>{safeStr(s.totalInIndia)}</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>In Transit</Text>
-            <Text style={styles.summaryValue}>{safeStr(s.totalInTransit)}</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>In China</Text>
-            <Text style={styles.summaryValue}>{safeStr(s.totalInChina)}</Text>
-          </View>
-          {indiaRows.length > 0 && (
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>India Products</Text>
-              <Text style={styles.summaryValue}>
-                {safeStr(s.totalIndiaProducts ?? 0)}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>China Products</Text>
-          <View style={styles.headerRow}>
-            <Text style={styles.cell}>Product</Text>
-            <Text style={styles.cellRight}>Total Bought</Text>
-            <Text style={styles.cellRight}>Available</Text>
-            <Text style={styles.cellRight}>China</Text>
-            <Text style={styles.cellRight}>Transit</Text>
-            <Text style={styles.cellRight}>India</Text>
-            <Text style={styles.cellRight}>Locked</Text>
-          </View>
-          {data.rows.map((r, i) => (
-            <View key={i} style={styles.row}>
-              <Text style={styles.cell}>{safeStr(r.productName)}</Text>
-              <Text style={styles.cellRight}>{safeStr(r.totalCtnBought)}</Text>
-              <Text style={styles.cellRight}>{safeStr(r.availableCtn)}</Text>
-              <Text style={styles.cellRight}>{safeStr(r.chinaWarehouse)}</Text>
-              <Text style={styles.cellRight}>{safeStr(r.inTransit)}</Text>
-              <Text style={styles.cellRight}>{safeStr(r.indiaWarehouse)}</Text>
-              <Text style={styles.cellRight}>{safeStr(r.lockedEntries)}</Text>
-            </View>
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.headerRow}>
+        {cols.map((c) => (
+          <Text key={c.key} style={styleFor(c.key)}>{c.label}</Text>
+        ))}
+      </View>
+      {rows.map((r, i) => (
+        <View key={i} style={styles.row} wrap={false}>
+          {cols.map((c) => (
+            <Text key={c.key} style={styleFor(c.key)}>{pdfText(formatStockCell(c.key, r[c.key], 'Rs '))}</Text>
           ))}
         </View>
+      ))}
+      {rows.length > 0 && (
+        <View style={stockPdfStyles.totalRow} wrap={false}>
+          {cols.map((c) => (
+            <Text key={c.key} style={styleFor(c.key)}>{pdfText(formatStockCell(c.key, totals[c.key], 'Rs '))}</Text>
+          ))}
+        </View>
+      )}
+    </View>
+  )
+}
+
+export function StockPdfDocument({
+  data,
+  columns = ALL_STOCK_COLUMN_KEYS,
+}: {
+  data: {
+    rows: StockPdfRow[]
+    indiaRows?: StockPdfRow[]
+  }
+  columns?: StockColumnKey[]
+}) {
+  const rows = data.rows ?? []
+  const indiaRows = data.indiaRows ?? []
+  // Worked out from the rows (not the API summary) so the cards match the
+  // filtered rows in the PDF, the same way the on-screen cards do.
+  const sum = (list: StockPdfRow[], k: 'chinaWarehouse' | 'inTransit' | 'availableCtn' | 'availablePcs' | 'totalCost') =>
+    list.reduce((s, r) => s + (Number(r[k]) || 0), 0)
+  const fmtCtn = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 2 })
+  const chinaValue = sum(rows, 'totalCost')
+  const indiaValue = sum(indiaRows, 'totalCost')
+
+  const card = (label: string, value: string) => (
+    <View key={label} style={stockPdfStyles.summaryCard}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  )
+
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <Text style={styles.title}>Stock Report</Text>
+        <Text style={stockPdfStyles.summaryHeading}>China Products</Text>
+        <View style={styles.summaryGrid}>
+          {card('Products', fmtNum(rows.length))}
+          {card('In China (CTN)', fmtCtn(sum(rows, 'chinaWarehouse')))}
+          {card('In Transit (CTN)', fmtCtn(sum(rows, 'inTransit')))}
+          {card('Available India (CTN)', fmtCtn(sum(rows, 'availableCtn')))}
+          {card('Available PCS', fmtNum(sum(rows, 'availablePcs')))}
+          {card('Stock Valuation', `Rs ${fmtNum(chinaValue)}`)}
+        </View>
         {indiaRows.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>India Products</Text>
-            <View style={styles.headerRow}>
-              <Text style={styles.cell}>Product</Text>
-              <Text style={styles.cellRight}>Total Bought</Text>
-              <Text style={styles.cellRight}>Available</Text>
+          <>
+            <Text style={stockPdfStyles.summaryHeading}>India Products</Text>
+            <View style={styles.summaryGrid}>
+              {card('Products', fmtNum(indiaRows.length))}
+              {card('Available (CTN)', fmtCtn(sum(indiaRows, 'availableCtn')))}
+              {card('Available PCS', fmtNum(sum(indiaRows, 'availablePcs')))}
+              {card('Stock Valuation', `Rs ${fmtNum(indiaValue)}`)}
             </View>
-            {indiaRows.map((r, i) => (
-              <View key={i} style={styles.row}>
-                <Text style={styles.cell}>{safeStr(r.productName)}</Text>
-                <Text style={styles.cellRight}>{safeStr(r.totalCtnBought)}</Text>
-                <Text style={styles.cellRight}>{safeStr(r.availableCtn)}</Text>
-              </View>
-            ))}
-          </View>
+          </>
         )}
+        <View style={styles.summaryGrid}>
+          {card('Total Stock Valuation', `Rs ${fmtNum(chinaValue + indiaValue)}`)}
+        </View>
+        <StockTable title="China Products" rows={rows} columns={columns} />
+        {indiaRows.length > 0 && <StockTable title="India Products" rows={indiaRows} columns={columns} />}
       </Page>
     </Document>
   )

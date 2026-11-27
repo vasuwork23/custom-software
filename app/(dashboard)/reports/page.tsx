@@ -25,6 +25,9 @@ import type { DateRange } from 'react-day-picker'
 import { TrendChart, type TrendRow } from '@/components/reports/TrendChart'
 import { ProductInsights } from '@/components/reports/ProductInsights'
 import { RevenueExclusionToggle } from '@/components/reports/RevenueExclusionToggle'
+import { StockReportTable } from '@/components/reports/StockReportTable'
+import { ExportColumnsDialog } from '@/components/reports/ExportColumnsDialog'
+import { STOCK_COLUMNS, type StockColumnKey, type StockReportRow } from '@/lib/stock-report-columns'
 import { useUrlParams, useSyncUrlParams, dateRangeParams, boolParam } from '@/hooks/useUrlFilters'
 
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
@@ -60,6 +63,8 @@ function ReportsPageContent() {
   // Companies flagged "Exclude from revenue" stay out of Revenue / Cost unless switched on
   const [includeExcluded, setIncludeExcluded] = useState(() => url.bool('includeExcluded', false))
   const [loading, setLoading] = useState(true)
+  // Which download the column picker is open for; null when it is closed.
+  const [stockExportFormat, setStockExportFormat] = useState<'pdf' | 'excel' | null>(null)
   const [showAvailableOnly, setShowAvailableOnly] = useState(() => url.bool('availableOnly', true))
   const [archive, setArchive] = useState(() => url.str('archive'))
   const [reportTab, setReportTab] = useState(() => url.oneOf('tab', ['pnl', 'stock', 'selling', 'insights'], 'pnl'))
@@ -98,8 +103,7 @@ function ReportsPageContent() {
       totalIndiaAvailablePcs?: number
       totalIndiaStockCost?: number
     }
-    rows: {
-      productName: string
+    rows: (StockReportRow & {
       totalCtnBought: number
       availableCtn: number
       chinaWarehouse: number
@@ -109,15 +113,13 @@ function ReportsPageContent() {
       availablePcs?: number
       costPerPiece?: number
       totalCost?: number
-    }[]
-    indiaRows?: {
-      productName: string
+    })[]
+    indiaRows?: (StockReportRow & {
       totalCtnBought: number
-      availableCtn: number
       availablePcs?: number
       costPerPiece?: number
       totalCost?: number
-    }[]
+    })[]
   } | null>(null)
   const [selling, setSelling] = useState<{
     summary: { totalBills: number; totalRevenue: number; totalProfit: number; avgBillValue: number }
@@ -146,10 +148,11 @@ function ReportsPageContent() {
   }, [period, dateRange, archive, includeExcluded])
 
   const handleExport = useCallback(
-    async (reportType: 'pnl' | 'stock' | 'selling' | 'buying', formatType: 'pdf' | 'excel') => {
+    async (reportType: 'pnl' | 'stock' | 'selling' | 'buying', formatType: 'pdf' | 'excel', columns?: string[]) => {
       const params = buildParams()
       if (reportType === 'pnl') params.set('withExpenses', String(withExpenses))
       if (reportType === 'stock') params.set('availableOnly', String(showAvailableOnly))
+      if (columns?.length) params.set('columns', columns.join(','))
       const url = `/api/reports/export?format=${formatType}&reportType=${reportType}&${params.toString()}`
       try {
         const res = await fetch(url, { headers: authHeaders() })
@@ -646,9 +649,19 @@ function ReportsPageContent() {
                       </Button>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'pdf')}>Download PDF</Button>
-                      <Button variant="outline" size="sm" onClick={() => handleExport('stock', 'excel')}>Download Excel</Button>
+                      <Button variant="outline" size="sm" onClick={() => setStockExportFormat('pdf')}>Download PDF</Button>
+                      <Button variant="outline" size="sm" onClick={() => setStockExportFormat('excel')}>Download Excel</Button>
                     </div>
+                    <ExportColumnsDialog<StockColumnKey>
+                      open={stockExportFormat !== null}
+                      onOpenChange={(o) => !o && setStockExportFormat(null)}
+                      formatLabel={stockExportFormat === 'excel' ? 'Excel' : 'PDF'}
+                      columns={STOCK_COLUMNS}
+                      storageKey="stock-report"
+                      onConfirm={(keys) => {
+                        if (stockExportFormat) handleExport('stock', stockExportFormat, keys)
+                      }}
+                    />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -703,68 +716,7 @@ function ReportsPageContent() {
                             </CardContent>
                           </Card>
                         </div>
-                        <div className="rounded-md border overflow-x-auto max-h-[550px] overflow-y-auto">
-                          <table className="w-full text-sm">
-                            <thead className="sticky top-0 z-10">
-                              <tr className="border-b bg-muted/80">
-                                <th className="p-3 text-left font-medium">Product</th>
-                                <th className="p-3 text-right font-medium">Total CTN</th>
-                                <th className="p-3 text-right font-medium">Available CTN</th>
-                                <th className="p-3 text-right font-medium">China</th>
-                                <th className="p-3 text-right font-medium">In Transit</th>
-                                <th className="p-3 text-right font-medium">India</th>
-                                <th className="p-3 text-right font-medium">Total PCS</th>
-                                <th className="p-3 text-right font-medium">Cost/Piece (₹)</th>
-                                <th className="p-3 text-right font-medium">Total Cost (₹)</th>
-                                <th className="p-3 text-right font-medium">Locked</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {displayRows.map((r, i) => (
-                                <tr key={i} className="border-b hover:bg-muted/30">
-                                  <td className="p-3">{r.productName}</td>
-                                  <td className="p-3 text-right">{r.totalCtnBought}</td>
-                                  <td className="p-3 text-right">{r.availableCtn}</td>
-                                  <td className="p-3 text-right">{r.chinaWarehouse}</td>
-                                  <td className="p-3 text-right">{r.inTransit}</td>
-                                  <td className="p-3 text-right">{r.indiaWarehouse}</td>
-                                  <td className="p-3 text-right">{r.availablePcs?.toLocaleString('en-IN')}</td>
-                                  <td className="p-3 text-right text-emerald-600">
-                                    {r.costPerPiece && r.costPerPiece > 0
-                                      ? `₹${r.costPerPiece.toFixed(5)}`
-                                      : (r.availablePcs ?? 0) === 0
-                                        ? <span className="text-gray-300">—</span>
-                                        : <span className="text-orange-500">No cost</span>}
-                                  </td>
-                                  <td className="p-3 text-right text-blue-600 font-medium">
-                                    {r.totalCost && r.totalCost > 0
-                                      ? `₹${Number(r.totalCost).toLocaleString('en-IN')}`
-                                      : <span className="text-gray-300">—</span>}
-                                  </td>
-                                  <td className="p-3 text-right">{r.lockedEntries}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            {displayRows.length > 0 && (
-                              <tfoot className="sticky bottom-0 z-10">
-                                <tr className="border-t-2 bg-muted/80 font-semibold">
-                                  <td className="p-3">Total</td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.chinaWarehouse ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.inTransit ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.indiaWarehouse ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0).toLocaleString('en-IN')}</td>
-                                  <td className="p-3 text-right">—</td>
-                                  <td className="p-3 text-right text-blue-700">
-                                    ₹{chinaStockCost.toLocaleString('en-IN')}
-                                  </td>
-                                  <td className="p-3 text-right">{displayRows.reduce((s, r) => s + (r.lockedEntries ?? 0), 0)}</td>
-                                </tr>
-                              </tfoot>
-                            )}
-                          </table>
-                        </div>
+                        <StockReportTable rows={displayRows} />
                       </TabsContent>
 
                       {/* India Products Tab */}
@@ -799,62 +751,7 @@ function ReportsPageContent() {
                             </CardContent>
                           </Card>
                         </div>
-                        {displayIndiaRows.length > 0 ? (
-                          <div className="rounded-md border overflow-x-auto max-h-[550px] overflow-y-auto">
-                            <table className="w-full text-sm">
-                              <thead className="sticky top-0 z-10">
-                                <tr className="border-b bg-muted/80">
-                                  <th className="p-3 text-left font-medium">Product</th>
-                                  <th className="p-3 text-right font-medium">Total CTN</th>
-                                  <th className="p-3 text-right font-medium">Available CTN</th>
-                                  <th className="p-3 text-right font-medium">Total PCS</th>
-                                  <th className="p-3 text-right font-medium">Cost/Piece (₹)</th>
-                                  <th className="p-3 text-right font-medium">Total Cost (₹)</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {displayIndiaRows.map((r, i) => (
-                                  <tr key={i} className="border-b hover:bg-muted/30">
-                                    <td className="p-3">{r.productName}</td>
-                                    <td className="p-3 text-right">{r.totalCtnBought}</td>
-                                    <td className="p-3 text-right">{r.availableCtn}</td>
-                                    <td className="p-3 text-right">
-                                      {r.availablePcs?.toLocaleString('en-IN') ?? '—'}
-                                    </td>
-                                    <td className="p-3 text-right text-emerald-600">
-                                      {r.costPerPiece && r.costPerPiece > 0
-                                        ? `₹${r.costPerPiece.toFixed(2)}`
-                                        : (r.availablePcs ?? 0) === 0
-                                          ? <span className="text-gray-300">—</span>
-                                          : <span className="text-orange-500">No cost</span>}
-                                    </td>
-                                    <td className="p-3 text-right text-emerald-600 font-medium">
-                                      {r.totalCost && r.totalCost > 0
-                                        ? `₹${Number(r.totalCost).toLocaleString('en-IN')}`
-                                        : <span className="text-gray-300">—</span>}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                              <tfoot className="sticky bottom-0 z-10">
-                                <tr className="border-t-2 bg-muted/80 font-semibold">
-                                  <td className="p-3">Total</td>
-                                  <td className="p-3 text-right">{displayIndiaRows.reduce((s, r) => s + (r.totalCtnBought ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">{displayIndiaRows.reduce((s, r) => s + (r.availableCtn ?? 0), 0)}</td>
-                                  <td className="p-3 text-right">
-                                    {displayIndiaRows.reduce((s, r) => s + (r.availablePcs ?? 0), 0).toLocaleString('en-IN')}
-                                  </td>
-                                  <td className="p-3 text-right">—</td>
-                                  <td className="p-3 text-right text-emerald-700">
-                                    ₹{indiaStockCost.toLocaleString('en-IN')}
-                                  </td>
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No India products with stock.</p>
-                        )}
+                        <StockReportTable rows={displayIndiaRows} emptyText="No India products with stock." />
                       </TabsContent>
                     </Tabs>
                   )}
