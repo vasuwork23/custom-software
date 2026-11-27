@@ -5,6 +5,7 @@ import React from 'react'
 import { renderToBuffer, DocumentProps } from '@react-pdf/renderer'
 import { PnlPdfDocument, StockPdfDocument, SellingPdfDocument, BuyingPdfDocument } from '@/lib/report-pdf'
 import { format } from 'date-fns'
+import { parseStockColumns, stockRowsForSheet, type StockReportRow } from '@/lib/stock-report-columns'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,8 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get('endDate')?.trim() ?? ''
     const withExpenses = searchParams.get('withExpenses') === 'true'
     const availableOnly = searchParams.get('availableOnly') === 'true'
+    // Columns picked in the download dialog (stock report); missing means all.
+    const stockColumns = parseStockColumns(searchParams.get('columns'))
 
     const archive = searchParams.get('archive')?.trim() ?? ''
     const params = new URLSearchParams()
@@ -47,7 +50,9 @@ export async function GET(req: NextRequest) {
     const origin = new URL(req.url).origin
     const auth = req.headers.get('authorization') ?? ''
     const reportUrl = `${origin}/api/reports/${reportType}?${params.toString()}`
-    const res = await fetch(reportUrl, { headers: { authorization: auth } })
+    // no-store: Next 14 otherwise keeps this response in its fetch cache (keyed by URL + token),
+    // so exports kept serving data from the first time a user downloaded that report.
+    const res = await fetch(reportUrl, { headers: { authorization: auth }, cache: 'no-store' })
     const json = await res.json()
     if (!res.ok || !json.success) {
       return NextResponse.json(
@@ -105,6 +110,7 @@ export async function GET(req: NextRequest) {
       } else if (reportType === 'stock') {
         doc = React.createElement(StockPdfDocument, {
           data: data as Parameters<typeof StockPdfDocument>[0]['data'],
+          columns: stockColumns,
         })
       } else if (reportType === 'selling') {
         const d = data as {
@@ -208,10 +214,12 @@ export async function GET(req: NextRequest) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.byProduct), 'By Product')
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.byCompany), 'By Company')
     } else if (reportType === 'stock') {
-      const d = data as { summary: Record<string, unknown>; rows: Record<string, unknown>[]; indiaRows?: Record<string, unknown>[] }
+      const d = data as { summary: Record<string, unknown>; rows: StockReportRow[]; indiaRows?: StockReportRow[] }
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([d.summary]), 'Summary')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.rows), 'China Stock')
-      if (d.indiaRows?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.indiaRows), 'India Stock')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockRowsForSheet(d.rows, stockColumns)), 'China Stock')
+      if (d.indiaRows?.length) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockRowsForSheet(d.indiaRows, stockColumns)), 'India Stock')
+      }
     } else if (reportType === 'selling') {
       const d = data as { summary: Record<string, unknown>; bills: { billNumber: number; billDate: Date | string; companyName: string; productCount: number; amount: number; profit: number }[] }
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([d.summary]), 'Summary')

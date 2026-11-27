@@ -59,6 +59,17 @@ export default function LoginPage() {
       if (!candidate) return
       if (probe && triedRef.current.has(candidate)) return
       if (probe) triedRef.current.add(candidate)
+        console.log('candidate', candidate)
+        console.log('probe', probe)
+        console.log('triedRef', triedRef.current)
+        console.log('busy', busy)
+        console.log('password', password)
+        console.log('MIN_PROBE_LENGTH', MIN_PROBE_LENGTH)
+        console.log('PROBE_DELAY_MS', PROBE_DELAY_MS)
+        console.log('router', router)
+        console.log('setAuth', setAuth)
+        console.log('clearAuth', clearAuth)
+        console.log('inputRef', inputRef.current)
 
       setBusy(true)
       try {

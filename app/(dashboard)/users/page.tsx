@@ -412,7 +412,7 @@ export default function UsersPage() {
                               </Button>
                             )}
                             {/* Reset password — Owner only (current user must be owner), hide for others */}
-                            {currentRole === 'owner' && user.role !== 'owner' && (
+                            {/* {currentRole === 'owner' && user.role !== 'owner' && ( */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -420,7 +420,7 @@ export default function UsersPage() {
                               >
                                 Reset Password
                               </Button>
-                            )}
+                            {/* )} */}
                             {/* Unblock — Owner only, show if blocked */}
                             {currentRole === 'owner' && user.isBlocked && (
                               <ConfirmDialog

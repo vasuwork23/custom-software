@@ -21,7 +21,7 @@ import Investment from '@/models/Investment'
 import mongoose from 'mongoose'
 import { countedIn, loadRevenueExclusion } from '@/lib/revenue-exclusion'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
 

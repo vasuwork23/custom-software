@@ -12,7 +12,7 @@ import Product from '@/models/Product'
 import IndiaProduct from '@/models/IndiaProduct'
 import mongoose from 'mongoose'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   try {

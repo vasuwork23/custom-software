@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
     const chinaFilter: ChinaFilter = allowedFilters.includes(rawFilter as ChinaFilter)
       ? (rawFilter as ChinaFilter)
       : 'all'
+    const rawMinAvailableCtn = parseInt(searchParams.get('minAvailableCtn') ?? '', 10)
+    const minAvailableCtn = Number.isFinite(rawMinAvailableCtn) && rawMinAvailableCtn > 0 ? rawMinAvailableCtn : null
 
     await connectDB()
 
@@ -281,6 +283,7 @@ export async function GET(req: NextRequest) {
 
     // Apply active filter server-side
     const filteredProducts = enrichedProducts.filter((p) => {
+      if (minAvailableCtn !== null && p.availableCtn < minAvailableCtn) return false
       switch (chinaFilter) {
         case 'chinaFactory':
           return p.hasNotReceived

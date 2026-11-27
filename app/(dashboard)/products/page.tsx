@@ -110,6 +110,8 @@ function ProductsPageContent() {
     return url.oneOf('chinaFilter', ALLOWED_FILTERS, stored)
   })
   const debouncedSearch = useDebounce(search, 400)
+  const [minAvailableCtn, setMinAvailableCtn] = useState(() => url.str('minCtn'))
+  const debouncedMinAvailableCtn = useDebounce(minAvailableCtn, 400)
 
   const handleChinaFilterChange = (value: ChinaFilterType) => {
     setChinaFilter(value)
@@ -136,6 +138,7 @@ function ProductsPageContent() {
     params.set('limit', '200')
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     params.set('filter', chinaFilter)
+    if (debouncedMinAvailableCtn.trim()) params.set('minAvailableCtn', debouncedMinAvailableCtn.trim())
     const result = await apiGet<{
       products: ProductItem[]
       counts: {
@@ -153,7 +156,7 @@ function ProductsPageContent() {
     setLoading(false)
     if (result.success) setData(result.data)
     else toast.error(result.message)
-  }, [page, debouncedSearch, chinaFilter])
+  }, [page, debouncedSearch, chinaFilter, debouncedMinAvailableCtn])
 
   const fetchIndiaProducts = useCallback(async () => {
     setIndiaLoading(true)
@@ -175,7 +178,7 @@ function ProductsPageContent() {
   }, [activeTab, fetchProducts])
 
   // Reset to first page when filter or search changes (not on mount, so a page from the URL is kept)
-  useOnFiltersChange([chinaFilter, debouncedSearch], () => setPage(1))
+  useOnFiltersChange([chinaFilter, debouncedSearch, debouncedMinAvailableCtn], () => setPage(1))
   useOnFiltersChange([indiaFilter, debouncedSearch], () => setIndiaPage(1))
 
   useSyncUrlParams({
@@ -183,6 +186,7 @@ function ProductsPageContent() {
     search: debouncedSearch.trim(),
     view: view !== 'card' ? view : undefined,
     chinaFilter: chinaFilter !== 'all' ? chinaFilter : undefined,
+    minCtn: debouncedMinAvailableCtn.trim() || undefined,
     indiaFilter: indiaFilter !== 'all' ? indiaFilter : undefined,
     page: page > 1 ? page : undefined,
     indiaPage: indiaPage > 1 ? indiaPage : undefined,
@@ -397,39 +401,56 @@ function ProductsPageContent() {
               </div>
             </div>
           )}
+          {data && (
+            <div className="flex flex-wrap items-center gap-2 my-3">
+              {[
+                { id: 'all', label: 'All', icon: '', count: data.counts.all },
+                { id: 'chinaFactory', label: '🏭 China Factory', icon: '', count: data.counts.chinaFactory },
+                { id: 'chinaWh', label: '🟡 China WH', icon: '', count: data.counts.chinaWh },
+                { id: 'inTransit', label: '🔵 In Transit', icon: '', count: data.counts.inTransit },
+                { id: 'inIndia', label: '🟢 In India', icon: '', count: data.counts.inIndia },
+                { id: 'fullySold', label: '📦 Fully Sold', icon: '', count: data.counts.fullySold },
+                { id: 'unpaid', label: '🔴 Unpaid', icon: '', count: data.counts.unpaid },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => handleChinaFilterChange(f.id as ChinaFilterType)}
+                  className={`rounded-full px-3 py-1 text-xs transition-colors ${chinaFilter === f.id
+                      ? 'bg-foreground text-background'
+                      : 'bg-muted text-muted-foreground'
+                    }`}
+                >
+                  <span>{f.label}</span>
+                  <span
+                    className={`ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] ${chinaFilter === f.id ? 'bg-white/20' : 'bg-background/60'
+                      }`}
+                  >
+                    {f.count}
+                  </span>
+                </button>
+              ))}
+              <label
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${minAvailableCtn.trim()
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground'
+                  }`}
+              >
+                <span>Available CTN ≥</span>
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={minAvailableCtn}
+                  onChange={(e) => setMinAvailableCtn(e.target.value)}
+                  placeholder="0"
+                  className="w-12 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </label>
+            </div>
+          )}
           {!currentLoading && (
             <>
-              {data && (
-                <div className="flex flex-wrap items-center gap-2 my-3">
-                  {[
-                    { id: 'all', label: 'All', icon: '', count: data.counts.all },
-                    { id: 'chinaFactory', label: '🏭 China Factory', icon: '', count: data.counts.chinaFactory },
-                    { id: 'chinaWh', label: '🟡 China WH', icon: '', count: data.counts.chinaWh },
-                    { id: 'inTransit', label: '🔵 In Transit', icon: '', count: data.counts.inTransit },
-                    { id: 'inIndia', label: '🟢 In India', icon: '', count: data.counts.inIndia },
-                    { id: 'fullySold', label: '📦 Fully Sold', icon: '', count: data.counts.fullySold },
-                    { id: 'unpaid', label: '🔴 Unpaid', icon: '', count: data.counts.unpaid },
-                  ].map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => handleChinaFilterChange(f.id as ChinaFilterType)}
-                      className={`rounded-full px-3 py-1 text-xs transition-colors ${chinaFilter === f.id
-                          ? 'bg-foreground text-background'
-                          : 'bg-muted text-muted-foreground'
-                        }`}
-                    >
-                      <span>{f.label}</span>
-                      <span
-                        className={`ml-1 inline-flex items-center rounded-full px-1.5 text-[10px] ${chinaFilter === f.id ? 'bg-white/20' : 'bg-background/60'
-                          }`}
-                      >
-                        {f.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
               {filteredChinaProducts.length > 0 && (
                 <div className="mb-3">
                   <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg border items-center">
